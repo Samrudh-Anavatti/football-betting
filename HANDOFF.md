@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-10-03 (first prototype deployed)._
+_Last updated: 2026-10-03 (prototype deployed, both API keys live)._
 
 ## Live resources
 
@@ -66,7 +66,23 @@ the settings above.
 Moving to Postgres later: set `DATABASE_URL`. The models are plain SQLAlchemy;
 only `database.py`'s SQLite pragmas are SQLite-specific.
 
+## Verified against the live APIs (2026-10-03)
+
+* **API-Football free plan only serves seasons 2022–2024.** A 2026 fixtures call
+  returns `{"plan": "Free plans do not have access to this season, try from 2022 to 2024."}`.
+  The current season needs Pro ($19/mo, 7,500 req/day). `/status` is free and
+  reports `requests.current` / `limit_day`. Every response also carries
+  `x-ratelimit-requests-remaining` (daily) and `x-ratelimit-remaining` (per minute, 10).
+* **The Odds API has no separate usage endpoint in its v4 docs.** Usage comes back
+  in `x-requests-remaining` / `-used` / `-last` headers on every call. `/v4/sports`
+  and `/v4/sports/{sport}/events` cost 0, so "Check balance" uses `/sports`.
+  `/odds` costs markets × regions and is free when no events come back.
+* All 12 Odds API sport keys in `config.py` exist and are active.
+
 ## Gotchas
+
+* After changing App Service settings, **restart the app** (`az webapp restart -g rg-football-betting -n football-betting-api-sa`).
+  The automatic restart can lag, and the app reads settings at startup.
 
 * API-Football returns HTTP 200 with an `errors` object for problems (bad key,
   season not on plan, rate limit). The client turns these into errors shown in
@@ -80,8 +96,25 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
 
 ## Next steps
 
-* [ ] Add both API keys as app settings and run the first sync.
-* [ ] Confirm API-Football's free plan serves season 2026; if not, decide on Pro ($19/mo).
-* [ ] Check the Odds API sport keys for Turkey/Belgium/Portugal match ("0 events" = wrong key or off-season).
+* [x] Both API keys added as app settings; balances show in Admin → Data.
+* [ ] Decide on API-Football Pro ($19/mo): the free plan can't serve the current season.
+* [ ] Move from SQLite to a database we can browse and monitor (see below).
 * [ ] LLM analysis per match (see DESIGN.md → Next: LLM).
 * [ ] Price-movement chart from odds history; closing-line value per pick.
+
+## Future: a database we can browse
+
+Today the data is a **SQLite file on App Service's persistent disk**
+(`/home/data/football.db`). It's on disk, not in memory, so it survives restarts and
+deploys, but the only way to look at it is to download it (Kudu → `/home/data`)
+and open it in a tool like DB Browser for SQLite.
+
+Plan: move to **Azure Database for PostgreSQL Flexible Server**, Burstable B1ms
+(about £10–13/month), in `rg-football-betting`.
+* Browse and query it from the portal, VS Code (PostgreSQL extension), pgAdmin or
+  DBeaver. Azure Monitor gives CPU/storage/connection metrics and slow-query insights.
+* Code change is small: set `DATABASE_URL=postgresql+psycopg://…`, add `psycopg[binary]`,
+  and drop the SQLite-only pragmas. Add Alembic for migrations at the same time.
+* One-off copy of existing picks/bets from SQLite. The provider cache can just be re-synced.
+* A cheaper alternative is the Azure SQL Database free offer (£0, serverless,
+  auto-pause), at the cost of ODBC driver setup and a slower first query after a pause.
