@@ -1,0 +1,39 @@
+name: Deploy backend to Azure App Service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+# Azure setup is documented in HANDOFF.md. Needs:
+#   Variable  AZURE_WEBAPP_NAME             (Settings > Secrets and variables > Actions > Variables)
+#   Secret    AZURE_WEBAPP_PUBLISH_PROFILE  (az webapp deployment list-publishing-profiles --xml)
+# Until AZURE_WEBAPP_NAME exists the deploy step is skipped, so tests still run.
+
+jobs:
+  test-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install deps & run tests
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pytest -q
+
+      - name: Deploy to Azure Web App
+        if: ${{ vars.AZURE_WEBAPP_NAME != '' }}
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ vars.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: backend
