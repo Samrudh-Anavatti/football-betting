@@ -98,16 +98,12 @@ signal before Ivo applies his own judgement.
 * API keys live only in App Service settings. The repo is public and holds no
   secrets.
 
-## Next: LLM
+## Next: AI predictions
 
-`GET /api/v1/matches/{id}` already returns the full bundle (fixture, odds board
-with fair prices, H2H, form, injuries, table, existing picks). The LLM step is:
-
-1. A `POST /admin/matches/{id}/analyse` that serialises that bundle into a prompt
-   (Claude, via the Anthropic API) along with Ivo's rules of thumb, and asks for a
-   structured suggestion (market, selection, minimum acceptable price, confidence,
-   reasoning).
-2. Store suggestions alongside tips (`source = llm`) so the LLM gets its **own
-   track record** and can be compared with Ivo's.
-3. Later: a daily "shortlist" across all priced fixtures, ranked by best-vs-fair
-   edge and the LLM's view.
+The full plan (data additions, model, structured output, storage, UI, evaluation,
+costs, hosting choice and open questions) is in
+[HANDOFF.md → AI predictions: plan](HANDOFF.md#ai-predictions-plan-next-session).
+The short version: Claude reads the same match bundle Ivo sees (`GET /matches/{id}`)
+and returns probabilities and value bets in a fixed structure. Suggestions stay
+private, and every one is stored and settled so the AI earns its own track record
+against Ivo and the market.

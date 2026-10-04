@@ -10,6 +10,7 @@ def test_name_similarity_handles_provider_spellings():
     assert name_similarity("Bayern München", "Bayern Munich") == 1.0
     assert name_similarity("FC Barcelona", "Barcelona") == 1.0
     assert name_similarity("Inter", "Inter Milan") == 1.0
+    assert name_similarity("Sporting Lisbon", "Sporting CP") == 1.0
     assert name_similarity("Arsenal", "Chelsea") < 0.5
 
 

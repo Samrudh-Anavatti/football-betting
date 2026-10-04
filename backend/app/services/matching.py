@@ -31,6 +31,8 @@ _ALIASES = {
     "nottingham forest": "nottingham forest",
     "brighton and hove albion": "brighton",
     "west ham united": "west ham",
+    "sporting lisbon": "sporting cp",
+    "sporting clube de portugal": "sporting cp",
 }
 
 MAX_KICKOFF_DRIFT = timedelta(hours=3)
