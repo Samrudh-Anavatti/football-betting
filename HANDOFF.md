@@ -15,7 +15,7 @@ _Last updated: 2026-10-07 (prices now come from API-Football for every market; A
 | App Service plan | `plan-football-betting`, Linux **B1**, Always On |
 | Web app | `football-betting-api-sa`, Python 3.11, startup `bash startup.sh` |
 | Database | SQLite at `/home/data/football.db` (persists across deploys) |
-| AI | Foundry resource `foundry-football-sa` (AIServices, **Sweden Central**). Deployment **`gpt-5.6-luna`** (version 2026-07-09, Global Standard, capacity 200 = 200k tokens/min), used by the app. `claude-sonnet-5-5` is still deployed but unused (no standing cost; delete it if we don't go back). |
+| AI | Foundry resource `foundry-football-sa` (AIServices, **Sweden Central**). Deployment **`gpt-5.6-luna`** (version 2026-07-09, Global Standard, capacity 200 = 200k tokens/min), used by the app. The `claude-sonnet-5-5` deployment was deleted on 2026-10-07 (no Marketplace/SaaS resources were left behind). No fallback model: if Luna is down, analysis waits. |
 | Budget alert | `football-betting-monthly` on the resource group: 50 (billing currency) a month, emails at 80% actual and 100% forecast. |
 | Plans | API-Football **Pro** ($19/mo, 7,500 req/day, upgraded 2026-10-03 for a one-month trial). The Odds API **free** (500 credits/month), now only a backup. |
 | Repo | https://github.com/Samrudh-Anavatti/football-betting |
