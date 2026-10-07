@@ -16,7 +16,7 @@ for live resources, config and operations.
 | Frontend | React + Vite + Tailwind + React Router (HashRouter) on GitHub Pages |
 | Backend  | FastAPI + SQLAlchemy 2.0 + SQLite on Azure App Service (Linux, B1, UK South) |
 | Data     | [API-Football](https://www.api-football.com/) Pro (fixtures, results, tables, research, prices for every market); [The Odds API](https://the-odds-api.com/) as a backup price source |
-| AI       | Claude Sonnet 5.5 on Microsoft Foundry (`anthropic` SDK, `AnthropicFoundry`) |
+| AI       | GPT-5.6 Luna on Microsoft Foundry (`openai` SDK, Responses API) |
 | Auth     | Username + password per person (bcrypt) → signed token (JWT) |
 
 ## Project layout
@@ -72,5 +72,5 @@ npm run dev                       # proxies /api to localhost:8000
 3. **Open a match → Refresh research** for form, H2H, injuries, season stats and
    API-Football's prediction (7–9 requests), then **click any price** to publish it
    as a pick or log a virtual bet.
-4. **Analyse with Claude** on the match page for a private second opinion, and ask
+4. **Analyse with AI** on the match page for a private second opinion, and ask
    it follow-up questions. Admin → AI tracks how its calls do against Ivo and the market.

@@ -42,7 +42,7 @@
 | Bookmaker prices, every market | API-Football `/odds?league&season` (paged 10 matches) / `/odds?fixture` | Pro only | 1 per 10 matches / 1 per match |
 | Prediction, team stats, line-ups | API-Football `/predictions`, `/teams/statistics`, `/fixtures/lineups` | Pro | 1 each (stats: 1 per team) |
 | Backup prices (result, totals) | The Odds API `/sports/{key}/odds` | 500 credits/month | markets × regions per league; 0 if no events |
-| AI analysis | Claude Sonnet 5.5 on Microsoft Foundry | pay per token | ~$0.15 per match, ~$0.015 per follow-up |
+| AI analysis | GPT-5.6 Luna on Microsoft Foundry (Responses API) | pay per token | ~$0.01 per match, ~$0.001 per follow-up |
 
 Bookmakers don't offer public odds APIs. The Odds API aggregates them through
 licensed feeds, so we get the prices without scraping.
@@ -105,7 +105,7 @@ around the most balanced line. `services/markets.py` builds it.
 
 ## AI analysis
 
-Claude reads the same match bundle Ivo sees and records probabilities and value bets through a strict tool, then
-answers follow-up questions in the same conversation. Suggestions stay private and are tracked as `source='ai'`
+The AI (GPT-5.6 Luna) reads the same match bundle Ivo sees and records probabilities and value bets through a
+strict function, then answers follow-up questions in the same conversation. Suggestions stay private and are tracked as `source='ai'`
 tips, so the AI earns its own record against Ivo and the market. Details, costs and setup:
 [HANDOFF.md → AI analysis](HANDOFF.md#ai-analysis-built-2026-10-07).

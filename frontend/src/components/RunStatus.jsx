@@ -8,13 +8,13 @@ export const KIND = {
   match_markets: 'Match prices',
   context: 'Match research',
   lineups: 'Line-ups',
-  analysis: 'Claude analysis',
-  chat: 'Claude reply',
+  analysis: 'AI analysis',
+  chat: 'AI reply',
 }
 
 export function runSummary(run) {
   if (run.provider === 'claude') {
-    if (run.status === 'running') return 'Claude is thinking…'
+    if (run.status === 'running') return 'The AI is thinking…'
     const c = run.details?.cost_usd
     const what = run.kind === 'analysis' ? (run.items ? 'Analysis recorded' : 'Replied') : run.items ? 'Replied with a revised analysis' : 'Replied'
     return c != null ? `${what}, cost ${c.toFixed(3)}` : what

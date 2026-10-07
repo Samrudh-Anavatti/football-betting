@@ -6,14 +6,14 @@ import { ago, odds, pct, pickLabel, teamify } from '../lib/format.js'
 import RunStatus from './RunStatus.jsx'
 import { ErrorNote, Loading } from './ui.jsx'
 
-// Signed-in only. Claude reads this match's bundle (prices, research, table)
+// Signed-in only. The AI (GPT-5.6 Luna) reads this match's bundle (prices, research, table)
 // and records an analysis; follow-up questions continue the same conversation.
 // Suggestions are private: "Use this" opens the normal pick form, so anything
 // published is Ivo's call.
 
 const usd = (x) => (x == null ? '–' : `$${x < 0.1 ? x.toFixed(3) : x.toFixed(2)}`)
 
-// Just enough Markdown for Claude's replies: paragraphs, bullets, **bold**.
+// Just enough Markdown for the AI's replies: paragraphs, bullets, **bold**.
 function inline(text) {
   return text.split(/(\*\*[^*]+\*\*)/g).map((part, i) =>
     part.startsWith('**') && part.endsWith('**') ? <strong key={i}>{part.slice(2, -2)}</strong> : <Fragment key={i}>{part}</Fragment>,
@@ -82,8 +82,8 @@ function Prediction({ pred, fx, board, tips, onPick }) {
         <thead className="text-ink-soft">
           <tr>
             <th className="text-left font-medium py-1">Chance of</th>
-            <th className="font-medium text-right">Claude</th>
-            <th className="font-medium text-right" title="Bookmakers' consensus with the margin removed, when Claude ran">
+            <th className="font-medium text-right">AI</th>
+            <th className="font-medium text-right" title="Bookmakers' consensus with the margin removed, when the AI ran">
               Market
             </th>
             <th className="font-medium text-right">Gap</th>
@@ -129,7 +129,7 @@ function Prediction({ pred, fx, board, tips, onPick }) {
                 <div className="flex flex-wrap items-center gap-3 text-sm">
                   <span className={ok ? 'text-pitch font-semibold' : 'text-ink-soft'}>
                     {now == null ? 'Not on the board now' : `Best now ${odds(now)} at ${found.sel.best_bookmaker}`}
-                    {now != null && !ok && ', below Claude’s minimum'}
+                    {now != null && !ok && ', below the AI’s minimum'}
                   </span>
                   {onPick && found && (
                     <button
@@ -180,7 +180,7 @@ function Prediction({ pred, fx, board, tips, onPick }) {
   )
 }
 
-function Conversation({ thread, busy, onSend }) {
+function Conversation({ thread, busy, readOnly, onSend }) {
   const [text, setText] = useState('')
   const send = (e) => {
     e.preventDefault()
@@ -203,23 +203,29 @@ function Conversation({ thread, busy, onSend }) {
           </div>
         ),
       )}
-      <form onSubmit={send} className="flex gap-2 items-end">
-        <textarea
-          className="input min-h-[2.75rem] flex-1"
-          rows={2}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) send(e)
-          }}
-          placeholder="Ask a follow-up, or tell it something it doesn't know (team news, a price you've seen)…"
-          aria-label="Message Claude"
-          disabled={busy}
-        />
-        <button className="btn-primary" disabled={busy || !text.trim()}>
-          {busy ? 'Thinking…' : 'Send'}
-        </button>
-      </form>
+      {readOnly ? (
+        <p className="text-sm text-ink-soft">
+          This conversation was with {thread.model} and can't be continued. Start a fresh analysis to ask follow-ups.
+        </p>
+      ) : (
+        <form onSubmit={send} className="flex gap-2 items-end">
+          <textarea
+            className="input min-h-[2.75rem] flex-1"
+            rows={2}
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) send(e)
+            }}
+            placeholder="Ask a follow-up, or tell it something it doesn't know (team news, a price you've seen)…"
+            aria-label="Message the AI"
+            disabled={busy}
+          />
+          <button className="btn-primary" disabled={busy || !text.trim()}>
+            {busy ? 'Thinking…' : 'Send'}
+          </button>
+        </form>
+      )}
     </div>
   )
 }
@@ -232,7 +238,7 @@ export default function AiPanel({ fx, board, onPick }) {
     if (data?.running && !r.run) r.resume(data.running)
   }, [data?.running]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  if (loading && !data) return <Loading label="Loading Claude's analysis" />
+  if (loading && !data) return <Loading label="Loading the AI's analysis" />
   if (error) return <ErrorNote error={error} />
 
   const thread = data.threads[threadIdx]
@@ -243,7 +249,7 @@ export default function AiPanel({ fx, board, onPick }) {
   return (
     <section className="panel border-ink/30 overflow-hidden">
       <header className="px-5 py-3 bg-ink text-white flex flex-wrap items-center gap-x-4 gap-y-1">
-        <h2 className="text-2xl">Claude's view</h2>
+        <h2 className="text-2xl">AI view</h2>
         <span className="text-sm text-white/60">
           {data.model} on {data.provider}
         </span>
@@ -252,16 +258,16 @@ export default function AiPanel({ fx, board, onPick }) {
         </span>
       </header>
       <div className="p-5 space-y-5">
-        {!data.configured && <ErrorNote>Claude isn't connected yet: add FOUNDRY_RESOURCE and FOUNDRY_API_KEY to the backend's settings.</ErrorNote>}
+        {!data.configured && <ErrorNote>The AI isn't connected yet: add FOUNDRY_RESOURCE and FOUNDRY_API_KEY to the backend's settings.</ErrorNote>}
         {!thread ? (
           <div className="space-y-3">
             <p className="text-ink-soft">
-              Claude reads everything on this page (prices across all markets, form, head-to-head, injuries, season stats,
+              The AI reads everything on this page (prices across all markets, form, head-to-head, injuries, season stats,
               API-Football's prediction, line-ups if out) and says where it sees value, or that there's none. Its calls
               stay private and are tracked against the market and Ivo. Refresh prices and research first.
             </p>
             <button type="button" className="btn-primary" disabled={!canRun} onClick={() => r.start(() => api.analyse(fx.id))}>
-              {r.busy ? 'Claude is analysing…' : `Analyse with Claude (about ${usd(data.estimate_usd)})`}
+              {r.busy ? 'Analysing…' : `Analyse with AI (about ${usd(data.estimate_usd)})`}
             </button>
           </div>
         ) : (
@@ -291,7 +297,12 @@ export default function AiPanel({ fx, board, onPick }) {
             )}
             <div className="border-t border-ink/10 pt-4">
               <h3 className="text-lg mb-2">Conversation</h3>
-              <Conversation thread={thread} busy={r.busy || !canRun} onSend={(text) => r.start(() => api.chatAi(thread.id, text))} />
+              <Conversation
+                thread={thread}
+                busy={r.busy || !canRun}
+                readOnly={thread.read_only}
+                onSend={(text) => r.start(() => api.chatAi(thread.id, text))}
+              />
             </div>
             {data.threads.length > 1 && (
               <div className="text-sm">

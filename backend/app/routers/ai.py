@@ -1,5 +1,5 @@
-"""Signed-in AI endpoints: analyse a match with Claude, chat about it, and see
-how the AI's calls are doing against the market and Ivo."""
+"""Signed-in AI endpoints: analyse a match with the AI (GPT-5.6 Luna), chat about
+it, and see how the AI's calls are doing against the market and Ivo."""
 import json
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -28,9 +28,9 @@ def _budget(db: Session) -> dict:
 
 def _guard(db: Session):
     if not ai_client.configured():
-        raise HTTPException(400, "Claude isn't connected: set FOUNDRY_RESOURCE and FOUNDRY_API_KEY in the App Service settings")
+        raise HTTPException(400, "The AI isn't connected: set FOUNDRY_RESOURCE and FOUNDRY_API_KEY in the App Service settings")
     if sync.running_run(db, "claude"):
-        raise HTTPException(409, "Claude is already working on something; wait for it to finish")
+        raise HTTPException(409, "The AI is already working on something; wait for it to finish")
     b = _budget(db)
     if b["spent_usd"] >= b["limit_usd"]:
         raise HTTPException(402, f"This month's AI budget (${b['limit_usd']:.0f}) is used up. Raise AI_MONTHLY_BUDGET_USD to continue.")
@@ -95,6 +95,8 @@ def chat(thread_id: int, body: ChatIn, db: Session = Depends(get_db), user: User
     if thread is None:
         raise HTTPException(404, "Conversation not found")
     fx = _fixture(db, thread.fixture_id)
+    if service.is_legacy(thread):
+        raise HTTPException(409, "This conversation was with Claude and can't be continued; start a fresh analysis")
     _guard(db)
     service.add_user_message(db, thread, user, body.text.strip())
     run = sync.start_run(db, "claude", "chat", f"{fx.home_team.name} v {fx.away_team.name}", 1,

@@ -22,9 +22,9 @@ function Records({ records }) {
   return (
     <section className="panel overflow-hidden">
       <header className="px-5 py-3 border-b border-ink/10">
-        <h3 className="text-2xl">Claude vs Ivo</h3>
+        <h3 className="text-2xl">AI vs Ivo</h3>
         <p className="text-sm text-ink-soft">
-          Claude's suggestions are tracked at the best price when it made them, and settle like Ivo's picks. Beating the
+          The AI's suggestions are tracked at the best price when it made them, and settle like Ivo's picks. Beating the
           closing price is the best early sign of a real edge.
         </p>
       </header>
@@ -32,7 +32,7 @@ function Records({ records }) {
         <thead className="text-ink-soft">
           <tr>
             <th />
-            <th className="font-medium text-right px-5 py-2">Claude</th>
+            <th className="font-medium text-right px-5 py-2">AI</th>
             <th className="font-medium text-right px-5 py-2">Ivo</th>
           </tr>
         </thead>
@@ -67,7 +67,7 @@ function Scores({ scores }) {
         <h3 className="text-2xl">Probabilities vs the market</h3>
         <p className="text-sm text-ink-soft">
           Brier score (lower is better) over {scores.matches} finished match{scores.matches === 1 ? '' : 'es'}, using
-          Claude's last analysis before kick-off and the bookmakers' margin-free prices at that moment. Claude is only
+          the AI's last analysis before kick-off and the bookmakers' margin-free prices at that moment. The AI is only
           useful if it beats the market here over a decent sample (50+ matches).
         </p>
       </header>
@@ -75,7 +75,7 @@ function Scores({ scores }) {
         <thead className="text-ink-soft">
           <tr>
             <th />
-            <th className="font-medium text-right px-5 py-2">Claude</th>
+            <th className="font-medium text-right px-5 py-2">AI</th>
             <th className="font-medium text-right px-5 py-2">Market</th>
           </tr>
         </thead>
@@ -127,7 +127,7 @@ export default function AiTab() {
         </header>
         {data.recent.length === 0 ? (
           <div className="p-5">
-            <Empty title="No analyses yet">Open an upcoming match and use Analyse with Claude.</Empty>
+            <Empty title="No analyses yet">Open an upcoming match and use Analyse with AI.</Empty>
           </div>
         ) : (
           <ul className="divide-y divide-ink/5 text-sm">

@@ -29,19 +29,18 @@ ODDS_MARKETS = ["h2h", "totals"]
 # Hill, Betfair, BetVictor, Pinnacle (the sharp reference for fair prices).
 ODDS_BOOKMAKERS = [int(x) for x in os.getenv("ODDS_BOOKMAKERS", "8,7,3,36,4").split(",") if x.strip()]
 
-# ── AI analysis (Claude on Microsoft Foundry) ──
+# ── AI analysis (GPT-5.6 Luna on Microsoft Foundry) ──
 # FOUNDRY_RESOURCE is the resource name (foundry-football-sa), not the URL.
 FOUNDRY_RESOURCE = os.getenv("FOUNDRY_RESOURCE", "").strip()
 FOUNDRY_API_KEY = os.getenv("FOUNDRY_API_KEY", "").strip()
-# Fallback/alternative: Anthropic's own API. Used only when Foundry isn't set.
-ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
-AI_MODEL = os.getenv("AI_MODEL", "claude-sonnet-5-5")
-AI_EFFORT = os.getenv("AI_EFFORT", "high")
+DEFAULT_AI_MODEL = "gpt-5.6-luna"
+AI_MODEL = os.getenv("AI_MODEL", DEFAULT_AI_MODEL)  # the Foundry deployment name
+AI_EFFORT = os.getenv("AI_EFFORT", "high")  # reasoning effort: low | medium | high
 AI_MONTHLY_BUDGET_USD = float(os.getenv("AI_MONTHLY_BUDGET_USD", "20"))
-# USD per million tokens: input, output, cache write (5 min), cache read.
+# USD per million tokens (Azure Global Standard, short context): input, output, cached input.
 AI_PRICES = {
-    "claude-sonnet-5-5": (2.0, 10.0, 2.5, 0.2),
-    "claude-opus-5-5": (4.0, 20.0, 5.0, 0.2),
+    "gpt-5.6-luna": (0.20, 1.20, 0.02),
+    "gpt-5.6-terra": (2.00, 12.00, 0.20),
 }
 
 
