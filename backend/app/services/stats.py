@@ -1,13 +1,21 @@
 """Track record (tips) and virtual bankrolls (bets)."""
+import json
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import Bet, Fixture, OddsSnapshot, Tip, User
+from ..models import Bet, Fixture, MarketBook, OddsSnapshot, Tip, User
+from .markets import best_price
 
 
 def closing_price(db: Session, tip: Tip) -> float | None:
     """Best price in the last odds pull before kickoff — the market's final word."""
     fx: Fixture = tip.fixture
+    if tip.market_id is not None:  # any board market: the frozen pre-kick-off book
+        book = db.get(MarketBook, fx.id)
+        if book is None or book.pulled_at <= tip.created_at or book.pulled_at > fx.kickoff:
+            return None
+        return best_price(json.loads(book.bookmakers_json), tip.market_id, tip.selection)
     last_pull = db.scalar(
         select(OddsSnapshot.pulled_at)
         .where(OddsSnapshot.fixture_id == fx.id, OddsSnapshot.pulled_at <= fx.kickoff)

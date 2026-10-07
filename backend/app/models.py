@@ -61,6 +61,9 @@ class Fixture(Base):
     # 90-minute score (what bets settle on); null until played.
     home_goals: Mapped[int | None] = mapped_column(Integer)
     away_goals: Mapped[int | None] = mapped_column(Integer)
+    # Half-time score, for first/second-half markets.
+    ht_home_goals: Mapped[int | None] = mapped_column(Integer)
+    ht_away_goals: Mapped[int | None] = mapped_column(Integer)
     venue: Mapped[str | None] = mapped_column(String(120))
     odds_event_id: Mapped[str | None] = mapped_column(String(64), index=True)
     odds_synced_at: Mapped[datetime | None] = mapped_column(DateTime)
@@ -91,6 +94,25 @@ class OddsSnapshot(Base):
     __table_args__ = (Index("ix_odds_fixture_pull", "fixture_id", "pulled_at"),)
 
 
+class MarketBook(Base):
+    """Every market API-Football's /odds has for a fixture, for our chosen
+    bookmakers, as one JSON document (thousands of prices, so not one row each).
+
+    Holds the latest pull only, and stops updating at kick-off, so after the match
+    it is the closing book. Core markets (result, totals, BTTS) are also written
+    to odds_snapshots on every pull, which keeps their price history.
+    """
+
+    __tablename__ = "market_books"
+
+    fixture_id: Mapped[int] = mapped_column(ForeignKey("fixtures.id"), primary_key=True)
+    provider: Mapped[str] = mapped_column(String(20), default="api_football")
+    pulled_at: Mapped[datetime] = mapped_column(DateTime)
+    provider_updated_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # [{"id", "name", "bets": [{"id", "name", "values": [{"value", "odd"}]}]}], as the API sends it.
+    bookmakers_json: Mapped[str] = mapped_column(Text)
+
+
 class MatchContext(Base):
     """Per-fixture research bundle (H2H, form, injuries) — fetched on demand."""
 
@@ -101,6 +123,12 @@ class MatchContext(Base):
     home_form_json: Mapped[str | None] = mapped_column(Text)
     away_form_json: Mapped[str | None] = mapped_column(Text)
     injuries_json: Mapped[str | None] = mapped_column(Text)
+    # Pro-plan extras: API-Football's own prediction, season stats per team, line-ups.
+    prediction_json: Mapped[str | None] = mapped_column(Text)
+    home_stats_json: Mapped[str | None] = mapped_column(Text)
+    away_stats_json: Mapped[str | None] = mapped_column(Text)
+    lineups_json: Mapped[str | None] = mapped_column(Text)
+    lineups_fetched_at: Mapped[datetime | None] = mapped_column(DateTime)
     errors_json: Mapped[str | None] = mapped_column(Text)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
@@ -129,8 +157,9 @@ class SyncRun(Base):
     __tablename__ = "sync_runs"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    provider: Mapped[str] = mapped_column(String(20))  # api_football | odds_api
-    kind: Mapped[str] = mapped_column(String(20))  # fixtures | odds | context | match_odds
+    provider: Mapped[str] = mapped_column(String(20))  # api_football | odds_api | claude
+    # fixtures | odds | context | match_odds | markets | match_markets | lineups | analysis | chat
+    kind: Mapped[str] = mapped_column(String(20))
     scope: Mapped[str] = mapped_column(String(255), default="")  # human description
     status: Mapped[str] = mapped_column(String(10), default="running")  # running|ok|partial|error
     progress: Mapped[int] = mapped_column(Integer, default=0)
@@ -159,15 +188,24 @@ class User(Base):
 
 
 class Tip(Base):
-    """A recommendation Ivo publishes. Locked once the match kicks off."""
+    """A recommendation. Ivo's are published; the AI's are private (published=False)
+    but settle the same way, so both build a track record. Locked at kick-off.
+
+    market/selection are either our short codes (1X2/OU/BTTS + home/over/yes...)
+    or, for anything else on the board, API-Football's names ("Double Chance" /
+    "Home/Draw"), with market_id set to its bet id.
+    """
 
     __tablename__ = "tips"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     fixture_id: Mapped[int] = mapped_column(ForeignKey("fixtures.id"), index=True)
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    market: Mapped[str] = mapped_column(String(8))  # 1X2 | OU | BTTS
-    selection: Mapped[str] = mapped_column(String(8))
+    source: Mapped[str] = mapped_column(String(8), default="ivo")  # ivo | ai
+    ai_prediction_id: Mapped[int | None] = mapped_column(Integer)
+    market_id: Mapped[int | None] = mapped_column(Integer)
+    market: Mapped[str] = mapped_column(String(80))
+    selection: Mapped[str] = mapped_column(String(120))
     line: Mapped[float | None] = mapped_column(Float)
     odds: Mapped[float] = mapped_column(Float)
     bookmaker: Mapped[str | None] = mapped_column(String(60))
@@ -193,8 +231,9 @@ class Bet(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
     tip_id: Mapped[int | None] = mapped_column(ForeignKey("tips.id"))
     fixture_id: Mapped[int] = mapped_column(ForeignKey("fixtures.id"), index=True)
-    market: Mapped[str] = mapped_column(String(8))
-    selection: Mapped[str] = mapped_column(String(8))
+    market_id: Mapped[int | None] = mapped_column(Integer)
+    market: Mapped[str] = mapped_column(String(80))
+    selection: Mapped[str] = mapped_column(String(120))
     line: Mapped[float | None] = mapped_column(Float)
     odds: Mapped[float] = mapped_column(Float)
     bookmaker: Mapped[str | None] = mapped_column(String(60))
@@ -206,3 +245,64 @@ class Bet(Base):
 
     fixture: Mapped[Fixture] = relationship()
     user: Mapped[User] = relationship()
+
+
+# ── AI analysis ──────────────────────────────────────────────────────────────
+
+
+class AiThread(Base):
+    """One conversation with Claude about one fixture. The first turn sends the
+    match bundle and asks for an analysis; later turns are follow-up chat.
+    "Start fresh" opens a new thread with a newly built bundle, so a thread's
+    context never changes under it (which keeps the prompt cache valid)."""
+
+    __tablename__ = "ai_threads"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    fixture_id: Mapped[int] = mapped_column(ForeignKey("fixtures.id"), index=True)
+    model: Mapped[str] = mapped_column(String(40))
+    effort: Mapped[str] = mapped_column(String(10))
+    prompt_version: Mapped[str] = mapped_column(String(10))
+    bundle_json: Mapped[str] = mapped_column(Text)  # exactly what Claude was sent
+    bundle_hash: Mapped[str] = mapped_column(String(64))
+    created_by: Mapped[str | None] = mapped_column(String(40))
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class AiMessage(Base):
+    """One API message in a thread, stored exactly as sent/received (content
+    blocks as JSON, thinking blocks included) so history replays unchanged."""
+
+    __tablename__ = "ai_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    thread_id: Mapped[int] = mapped_column(ForeignKey("ai_threads.id"), index=True)
+    role: Mapped[str] = mapped_column(String(10))  # user | assistant
+    content_json: Mapped[str] = mapped_column(Text)
+    author: Mapped[str | None] = mapped_column(String(40))  # who typed it (user turns)
+    stop_reason: Mapped[str | None] = mapped_column(String(20))
+    # Assistant turns: what that API call used and cost.
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cache_read_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cache_write_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
+
+
+class AiPrediction(Base):
+    """A structured analysis Claude recorded (through its record_analysis tool).
+    The latest one before kick-off is the AI's call for the match."""
+
+    __tablename__ = "ai_predictions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    thread_id: Mapped[int] = mapped_column(ForeignKey("ai_threads.id"), index=True)
+    tool_use_id: Mapped[str | None] = mapped_column(String(64))
+    fixture_id: Mapped[int] = mapped_column(ForeignKey("fixtures.id"), index=True)
+    model: Mapped[str] = mapped_column(String(40))
+    prompt_version: Mapped[str] = mapped_column(String(10))
+    analysis_json: Mapped[str] = mapped_column(Text)
+    # Margin-free bookmaker probabilities at the time, to score against later.
+    market_probs_json: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)

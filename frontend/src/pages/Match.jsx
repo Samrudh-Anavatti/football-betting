@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import OddsBoard from '../components/OddsBoard.jsx'
+import AiPanel from '../components/AiPanel.jsx'
+import MarketBoard from '../components/MarketBoard.jsx'
 import PickForm from '../components/PickForm.jsx'
 import RunStatus from '../components/RunStatus.jsx'
 import TipCard from '../components/TipCard.jsx'
@@ -36,12 +37,13 @@ function Header({ fx }) {
   )
 }
 
-// Signed-in only: the two buttons that spend API quota for this match.
+// Signed-in only: the buttons that spend API-Football quota for this match.
 function ResearchBar({ fx, data, reload }) {
   const ctx = useRun(() => reload())
   const prices = useRun(() => reload())
+  const lineups = useRun(() => reload())
   return (
-    <section className="panel px-5 py-4 grid gap-4 sm:grid-cols-2 border-amber/60 bg-amber-light/40">
+    <section className="panel px-5 py-4 grid gap-4 sm:grid-cols-3 border-amber/60 bg-amber-light/40">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" className="btn-primary" disabled={ctx.busy} onClick={() => ctx.start(() => api.refreshContext(fx.id))}>
@@ -49,18 +51,30 @@ function ResearchBar({ fx, data, reload }) {
           </button>
           <Freshness at={data.context.fetched_at} warnAfter={24} staleAfter={72} />
         </div>
-        <p className="text-sm text-ink-soft">Head-to-head, form and injuries. Uses 4–6 API-Football requests.</p>
+        <p className="text-sm text-ink-soft">
+          Form, head-to-head, injuries, season stats and API-Football's prediction. Uses 7 to 9 requests.
+        </p>
         <RunStatus run={ctx.run} error={ctx.error} />
       </div>
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
-          <button type="button" className="btn-primary" disabled={prices.busy} onClick={() => prices.start(() => api.refreshMatchOdds(fx.id))}>
+          <button type="button" className="btn-primary" disabled={prices.busy} onClick={() => prices.start(() => api.refreshMatchMarkets(fx.id))}>
             {prices.busy ? 'Fetching…' : 'Refresh prices'}
           </button>
           <Freshness at={data.odds.pulled_at} warnAfter={6} staleAfter={24} />
         </div>
-        <p className="text-sm text-ink-soft">Match result and total goals from UK bookmakers. Uses 2 Odds API credits.</p>
+        <p className="text-sm text-ink-soft">Every market from our bookmakers. Uses 1 request.</p>
         <RunStatus run={prices.run} error={prices.error} />
+      </div>
+      <div className="space-y-2">
+        <div className="flex flex-wrap items-center gap-3">
+          <button type="button" className="btn-primary" disabled={lineups.busy} onClick={() => lineups.start(() => api.refreshLineups(fx.id))}>
+            {lineups.busy ? 'Fetching…' : 'Line-ups'}
+          </button>
+          <Freshness at={data.context.lineups_fetched_at} warnAfter={1} staleAfter={3} prefix="Checked" />
+        </div>
+        <p className="text-sm text-ink-soft">Confirmed XIs, out 20 to 40 minutes before kick-off. Uses 1 request.</p>
+        <RunStatus run={lineups.run} error={lineups.error} />
       </div>
     </section>
   )
@@ -136,6 +150,85 @@ function Injuries({ list, fx }) {
   )
 }
 
+function Prediction({ p, fx }) {
+  if (!p) return null
+  const pc = p.percent || {}
+  return (
+    <div className="panel p-4 space-y-2">
+      <h3 className="text-lg">API-Football's prediction</h3>
+      {p.advice && <p className="text-sm">{p.advice}</p>}
+      <div className="grid grid-cols-3 text-center text-sm">
+        {[[fx.home.name, pc.home], ['Draw', pc.draw], [fx.away.name, pc.away]].map(([label, v]) => (
+          <div key={label}>
+            <p className="num text-2xl font-semibold">{v || '–'}</p>
+            <p className="text-ink-soft truncate">{label}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function TeamStats({ fx, home, away }) {
+  if (!home && !away) return null
+  // Home team's record at home, away team's record away: the splits that matter here.
+  const rows = [
+    ['Played', (s, k) => s?.played?.[k]],
+    ['Won, drawn, lost', (s, k) => (s?.wins ? `${s.wins[k]}-${s.draws[k]}-${s.losses[k]}` : null)],
+    ['Goals for per game', (s, k) => s?.goals_for_avg?.[k]],
+    ['Goals against per game', (s, k) => s?.goals_against_avg?.[k]],
+    ['Clean sheets', (s, k) => s?.clean_sheets?.[k]],
+    ['Failed to score', (s, k) => s?.failed_to_score?.[k]],
+  ]
+  return (
+    <div className="panel p-4">
+      <h3 className="text-lg mb-1">Season so far</h3>
+      <p className="text-sm text-ink-soft mb-2">{fx.home.name} at home, {fx.away.name} away, in this competition.</p>
+      <table className="w-full text-sm">
+        <thead className="text-ink-soft">
+          <tr>
+            <th />
+            <th className="font-medium text-right truncate max-w-[7rem]">{fx.home.name}</th>
+            <th className="font-medium text-right truncate max-w-[7rem]">{fx.away.name}</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-ink/5">
+          {rows.map(([label, get]) => (
+            <tr key={label}>
+              <td className="py-1">{label}</td>
+              <td className="text-right num text-base">{get(home, 'home') ?? '–'}</td>
+              <td className="text-right num text-base">{get(away, 'away') ?? '–'}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function Lineups({ list }) {
+  if (!list?.length) return null
+  return (
+    <div className="panel p-4">
+      <h3 className="text-lg mb-2">Line-ups</h3>
+      <div className="grid gap-4 sm:grid-cols-2">
+        {list.map((t) => (
+          <div key={t.team_id}>
+            <p className="font-semibold">
+              {t.team} <span className="text-ink-soft font-normal">{t.formation}</span>
+            </p>
+            <ol className="text-sm list-decimal pl-5">
+              {t.start_xi.map((p) => (
+                <li key={p}>{p}</li>
+              ))}
+            </ol>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function Match() {
   const { id } = useParams()
   const { user } = useAuth()
@@ -156,6 +249,7 @@ export default function Match() {
       </Link>
       <Header fx={fx} />
       {user && <ResearchBar fx={fx} data={data} reload={reload} />}
+      {user && <AiPanel fx={fx} board={data.odds} onPick={canPick ? setPick : null} />}
 
       {data.tips.length > 0 && (
         <section>
@@ -169,7 +263,7 @@ export default function Match() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <section className="space-y-3">
+        <section className="space-y-3 min-w-0">
           <div className="flex flex-wrap items-baseline gap-3">
             <h2 className="text-2xl">Prices</h2>
             <Freshness at={data.odds.pulled_at} warnAfter={6} staleAfter={24} />
@@ -179,7 +273,7 @@ export default function Match() {
           )}
           {saved && <p className="text-sm text-pitch font-semibold">{saved === 'tip' ? 'Tip published.' : 'Bet logged to your account.'}</p>}
           {data.odds.markets.length ? (
-            <OddsBoard board={data.odds} fx={fx} onPick={canPick ? setPick : null} />
+            <MarketBoard board={data.odds} fx={fx} onPick={canPick ? setPick : null} />
           ) : (
             <Empty title="No prices yet">
               {user ? 'Use Refresh prices above, or pull a whole league from the admin page.' : 'Prices appear closer to kick-off.'}
@@ -187,7 +281,7 @@ export default function Match() {
           )}
         </section>
 
-        <section className="space-y-4">
+        <section className="space-y-4 min-w-0">
           <div className="flex flex-wrap items-baseline gap-3">
             <h2 className="text-2xl">Research</h2>
             <Freshness at={ctx.fetched_at} warnAfter={24} staleAfter={72} />
@@ -203,6 +297,9 @@ export default function Match() {
             </Empty>
           ) : (
             <>
+              <Lineups list={ctx.lineups} />
+              <Prediction p={ctx.prediction} fx={fx} />
+              <TeamStats fx={fx} home={ctx.home_stats} away={ctx.away_stats} />
               <div className="panel p-4 space-y-5">
                 <h3 className="text-lg">Last five matches</h3>
                 <FormList team={fx.home} rows={ctx.home_form} />

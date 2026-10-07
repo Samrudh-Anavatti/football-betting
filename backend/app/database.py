@@ -34,6 +34,28 @@ class Base(DeclarativeBase):
     pass
 
 
+def add_missing_columns() -> None:
+    """Tiny forward-only migration: create_all() makes new tables but never alters
+    existing ones, so add any model column the live table lacks. Enough for
+    nullable/defaulted additions; anything harder needs Alembic (see HANDOFF.md)."""
+    from sqlalchemy import inspect, text
+
+    insp = inspect(engine)
+    with engine.begin() as conn:
+        for table in Base.metadata.sorted_tables:
+            if not insp.has_table(table.name):
+                continue
+            have = {c["name"] for c in insp.get_columns(table.name)}
+            for col in table.columns:
+                if col.name in have:
+                    continue
+                ddl = f'ALTER TABLE {table.name} ADD COLUMN "{col.name}" {col.type.compile(engine.dialect)}'
+                default = col.default.arg if col.default is not None and not callable(col.default.arg) else None
+                if default is not None:
+                    ddl += f" DEFAULT {default!r}" if isinstance(default, str) else f" DEFAULT {default}"
+                conn.execute(text(ddl))
+
+
 def get_db():
     """FastAPI dependency: yields a session and always closes it."""
     db = SessionLocal()

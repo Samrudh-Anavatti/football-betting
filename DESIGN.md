@@ -39,8 +39,10 @@
 |---|---|---|---|
 | Fixtures + results + tables | API-Football `/fixtures?league&season`, `/standings` | 100 req/day, 10/min | 1 per league (+1 for the table) |
 | H2H, last 5, injuries | API-Football `/fixtures/headtohead`, `/fixtures?team&season`, `/injuries` | (same) | 4 per match (+2 early in a season) |
-| Bookmaker prices | The Odds API `/sports/{key}/odds` | 500 credits/month | markets × regions per league; 0 if no events |
-| Single-match prices | The Odds API `/events/{id}/odds` | (same) | markets × regions |
+| Bookmaker prices, every market | API-Football `/odds?league&season` (paged 10 matches) / `/odds?fixture` | Pro only | 1 per 10 matches / 1 per match |
+| Prediction, team stats, line-ups | API-Football `/predictions`, `/teams/statistics`, `/fixtures/lineups` | Pro | 1 each (stats: 1 per team) |
+| Backup prices (result, totals) | The Odds API `/sports/{key}/odds` | 500 credits/month | markets × regions per league; 0 if no events |
+| AI analysis | Claude Sonnet 5.5 on Microsoft Foundry | pay per token | ~$0.15 per match, ~$0.015 per follow-up |
 
 Bookmakers don't offer public odds APIs. The Odds API aggregates them through
 licensed feeds, so we get the prices without scraping.
@@ -62,7 +64,8 @@ don't match are listed in the run details. Add an alias when that happens.
 ## Data model
 
 Provider cache (overwritten by syncs): `leagues`, `teams`, `fixtures`,
-`match_context` (H2H/form/injuries as JSON), `odds_snapshots`.
+`match_context` (H2H/form/injuries/prediction/stats/line-ups as JSON), `market_books` (latest full book per
+match, frozen at kick-off), `odds_snapshots`.
 
 `odds_snapshots` is **append-only**: every pull adds rows stamped with `pulled_at`,
 and "current prices" means the latest pull. Keeping history lets us compute
@@ -70,7 +73,8 @@ and "current prices" means the latest pull. Keeping history lets us compute
 the best single indicator of a tipster with a real edge. It also lets us chart
 price movement later.
 
-Our data (never touched by syncs): `users`, `tips`, `bets`.
+Our data (never touched by syncs): `users`, `tips` (Ivo's and the AI's, by `source`), `bets`,
+`ai_threads`, `ai_messages`, `ai_predictions`.
 
 Bookkeeping: `sync_runs`, `provider_quota`.
 
@@ -82,13 +86,14 @@ on whole and half lines (whole lines push = void), and both teams to score.
 Postponed/cancelled/abandoned matches void the bet. Quarter lines and anything odd
 are settled by hand in Admin → Picks.
 
-### The odds board
+### The market board
 
-For each market the match page shows every bookmaker's latest price and highlights
-the best one. It also shows a **fair price**: the average implied probability
-across bookmakers with each one's margin removed. **Best vs fair** shows how far
-the best available price sits above the consensus, which gives a quick value
-signal before Ivo applies his own judgement.
+Every market our five bookmakers price, in tabs (main, goals, halves, scores, handicaps, corners, cards, players,
+match stats, specials) with a search box. Each selection shows the best price (click it to pick), the **fair
+price** (each bookmaker's implied probabilities normalised to remove its margin, then averaged) and **best vs
+fair**. Fair is only computed where a bookmaker prices a complete, mutually exclusive set of outcomes (overround
+100–135%), so it's blank for things like anytime-scorer lists. Over/under and handicap markets show a ladder
+around the most balanced line. `services/markets.py` builds it.
 
 ## Security
 
@@ -98,12 +103,9 @@ signal before Ivo applies his own judgement.
 * API keys live only in App Service settings. The repo is public and holds no
   secrets.
 
-## Next: AI predictions
+## AI analysis
 
-The full plan (data additions, model, structured output, storage, UI, evaluation,
-costs, hosting choice and open questions) is in
-[HANDOFF.md → AI predictions: plan](HANDOFF.md#ai-predictions-plan-next-session).
-The short version: Claude reads the same match bundle Ivo sees (`GET /matches/{id}`)
-and returns probabilities and value bets in a fixed structure. Suggestions stay
-private, and every one is stored and settled so the AI earns its own track record
-against Ivo and the market.
+Claude reads the same match bundle Ivo sees and records probabilities and value bets through a strict tool, then
+answers follow-up questions in the same conversation. Suggestions stay private and are tracked as `source='ai'`
+tips, so the AI earns its own record against Ivo and the market. Details, costs and setup:
+[HANDOFF.md → AI analysis](HANDOFF.md#ai-analysis-built-2026-10-07).

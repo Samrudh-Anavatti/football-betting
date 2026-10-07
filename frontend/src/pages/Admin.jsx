@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import AccountsTab from '../components/admin/AccountsTab.jsx'
+import AiTab from '../components/admin/AiTab.jsx'
 import DataTab from '../components/admin/DataTab.jsx'
 import PicksTab from '../components/admin/PicksTab.jsx'
 import { ErrorNote, Loading } from '../components/ui.jsx'
@@ -9,6 +10,7 @@ import { useAuth } from '../lib/auth.jsx'
 const TABS = [
   { key: 'data', label: 'Data', el: DataTab },
   { key: 'picks', label: 'Picks', el: PicksTab },
+  { key: 'ai', label: 'AI', el: AiTab },
   { key: 'accounts', label: 'Accounts', el: AccountsTab },
 ]
 

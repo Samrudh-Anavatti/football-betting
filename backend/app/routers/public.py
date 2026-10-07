@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..models import Fixture, League, MatchContext, Tip
 from ..serialize import fixture_dict, iso, league_dict, tip_dict
-from ..services.board import best_1x2, build_board, latest_snapshots
+from ..services.board import best_1x2, latest_snapshots, match_board
 from ..services.settlement import FINISHED
 from ..services.stats import tip_record
 
@@ -56,33 +56,44 @@ def _standing_rows(fx: Fixture) -> list:
 
 @router.get("/matches/{fixture_id}")
 def match(fixture_id: int, db: Session = Depends(get_db)):
-    """Everything we know about one match — the same bundle Ivo (and later the LLM) reads."""
+    """Everything we know about one match: the same bundle Ivo and the AI read."""
     fx = db.get(Fixture, fixture_id)
     if fx is None:
         raise HTTPException(404, "Match not found")
-    ctx = db.get(MatchContext, fixture_id)
     rows = latest_snapshots(db, [fx.id]).get(fx.id, [])
-    load = lambda s: json.loads(s) if s else None  # noqa: E731
+    board = match_board(db, fx.id)
     return {
         "fixture": fixture_dict(fx, best_1x2(rows)),
-        "odds": {**build_board(rows), "pulled_at": iso(rows[0].pulled_at) if rows else None},
-        "context": {
-            "fetched_at": iso(ctx.fetched_at) if ctx else None,
-            "h2h": load(ctx.h2h_json) if ctx else None,
-            "home_form": load(ctx.home_form_json) if ctx else None,
-            "away_form": load(ctx.away_form_json) if ctx else None,
-            "injuries": load(ctx.injuries_json) if ctx else None,
-            "errors": load(ctx.errors_json) if ctx else None,
-        },
+        "odds": {**board, "pulled_at": iso(board["pulled_at"])},
+        "context": context_dict(db.get(MatchContext, fixture_id)),
         "standings": {"synced_at": iso(fx.league.standings_synced_at), "rows": _standing_rows(fx)},
         "tips": [tip_dict(t, with_fixture=False) for t in
                  db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.published.is_(True)))],
     }
 
 
+def context_dict(ctx: MatchContext | None) -> dict:
+    load = lambda s: json.loads(s) if s else None  # noqa: E731
+    if ctx is None:
+        ctx = MatchContext()
+    return {
+        "fetched_at": iso(ctx.fetched_at),
+        "h2h": load(ctx.h2h_json),
+        "home_form": load(ctx.home_form_json),
+        "away_form": load(ctx.away_form_json),
+        "injuries": load(ctx.injuries_json),
+        "prediction": load(ctx.prediction_json),
+        "home_stats": load(ctx.home_stats_json),
+        "away_stats": load(ctx.away_stats_json),
+        "lineups": load(ctx.lineups_json),
+        "lineups_fetched_at": iso(ctx.lineups_fetched_at),
+        "errors": load(ctx.errors_json),
+    }
+
+
 @router.get("/tips")
 def tips(status: str = Query("open", pattern="^(open|settled|all)$"), limit: int = 50, db: Session = Depends(get_db)):
-    q = select(Tip).join(Fixture).where(Tip.published.is_(True))
+    q = select(Tip).join(Fixture).where(Tip.published.is_(True), Tip.source == "ivo")
     if status == "open":
         q = q.where(Tip.status == "pending").order_by(Fixture.kickoff)
     elif status == "settled":
@@ -94,4 +105,4 @@ def tips(status: str = Query("open", pattern="^(open|settled|all)$"), limit: int
 
 @router.get("/record")
 def record(db: Session = Depends(get_db)):
-    return tip_record(db, list(db.scalars(select(Tip).where(Tip.published.is_(True)))))
+    return tip_record(db, list(db.scalars(select(Tip).where(Tip.published.is_(True), Tip.source == "ivo"))))

@@ -75,9 +75,18 @@ export const api = {
   syncOdds: (body) => request('/admin/sync/odds', { method: 'POST', body }),
   refreshContext: (id) => request(`/admin/matches/${id}/context`, { method: 'POST' }),
   refreshMatchOdds: (id, body) => request(`/admin/matches/${id}/odds`, { method: 'POST', body }),
+  syncMarkets: (body) => request('/admin/sync/markets', { method: 'POST', body }),
+  refreshMatchMarkets: (id) => request(`/admin/matches/${id}/markets`, { method: 'POST' }),
+  refreshLineups: (id) => request(`/admin/matches/${id}/lineups`, { method: 'POST' }),
+
+  // AI
+  matchAi: (id) => request(`/admin/matches/${id}/ai`),
+  analyse: (id) => request(`/admin/matches/${id}/ai`, { method: 'POST' }),
+  chatAi: (threadId, text) => request(`/admin/ai/threads/${threadId}/messages`, { method: 'POST', body: { text } }),
+  aiSummary: () => request('/admin/ai/summary'),
 
   // tips + accounts
-  adminTips: () => request('/admin/tips'),
+  adminTips: (source = 'ivo') => request(`/admin/tips${qs({ source })}`),
   createTip: (body) => request('/admin/tips', { method: 'POST', body }),
   deleteTip: (id) => request(`/admin/tips/${id}`, { method: 'DELETE' }),
   settleTip: (id, status) => request(`/admin/tips/${id}/settle`, { method: 'POST', body: { status } }),

@@ -24,11 +24,14 @@ def test_full_flow(client, auth, fake):
     assert fixtures[0]["best_1x2"] == {"home": 1.45, "away": 7.5, "draw": 5.0}
 
     run = client.post(f"{API}/admin/matches/1001/context", headers=auth).json()
-    assert run["status"] == "ok" and run["requests_made"] == 4 + 2  # +2: early-season form top-up
+    assert run["status"] == "ok" and run["requests_made"] == 7 + 2  # +2: early-season form top-up
 
+    # Before an API-Football pull the board falls back to The Odds API's snapshots.
     m = client.get(f"{API}/matches/1001").json()
+    assert m["odds"]["source"] == "odds_api"
     one_x_two = m["odds"]["markets"][0]
-    assert one_x_two["market"] == "1X2" and one_x_two["selections"][0]["best_bookmaker"] == "Sky Bet"
+    assert one_x_two["name"] == "Match Winner" and one_x_two["groups"][0]["selections"][0]["best_bookmaker"] == "Sky Bet"
+    assert m["context"]["prediction"]["winner"] == "Manchester City" and m["context"]["home_stats"]["form"] == "WWDLW"
     assert m["context"]["h2h"][0]["hg"] == 1 and m["context"]["injuries"][0]["player"] == "R. Dias"
     assert len(m["standings"]["rows"]) == 2
 
@@ -70,3 +73,49 @@ def test_surfaces_provider_errors(client, auth, fake, monkeypatch):
     assert run["status"] == "error" and "do not have access" in run["message"]
     lg = next(lg for lg in client.get(f"{API}/leagues").json() if lg["id"] == 61)
     assert "do not have access" in lg["last_error"]
+
+
+def test_markets_board_and_any_market_pick(client, auth, fake):
+    client.post(f"{API}/admin/sync/fixtures", json={"league_ids": [39]}, headers=auth)
+    run = client.post(f"{API}/admin/sync/markets", json={"league_ids": [39]}, headers=auth).json()
+    assert run["status"] == "ok" and run["items"] == 1 and run["requests_made"] == 1
+
+    m = client.get(f"{API}/matches/1001").json()
+    board = m["odds"]
+    assert board["source"] == "api_football"
+    assert board["bookmakers"] == ["Bet365", "William Hill"]  # 1xBet isn't one of ours
+    cats = {c["key"] for c in board["categories"]}
+    assert {"main", "cards"} <= cats
+    result = next(mk for mk in board["markets"] if mk["id"] == 1)
+    home = result["groups"][0]["selections"][0]
+    assert home["value"] == "Home" and home["best"] == 1.45 and home["best_bookmaker"] == "William Hill"
+    assert home["prices"] == [1.4, 1.45] and home["fair"] is not None
+    goals = next(mk for mk in board["markets"] if mk["id"] == 5)
+    assert goals["layout"] == "lines" and goals["main_line"] == 2.5
+    # Core markets also land in the fixture list's best prices.
+    assert client.get(f"{API}/fixtures").json()[0]["best_1x2"]["home"] == 1.45
+
+    # A board pick on a core market is stored as our short code...
+    t1 = client.post(f"{API}/admin/tips", headers=auth, json={
+        "fixture_id": 1001, "market_id": 1, "market": "Match Winner", "selection": "Home", "odds": 1.45})
+    assert t1.status_code == 201 and t1.json()["market"] == "1X2" and t1.json()["selection"] == "home"
+    # ...anything else keeps API-Football's names.
+    t2 = client.post(f"{API}/admin/tips", headers=auth, json={
+        "fixture_id": 1001, "market_id": 12, "market": "Double Chance", "selection": "Home/Draw", "odds": 1.10})
+    t3 = client.post(f"{API}/admin/tips", headers=auth, json={
+        "fixture_id": 1001, "market_id": 80, "market": "Cards Over/Under", "selection": "Over 3.5", "odds": 1.9})
+    assert t2.json()["market_id"] == 12 and t3.json()["line"] == 3.5
+
+    fake.af_fixtures = [af_fixture(1001, (50, "Manchester City"), (39, "Wolves"), KICKOFF, "FT", 1, 1)]
+    client.post(f"{API}/admin/sync/fixtures", json={"league_ids": [39], "include_standings": False}, headers=auth)
+    by_id = {t["id"]: t for t in client.get(f"{API}/admin/tips", headers=auth).json()["tips"]}
+    assert by_id[t1.json()["id"]]["status"] == "lost"
+    assert by_id[t2.json()["id"]]["status"] == "won"  # Double chance Home/Draw on a 1-1
+    assert by_id[t3.json()["id"]]["status"] == "pending"  # cards: settled by hand
+
+
+def test_lineups(client, auth, fake):
+    client.post(f"{API}/admin/sync/fixtures", json={"league_ids": [39]}, headers=auth)
+    run = client.post(f"{API}/admin/matches/1001/lineups", headers=auth).json()
+    assert run["status"] == "ok"
+    assert client.get(f"{API}/matches/1001").json()["context"]["lineups"][0]["start_xi"] == ["Haaland (F)"]

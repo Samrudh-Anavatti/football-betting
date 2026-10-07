@@ -30,8 +30,28 @@ def af_fixture(fid, home, away, kickoff, status="NS", hg=None, ag=None):
         "league": {"id": 39, "season": 2026, "round": "Regular Season - 7", "logo": "x.png"},
         "teams": {"home": {"id": home[0], "name": home[1]}, "away": {"id": away[0], "name": away[1]}},
         "goals": {"home": hg, "away": ag},
-        "score": {"fulltime": {"home": hg, "away": ag}},
+        "score": {"fulltime": {"home": hg, "away": ag},
+                  "halftime": {"home": None if hg is None else min(hg, 1), "away": None if ag is None else 0}},
     }
+
+
+def af_odds_item(fid):
+    """API-Football /odds for one fixture: two of our bookmakers plus one we drop."""
+    def book(bid, name, home, draw, away, dc_hd, over, under):
+        return {"id": bid, "name": name, "bets": [
+            {"id": 1, "name": "Match Winner", "values": [
+                {"value": "Home", "odd": str(home)}, {"value": "Draw", "odd": str(draw)}, {"value": "Away", "odd": str(away)}]},
+            {"id": 12, "name": "Double Chance", "values": [{"value": "Home/Draw", "odd": str(dc_hd)}]},
+            {"id": 5, "name": "Goals Over/Under", "values": [
+                {"value": "Over 2.5", "odd": str(over)}, {"value": "Under 2.5", "odd": str(under)}]},
+            {"id": 80, "name": "Cards Over/Under", "values": [
+                {"value": "Over 3.5", "odd": "1.9"}, {"value": "Under 3.5", "odd": "1.9"}]},
+        ]}
+    return {"fixture": {"id": fid}, "update": KICKOFF.isoformat() + "+00:00", "bookmakers": [
+        book(8, "Bet365", 1.40, 5.0, 7.5, 1.08, 1.60, 2.30),
+        book(7, "William Hill", 1.45, 4.8, 7.0, 1.10, 1.62, 2.25),
+        book(11, "1xBet", 1.50, 5.5, 8.0, 1.12, 1.70, 2.40),
+    ]}
 
 
 class FakeProviders:
@@ -62,9 +82,22 @@ class FakeProviders:
             body = [af_fixture(900, (39, "Wolves"), (50, "Manchester City"), KICKOFF - timedelta(days=200), "FT", 1, 3)]
         elif p == "/injuries":
             body = [{"player": {"name": "R. Dias", "type": "Missing Fixture", "reason": "Hamstring"}, "team": {"id": 50}}]
+        elif p == "/odds":
+            body = [af_odds_item(1001)]
+        elif p == "/predictions":
+            body = [{"predictions": {"advice": "Double chance: City or draw", "winner": {"name": "Manchester City"},
+                                     "percent": {"home": "60%", "draw": "25%", "away": "15%"}},
+                     "comparison": {"form": {"home": "60%", "away": "40%"}}}]
+        elif p == "/teams/statistics":
+            body = {"form": "WWDLW", "fixtures": {"played": {"home": 3, "away": 3, "total": 6}},
+                    "goals": {"for": {"total": {"home": 7, "away": 4, "total": 11}}}}
+        elif p == "/fixtures/lineups":
+            body = [{"team": {"id": 50, "name": "Manchester City"}, "formation": "4-3-3", "coach": {"name": "P"},
+                     "startXI": [{"player": {"name": "Haaland", "pos": "F"}}], "substitutes": []}]
         else:
             return httpx.Response(404)
-        return httpx.Response(200, json={"errors": [], "response": body}, headers=headers)
+        return httpx.Response(200, json={"errors": [], "response": body, "paging": {"current": 1, "total": 1}},
+                              headers=headers)
 
     def odds_api(self, request: httpx.Request):
         self.calls.append(request.url.path)
@@ -91,8 +124,22 @@ class FakeProviders:
         return httpx.Response(200, json=body, headers=headers)
 
 
+def _wipe():
+    """Tests share one database file; start each from no provider data or picks."""
+    from app.database import Base, SessionLocal, engine
+    from app.models import AiMessage, AiPrediction, AiThread, Bet, MarketBook, MatchContext, OddsSnapshot, SyncRun, Tip
+
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    for model in (Bet, Tip, AiMessage, AiPrediction, AiThread, MarketBook, MatchContext, OddsSnapshot, SyncRun):
+        db.query(model).delete()
+    db.commit()
+    db.close()
+
+
 @pytest.fixture()
 def fake(monkeypatch):
+    _wipe()
     f = FakeProviders()
     monkeypatch.setattr(sync, "make_api_football", lambda: ApiFootball("k", 0, transport=httpx.MockTransport(f.api_football)))
     monkeypatch.setattr(sync, "make_odds_api", lambda: OddsApi("k", transport=httpx.MockTransport(f.odds_api)))

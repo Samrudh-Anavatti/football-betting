@@ -3,7 +3,7 @@ import { useApi } from '../../hooks/useApi.js'
 import { useRun } from '../../hooks/useRun.js'
 import { api } from '../../lib/api.js'
 import { ago } from '../../lib/format.js'
-import RunStatus, { runSummary } from '../RunStatus.jsx'
+import RunStatus, { KIND, runSummary } from '../RunStatus.jsx'
 import { ErrorNote, Freshness, LeagueBadge, Loading } from '../ui.jsx'
 
 const MARKET_NAMES = { h2h: 'Match result', totals: 'Total goals' }
@@ -152,6 +152,35 @@ function FixturesAction({ provider, selected, pacing, onChange }) {
   )
 }
 
+function MarketsAction({ provider, selected, onChange }) {
+  const r = useRun(onChange)
+  useEffect(() => {
+    if (provider.running && !r.run) r.resume(provider.running)
+  }, [provider.running]) // eslint-disable-line react-hooks/exhaustive-deps
+  // /odds is paged 10 matches at a time; a league usually has 1 to 3 pages priced.
+  const cost = selected.length * 2
+  return (
+    <div className="space-y-3 border-t border-ink/10 pt-4">
+      <h4 className="font-display text-xl font-semibold">Prices, all markets</h4>
+      <p className="text-sm text-ink-soft">
+        Every market (result, goals, halves, handicaps, corners, cards, scorers and more) from our five bookmakers for
+        every upcoming match that has prices, usually up to two weeks ahead. Pull fixtures first. Daily is plenty, plus
+        on the day for the matches you're looking at.
+      </p>
+      <CostLine cost={cost} provider={provider} extra="About 1 to 3 per league, depending on how many matches are priced." />
+      <button
+        type="button"
+        className="btn-primary"
+        disabled={!provider.configured || r.busy || !selected.length}
+        onClick={() => r.start(() => api.syncMarkets({ league_ids: selected }))}
+      >
+        {r.busy ? 'Pulling…' : `Pull prices for ${selected.length} league${selected.length === 1 ? '' : 's'}`}
+      </button>
+      <RunStatus run={r.run} error={r.error} />
+    </div>
+  )
+}
+
 function OddsAction({ provider, selected, options, onChange }) {
   const [markets, setMarkets] = useState(['h2h', 'totals'])
   const [regions, setRegions] = useState(['uk'])
@@ -162,10 +191,10 @@ function OddsAction({ provider, selected, options, onChange }) {
   const cost = selected.length * markets.length * regions.length
   return (
     <div className="space-y-3 border-t border-ink/10 pt-4">
-      <h4 className="font-display text-xl font-semibold">Latest prices</h4>
+      <h4 className="font-display text-xl font-semibold">Backup prices</h4>
       <p className="text-sm text-ink-soft">
-        Pulls current prices for every upcoming match in the selected leagues and keeps the old ones, so we can track how
-        prices moved. Pull fixtures first so prices have matches to attach to.
+        Match result and total goals only. API-Football's prices (left) are the main source; use this if we drop the
+        API-Football Pro plan. A match page shows these only when it has no API-Football prices.
       </p>
       <div className="space-y-2">
         <Checks options={options.markets} names={MARKET_NAMES} value={markets} onChange={setMarkets} />
@@ -242,7 +271,7 @@ function LeagueTable({ leagues, selected, setSelected }) {
   )
 }
 
-const KIND_NAMES = { fixtures: 'Fixtures and results', odds: 'Prices', context: 'Match research', match_odds: 'Match prices' }
+const KIND_NAMES = KIND
 const STATUS_STYLE = { ok: 'bg-pitch-light text-pitch', partial: 'bg-amber-light text-amber-dark', error: 'bg-red-light text-red', running: 'bg-ink/10 text-ink' }
 const STATUS_NAMES = { ok: 'Done', partial: 'Partly failed', error: 'Failed', running: 'Running' }
 
@@ -285,6 +314,8 @@ function History({ version }) {
                             ? <span className="text-red">{d.error}</span>
                             : d.fixtures != null
                               ? `${d.fixtures} fixtures, ${d.settled} picks or bets settled`
+                              : r.kind === 'markets'
+                              ? `${d.matched} of ${d.events} priced matches saved`
                               : `${d.matched} of ${d.events} bookmaker events matched${d.unmatched?.length ? ` (unmatched: ${d.unmatched.join(', ')})` : ''}`}
                         </li>
                       ))}
@@ -327,6 +358,7 @@ export default function DataTab() {
       <div className="grid gap-6 lg:grid-cols-2">
         <ProviderCard provider={af} onChecked={refresh}>
           <FixturesAction provider={af} selected={sel} pacing={data.pacing_seconds} onChange={refresh} />
+          <MarketsAction provider={af} selected={sel} onChange={refresh} />
         </ProviderCard>
         <ProviderCard provider={odds} onChecked={refresh}>
           <OddsAction provider={odds} selected={sel} options={data.odds_options} onChange={refresh} />

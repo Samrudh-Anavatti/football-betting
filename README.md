@@ -15,7 +15,8 @@ for live resources, config and operations.
 |----------|--------|
 | Frontend | React + Vite + Tailwind + React Router (HashRouter) on GitHub Pages |
 | Backend  | FastAPI + SQLAlchemy 2.0 + SQLite on Azure App Service (Linux, B1, UK South) |
-| Data     | [API-Football](https://www.api-football.com/) (fixtures, results, tables, H2H, form, injuries) and [The Odds API](https://the-odds-api.com/) (bookmaker prices) |
+| Data     | [API-Football](https://www.api-football.com/) Pro (fixtures, results, tables, research, prices for every market); [The Odds API](https://the-odds-api.com/) as a backup price source |
+| AI       | Claude Sonnet 5.5 on Microsoft Foundry (`anthropic` SDK, `AnthropicFoundry`) |
 | Auth     | Username + password per person (bcrypt) → signed token (JWT) |
 
 ## Project layout
@@ -66,7 +67,10 @@ npm run dev                       # proxies /api to localhost:8000
 1. **Admin → Data → Sync fixtures and results.** Pulls each league's whole season
    in one request per league (+1 for the table). Weekly is enough, plus after a
    matchday to settle picks.
-2. **Admin → Data → Pull prices.** One Odds API call per league; cost is shown
-   before you click.
-3. **Open a match → Refresh research** for H2H, last five and injuries (4–6
-   requests), then **click any price** to publish it as a pick or log a virtual bet.
+2. **Admin → Data → Prices, all markets.** Every market from our five bookmakers,
+   about 1 request per 10 matches.
+3. **Open a match → Refresh research** for form, H2H, injuries, season stats and
+   API-Football's prediction (7–9 requests), then **click any price** to publish it
+   as a pick or log a virtual bet.
+4. **Analyse with Claude** on the match page for a private second opinion, and ask
+   it follow-up questions. Admin → AI tracks how its calls do against Ivo and the market.

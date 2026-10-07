@@ -5,6 +5,14 @@ export const SELECTION_LABELS = {
 }
 export const MARKET_LABELS = { '1X2': 'Match result', OU: 'Total goals', BTTS: 'Both teams to score' }
 
+// "Home/Draw" -> "Arsenal/Draw": API-Football values name sides as Home and Away.
+export function teamify(value, fixture) {
+  if (!fixture) return String(value)
+  return String(value)
+    .replace(/\bHome\b/g, fixture.home.name)
+    .replace(/\bAway\b/g, fixture.away.name)
+}
+
 export function pickLabel({ market, selection, line }, fixture) {
   if (market === '1X2') {
     if (selection === 'draw') return 'Draw'
@@ -13,7 +21,8 @@ export function pickLabel({ market, selection, line }, fixture) {
   }
   if (market === 'OU') return `${SELECTION_LABELS[selection]} ${line} goals`
   if (market === 'BTTS') return `Both teams to score: ${SELECTION_LABELS[selection]}`
-  return `${market} ${selection}`
+  // Any other board market: API-Football's market name and selection value.
+  return `${market}: ${teamify(selection, fixture)}`
 }
 
 export const odds = (p) => (p == null ? '–' : Number(p).toFixed(2))

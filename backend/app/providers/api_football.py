@@ -37,6 +37,7 @@ class ApiFootball:
         self.requests_made = 0
         self.remaining: int | None = None
         self.limit: int | None = None
+        self._last_paging: dict | None = None
 
     def _pace(self):
         global _last_call
@@ -68,6 +69,7 @@ class ApiFootball:
         if errors:
             msg = "; ".join(f"{v}" for v in errors.values()) if isinstance(errors, dict) else "; ".join(map(str, errors))
             raise ProviderError(f"API-Football: {msg}")
+        self._last_paging = body.get("paging")
         return body.get("response", [])
 
     # ── Endpoints ──
@@ -99,3 +101,26 @@ class ApiFootball:
 
     def injuries(self, fixture: int) -> list:
         return self.get("/injuries", {"fixture": fixture})
+
+    # Pro-plan data. /odds is pre-match prices for every market the bookmakers
+    # list, usually from ~2 weeks out; it's paged 10 fixtures at a time.
+
+    def league_odds(self, league: int, season: int) -> list:
+        items, page, total = [], 1, 1
+        while page <= total:
+            items += self.get("/odds", {"league": league, "season": season, "page": page})
+            total = (self._last_paging or {}).get("total", 1)
+            page += 1
+        return items
+
+    def fixture_odds(self, fixture: int) -> list:
+        return self.get("/odds", {"fixture": fixture})
+
+    def prediction(self, fixture: int) -> list:
+        return self.get("/predictions", {"fixture": fixture})
+
+    def team_statistics(self, league: int, season: int, team: int) -> dict:
+        return self.get("/teams/statistics", {"league": league, "season": season, "team": team})
+
+    def lineups(self, fixture: int) -> list:
+        return self.get("/fixtures/lineups", {"fixture": fixture})

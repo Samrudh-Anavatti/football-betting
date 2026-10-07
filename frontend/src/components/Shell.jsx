@@ -36,7 +36,7 @@ export default function Shell({ children }) {
       <footer className="border-t border-ink/10">
         <div className="mx-auto max-w-6xl px-4 py-5 text-sm text-ink-soft flex flex-wrap gap-x-6 gap-y-1">
           <span>18+ only. Bet with money you can afford to lose. Free support at BeGambleAware.org.</span>
-          <span className="sm:ml-auto">Fixtures by API-Football, prices by The Odds API</span>
+          <span className="sm:ml-auto">Fixtures, research and prices by API-Football</span>
         </div>
       </footer>
     </div>

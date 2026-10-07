@@ -1,18 +1,30 @@
 import { ago } from '../lib/format.js'
 
-const KIND = {
-  fixtures: 'Fixtures & results',
-  odds: 'Prices',
+export const KIND = {
+  fixtures: 'Fixtures and results',
+  odds: 'Prices (The Odds API)',
+  match_odds: 'Match prices (The Odds API)',
+  markets: 'Prices, all markets',
+  match_markets: 'Match prices',
   context: 'Match research',
-  match_odds: 'Match prices',
+  lineups: 'Line-ups',
+  analysis: 'Claude analysis',
+  chat: 'Claude reply',
 }
 
 export function runSummary(run) {
+  if (run.provider === 'claude') {
+    if (run.status === 'running') return 'Claude is thinking…'
+    const c = run.details?.cost_usd
+    const what = run.kind === 'analysis' ? (run.items ? 'Analysis recorded' : 'Replied') : run.items ? 'Replied with a revised analysis' : 'Replied'
+    return c != null ? `${what}, cost ${c.toFixed(3)}` : what
+  }
   const cost = run.provider === 'odds_api' ? `${run.credits_used} credit${run.credits_used === 1 ? '' : 's'}` : `${run.requests_made} request${run.requests_made === 1 ? '' : 's'}`
   if (run.status === 'running') return `Working… ${run.progress} of ${run.total}`
   const what =
     run.kind === 'fixtures' ? `${run.items} fixtures saved` :
-    run.kind === 'odds' ? `${run.items} matches priced` :
+    run.kind === 'odds' || run.kind === 'markets' ? `${run.items} matches priced` :
+    run.kind === 'lineups' ? (run.items ? 'Line-ups saved' : 'No line-ups yet') :
     run.kind === 'context' ? `${run.items} of ${run.total} sections fetched` :
     run.items ? 'Prices updated' : 'No prices found'
   return `${what}, used ${cost}`

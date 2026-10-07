@@ -13,6 +13,7 @@ from ..models import Bet, Fixture, League, ProviderQuota, SyncRun, Tip, User
 from ..security import make_token, verify_password
 from ..serialize import bet_dict, iso, league_dict, run_dict, tip_dict
 from ..services import sync
+from ..services.markets import parse_value, to_code
 from ..services.settlement import MARKETS, apply_result, settle_fixture
 from ..services.stats import account_summary, tip_record
 
@@ -159,12 +160,45 @@ def _fixture(db: Session, fixture_id: int) -> Fixture:
     return fx
 
 
+class MarketsSyncIn(BaseModel):
+    league_ids: list[int]
+
+
+@router.post("/sync/markets")
+def sync_markets(body: MarketsSyncIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Every market for every upcoming match in the leagues (API-Football /odds)."""
+    _guard(db, "api_football")
+    lgs = _leagues(db, body.league_ids)
+    scope = f"{len(lgs)} league{'s' * (len(lgs) != 1)} · all markets"
+    run = sync.start_run(db, "api_football", "markets", scope, len(lgs), user.display_name,
+                         sync.job_markets, body.league_ids)
+    return run_dict(run)
+
+
 @router.post("/matches/{fixture_id}/context")
 def refresh_context(fixture_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
     fx = _fixture(db, fixture_id)
     _guard(db, "api_football")
-    run = sync.start_run(db, "api_football", "context", f"{fx.home_team.name} v {fx.away_team.name}", 4,
-                         user.display_name, sync.job_context, fixture_id)
+    run = sync.start_run(db, "api_football", "context", f"{fx.home_team.name} v {fx.away_team.name}",
+                         sync.CONTEXT_STEPS, user.display_name, sync.job_context, fixture_id)
+    return run_dict(run)
+
+
+@router.post("/matches/{fixture_id}/markets")
+def refresh_match_markets(fixture_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    fx = _fixture(db, fixture_id)
+    _guard(db, "api_football")
+    run = sync.start_run(db, "api_football", "match_markets", f"{fx.home_team.name} v {fx.away_team.name}", 1,
+                         user.display_name, sync.job_match_markets, fixture_id)
+    return run_dict(run)
+
+
+@router.post("/matches/{fixture_id}/lineups")
+def refresh_lineups(fixture_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+    fx = _fixture(db, fixture_id)
+    _guard(db, "api_football")
+    run = sync.start_run(db, "api_football", "lineups", f"{fx.home_team.name} v {fx.away_team.name}", 1,
+                         user.display_name, sync.job_lineups, fixture_id)
     return run_dict(run)
 
 
@@ -183,14 +217,27 @@ def refresh_match_odds(fixture_id: int, body: OddsSyncIn | None = None, db: Sess
 
 
 class Selection(BaseModel):
-    market: str
-    selection: str
+    """Either one of our short codes (market 1X2/OU/BTTS), or any market on the
+    board: market_id + API-Football's market name and selection value."""
+
+    market: str = Field(min_length=1, max_length=80)
+    selection: str = Field(min_length=1, max_length=120)
+    market_id: int | None = None
     line: float | None = None
     odds: float = Field(gt=1.0)
     bookmaker: str | None = None
 
     @model_validator(mode="after")
     def _valid(self):
+        if self.market_id is not None:
+            # Board markets that have a short code are stored as the code, so they
+            # keep price history, closing-line value and the original settlement.
+            code = to_code(self.market_id, self.selection)
+            if code is None:
+                self.line = parse_value(self.selection)[1]
+                return self
+            self.market, self.selection, self.line = code
+            self.market_id = None
         if self.market not in MARKETS or self.selection not in MARKETS[self.market]:
             raise ValueError(f"Unknown selection {self.market}/{self.selection}")
         if self.market == "OU" and self.line is None:
@@ -227,8 +274,8 @@ def _not_started(fx: Fixture):
 
 
 @router.get("/tips")
-def admin_tips(db: Session = Depends(get_db)):
-    tips = list(db.scalars(select(Tip).join(Fixture).order_by(Fixture.kickoff.desc())))
+def admin_tips(source: str = "ivo", db: Session = Depends(get_db)):
+    tips = list(db.scalars(select(Tip).join(Fixture).where(Tip.source == source).order_by(Fixture.kickoff.desc())))
     return {"tips": [tip_dict(t) for t in tips], "record": tip_record(db, tips)}
 
 

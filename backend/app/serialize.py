@@ -43,7 +43,8 @@ def fixture_dict(fx: Fixture, best: dict | None = None) -> dict:
 
 def tip_dict(t: Tip, with_fixture: bool = True) -> dict:
     d = {
-        "id": t.id, "fixture_id": t.fixture_id, "author": t.author.display_name, "market": t.market,
+        "id": t.id, "fixture_id": t.fixture_id, "author": t.author.display_name, "source": t.source,
+        "ai_prediction_id": t.ai_prediction_id, "market_id": t.market_id, "market": t.market,
         "selection": t.selection, "line": t.line, "odds": t.odds, "bookmaker": t.bookmaker,
         "stake_units": t.stake_units, "confidence": t.confidence, "reasoning": t.reasoning,
         "published": t.published, "status": t.status, "profit_units": t.profit_units,
@@ -58,7 +59,7 @@ def tip_dict(t: Tip, with_fixture: bool = True) -> dict:
 def bet_dict(b: Bet) -> dict:
     return {
         "id": b.id, "user": b.user.display_name, "user_id": b.user_id, "tip_id": b.tip_id,
-        "market": b.market, "selection": b.selection, "line": b.line, "odds": b.odds, "bookmaker": b.bookmaker,
+        "market_id": b.market_id, "market": b.market, "selection": b.selection, "line": b.line, "odds": b.odds, "bookmaker": b.bookmaker,
         "stake": b.stake, "status": b.status, "profit": b.profit, "created_at": iso(b.created_at),
         "settled_at": iso(b.settled_at), "fixture": fixture_dict(b.fixture),
     }

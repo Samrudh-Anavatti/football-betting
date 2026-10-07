@@ -20,9 +20,29 @@ API_FOOTBALL_MIN_INTERVAL = float(os.getenv("API_FOOTBALL_MIN_INTERVAL", "6.5"))
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-secret")
 TOKEN_DAYS = int(os.getenv("TOKEN_DAYS", "14"))
 
-# Odds pulls default to UK bookmakers; "eu" adds Pinnacle, Unibet etc.
+# The Odds API (backup price source: match result and totals only).
 ODDS_REGIONS = ["uk", "eu"]
 ODDS_MARKETS = ["h2h", "totals"]
+
+# Main price source: API-Football's /odds (every market it carries), kept for
+# these bookmakers only. Ids from /odds/bookmakers. Default: Bet365, William
+# Hill, Betfair, BetVictor, Pinnacle (the sharp reference for fair prices).
+ODDS_BOOKMAKERS = [int(x) for x in os.getenv("ODDS_BOOKMAKERS", "8,7,3,36,4").split(",") if x.strip()]
+
+# ── AI analysis (Claude on Microsoft Foundry) ──
+# FOUNDRY_RESOURCE is the resource name (foundry-football-sa), not the URL.
+FOUNDRY_RESOURCE = os.getenv("FOUNDRY_RESOURCE", "").strip()
+FOUNDRY_API_KEY = os.getenv("FOUNDRY_API_KEY", "").strip()
+# Fallback/alternative: Anthropic's own API. Used only when Foundry isn't set.
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
+AI_MODEL = os.getenv("AI_MODEL", "claude-sonnet-5-5")
+AI_EFFORT = os.getenv("AI_EFFORT", "high")
+AI_MONTHLY_BUDGET_USD = float(os.getenv("AI_MONTHLY_BUDGET_USD", "20"))
+# USD per million tokens: input, output, cache write (5 min), cache read.
+AI_PRICES = {
+    "claude-sonnet-5-5": (2.0, 10.0, 2.5, 0.2),
+    "claude-opus-5-5": (4.0, 20.0, 5.0, 0.2),
+}
 
 
 @dataclass(frozen=True)

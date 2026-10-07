@@ -3,22 +3,29 @@ import { api } from '../lib/api.js'
 import { odds as fmtOdds, pickLabel } from '../lib/format.js'
 import { ErrorNote } from './ui.jsx'
 
-// Slide-over form opened by clicking a price on the odds board. One selection,
-// two outcomes: publish it as a tip, or log it as a virtual bet in your account.
+// Slide-over form opened by clicking a price on the market board (or "Use this"
+// on an AI suggestion, which pre-fills stake, confidence and reasoning). One
+// selection, two outcomes: publish it as a tip, or log it as a virtual bet.
 export default function PickForm({ pick, fx, onClose, onSaved }) {
   const [form, setForm] = useState({
     odds: pick.odds,
     bookmaker: pick.bookmaker,
-    stake_units: 1,
-    confidence: 3,
-    reasoning: '',
+    stake_units: pick.prefill?.stake_units ?? 1,
+    confidence: pick.prefill?.confidence ?? 3,
+    reasoning: pick.prefill?.reasoning ?? '',
     stake: 10,
   })
   const [busy, setBusy] = useState(null)
   const [error, setError] = useState(null)
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }))
 
-  const base = { fixture_id: fx.id, market: pick.market, selection: pick.selection, line: pick.line }
+  const base = {
+    fixture_id: fx.id,
+    market_id: pick.market_id ?? null,
+    market: pick.market,
+    selection: pick.selection,
+    line: pick.line ?? null,
+  }
   const submit = async (kind) => {
     setBusy(kind)
     setError(null)

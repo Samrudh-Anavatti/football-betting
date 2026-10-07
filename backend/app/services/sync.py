@@ -16,10 +16,11 @@ from sqlalchemy.orm import Session
 
 from .. import config
 from ..database import SessionLocal
-from ..models import Fixture, League, MatchContext, OddsSnapshot, ProviderQuota, SyncRun, Team
+from ..models import Fixture, League, MarketBook, MatchContext, OddsSnapshot, ProviderQuota, SyncRun, Team
 from ..providers.api_football import ApiFootball
 from ..providers.base import ProviderError
 from ..providers.odds_api import OddsApi
+from .markets import filter_bookmakers, snapshots_from_book
 from .matching import best_fixture_for_event
 from .settlement import settle_fixture
 
@@ -31,14 +32,14 @@ PROVIDERS = {
         "site": "https://dashboard.api-football.com",
         "unit": "requests",
         "period": "per day",
-        "feeds": "Fixtures, results, standings, head-to-head, form, injuries",
+        "feeds": "Fixtures, results, tables, research, and bookmaker prices for every market",
     },
     "odds_api": {
         "label": "The Odds API",
         "site": "https://the-odds-api.com/account/",
         "unit": "credits",
         "period": "per month",
-        "feeds": "Bookmaker prices: match result (1X2) and over/under goals",
+        "feeds": "Backup price source: match result and total goals only",
     },
 }
 
@@ -193,6 +194,8 @@ def upsert_fixture(db: Session, item: dict) -> Fixture:
     goals = item.get("goals") or {}
     fx.home_goals = ft.get("home") if ft.get("home") is not None else goals.get("home")
     fx.away_goals = ft.get("away") if ft.get("away") is not None else goals.get("away")
+    ht = (item.get("score") or {}).get("halftime") or {}
+    fx.ht_home_goals, fx.ht_away_goals = ht.get("home"), ht.get("away")
     fx.venue = (f.get("venue") or {}).get("name")
     fx.updated_at = datetime.utcnow()
     db.flush()
@@ -337,6 +340,65 @@ def job_match_odds(db: Session, run: SyncRun, fixture_id: int, regions: list[str
     _finish(db, run, api, errors)
 
 
+# ── All markets (API-Football /odds) ─────────────────────────────────────────
+
+
+def ingest_market_items(db: Session, items: list[dict], pulled_at: datetime) -> int:
+    """Store each fixture's book (our bookmakers only). Returns fixtures priced.
+    Books freeze at kick-off: the last one before it is the closing book."""
+    n = 0
+    for item in items:
+        fx = db.get(Fixture, item["fixture"]["id"])
+        if fx is None or fx.kickoff <= pulled_at:
+            continue
+        books = filter_bookmakers(item.get("bookmakers", []), config.ODDS_BOOKMAKERS)
+        if not books:
+            continue
+        db.merge(MarketBook(
+            fixture_id=fx.id, provider="api_football", pulled_at=pulled_at,
+            provider_updated_at=_utc_naive(item["update"]) if item.get("update") else None,
+            bookmakers_json=json.dumps(books, separators=(",", ":")),
+        ))
+        db.add_all(snapshots_from_book(books, fx, pulled_at))
+        fx.odds_synced_at = pulled_at
+        n += 1
+    return n
+
+
+def job_markets(db: Session, run: SyncRun, league_ids: list[int]) -> None:
+    af = make_api_football()
+    errors, per_league = [], {}
+    for lid in league_ids:
+        lg = db.get(League, lid)
+        try:
+            items = af.league_odds(lid, lg.season)
+            priced = ingest_market_items(db, items, datetime.utcnow())
+            lg.odds_synced_at = datetime.utcnow()
+            run.items += priced
+            per_league[lg.name] = {"events": len(items), "matched": priced, "unmatched": []}
+        except ProviderError as e:
+            errors.append(f"{lg.name}: {e}")
+            per_league[lg.name] = {"error": str(e)}
+        run.progress += 1
+        run.requests_made = af.requests_made
+        db.commit()
+    _finish(db, run, af, errors, {"leagues": per_league})
+
+
+def job_match_markets(db: Session, run: SyncRun, fixture_id: int) -> None:
+    af = make_api_football()
+    errors = []
+    try:
+        run.items = ingest_market_items(db, af.fixture_odds(fixture_id), datetime.utcnow())
+        if not run.items:
+            errors.append("No prices from our bookmakers for this match yet (they usually appear 1 to 2 weeks before kick-off)")
+    except ProviderError as e:
+        errors.append(str(e))
+    run.progress = 1
+    db.commit()
+    _finish(db, run, af, errors)
+
+
 # ── Match context: H2H, form, injuries (API-Football) ────────────────────────
 
 
@@ -405,12 +467,107 @@ def job_context(db: Session, run: SyncRun, fixture_id: int) -> None:
             for i in af.injuries(fx.id)
         ])
 
+    def prediction():
+        resp = af.prediction(fx.id)
+        ctx.prediction_json = json.dumps(_compact_prediction(resp[0])) if resp else None
+
+    def stats(team_id, attr):
+        def _go():
+            setattr(ctx, attr, json.dumps(_compact_team_stats(af.team_statistics(fx.league_id, fx.season, team_id))))
+        return _go
+
     step("h2h", h2h)
     step("home_form", form(fx.home_team_id, "home_form_json"))
     step("away_form", form(fx.away_team_id, "away_form_json"))
     step("injuries", injuries)
+    step("prediction", prediction)
+    step("home_stats", stats(fx.home_team_id, "home_stats_json"))
+    step("away_stats", stats(fx.away_team_id, "away_stats_json"))
     ctx.errors_json = json.dumps(errors) if errors else None
     ctx.fetched_at = datetime.utcnow()
     db.merge(ctx)
     db.commit()
     _finish(db, run, af, [f"{k}: {v}" for k, v in errors.items()])
+
+
+CONTEXT_STEPS = 7
+
+
+def _compact_prediction(p: dict) -> dict:
+    pred = p.get("predictions") or {}
+    return {
+        "advice": pred.get("advice"),
+        "winner": (pred.get("winner") or {}).get("name"),
+        "win_or_draw": pred.get("win_or_draw"),
+        "under_over": pred.get("under_over"),
+        "goals": pred.get("goals"),
+        "percent": pred.get("percent"),
+        "comparison": p.get("comparison"),
+    }
+
+
+def _compact_team_stats(s: dict) -> dict:
+    """Season stats for one team in this competition, home/away split."""
+    if not s or not isinstance(s, dict):
+        return {}
+    g, fx = s.get("goals") or {}, s.get("fixtures") or {}
+
+    def split(d):
+        return {k: (d or {}).get(k) for k in ("home", "away", "total")}
+
+    def by_minute(d):
+        return {k: v.get("total") for k, v in (d or {}).items() if (v or {}).get("total")}
+
+    cards = s.get("cards") or {}
+    return {
+        "form": s.get("form"),
+        "played": split(fx.get("played")),
+        "wins": split(fx.get("wins")),
+        "draws": split(fx.get("draws")),
+        "losses": split(fx.get("loses")),
+        "goals_for": split((g.get("for") or {}).get("total")),
+        "goals_against": split((g.get("against") or {}).get("total")),
+        "goals_for_avg": split((g.get("for") or {}).get("average")),
+        "goals_against_avg": split((g.get("against") or {}).get("average")),
+        "goals_for_by_minute": by_minute((g.get("for") or {}).get("minute")),
+        "goals_against_by_minute": by_minute((g.get("against") or {}).get("minute")),
+        "clean_sheets": split(s.get("clean_sheet")),
+        "failed_to_score": split(s.get("failed_to_score")),
+        "biggest": s.get("biggest"),
+        "penalty": s.get("penalty"),
+        "formations": s.get("lineups"),
+        "yellow_cards_by_minute": by_minute(cards.get("yellow")),
+        "red_cards_by_minute": by_minute(cards.get("red")),
+    }
+
+
+def _lineup(t: dict) -> dict:
+    def name(p):
+        pl = p.get("player") or {}
+        return f"{pl.get('name')} ({pl.get('pos')})" if pl.get("pos") else pl.get("name")
+
+    return {
+        "team_id": t["team"]["id"], "team": t["team"]["name"], "formation": t.get("formation"),
+        "coach": (t.get("coach") or {}).get("name"),
+        "start_xi": [name(p) for p in t.get("startXI", [])],
+        "substitutes": [name(p) for p in t.get("substitutes", [])],
+    }
+
+
+def job_lineups(db: Session, run: SyncRun, fixture_id: int) -> None:
+    af = make_api_football()
+    ctx = db.get(MatchContext, fixture_id) or MatchContext(fixture_id=fixture_id)
+    errors = []
+    try:
+        resp = af.lineups(fixture_id)
+        ctx.lineups_json = json.dumps([_lineup(t) for t in resp]) if resp else None
+        ctx.lineups_fetched_at = datetime.utcnow()
+        run.items = 1 if resp else 0
+        if not resp:
+            errors.append("Line-ups aren't out yet (usually 20 to 40 minutes before kick-off)")
+        db.merge(ctx)
+    except ProviderError as e:
+        errors.append(str(e))
+    run.progress = 1
+    db.commit()
+    _finish(db, run, af, errors)

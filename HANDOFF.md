@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-10-04 (API-Football Pro live, first full sync done, AI plan written; **next session: build the AI analysis, see the last section**)._
+_Last updated: 2026-10-07 (prices now come from API-Football for every market; Claude analysis built on Microsoft Foundry; **next: Ivo's method for the prompt, then back-testing**)._
 
 ## Live resources
 
@@ -15,7 +15,9 @@ _Last updated: 2026-10-04 (API-Football Pro live, first full sync done, AI plan 
 | App Service plan | `plan-football-betting`, Linux **B1**, Always On |
 | Web app | `football-betting-api-sa`, Python 3.11, startup `bash startup.sh` |
 | Database | SQLite at `/home/data/football.db` (persists across deploys) |
-| Plans | API-Football **Pro** ($19/mo, 7,500 req/day, upgraded 2026-10-03 for a one-month trial). The Odds API **free** (500 credits/month). |
+| AI | Foundry resource `foundry-football-sa` (AIServices, **Sweden Central**: Claude isn't offered in UK South), deployment `claude-sonnet-5-5` (Global Standard, capacity 80 = 80 requests and 80k tokens per minute). Pay per token; no standing cost. |
+| Budget alert | `football-betting-monthly` on the resource group: 50 (billing currency) a month, emails at 80% actual and 100% forecast. |
+| Plans | API-Football **Pro** ($19/mo, 7,500 req/day, upgraded 2026-10-03 for a one-month trial). The Odds API **free** (500 credits/month), now only a backup. |
 | Repo | https://github.com/Samrudh-Anavatti/football-betting |
 
 ### Why its own B1 (and not PongPoints' plan)
@@ -42,6 +44,12 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 | `JWT_SECRET` | — | Signs login tokens. Changing it signs everyone out. |
 | `CORS_ORIGINS` | — | `https://samrudh-anavatti.github.io,http://localhost:5173` |
 | `DATA_DIR` | /home/data | Where SQLite lives. |
+| `ODDS_BOOKMAKERS` | 8,7,3,36,4 | API-Football bookmaker ids kept on the board: Bet365, William Hill, Betfair, BetVictor, Pinnacle. Ids from `/odds/bookmakers`. Swap when the affiliate deals are decided. |
+| `FOUNDRY_RESOURCE` / `FOUNDRY_API_KEY` | — | Claude on Foundry. Key: `az cognitiveservices account keys list -g rg-football-betting -n foundry-football-sa`. |
+| `ANTHROPIC_API_KEY` | — | Only used if Foundry isn't set (Anthropic's own API instead). |
+| `AI_MODEL` | claude-sonnet-5-5 | Must match a Foundry deployment name. |
+| `AI_EFFORT` | high | Thinking effort per call. |
+| `AI_MONTHLY_BUDGET_USD` | 20 | The Analyse/chat buttons refuse once this month's AI spend reaches it. |
 | `SCM_DO_BUILD_DURING_DEPLOYMENT` | true | Azure pip-installs requirements on deploy. |
 
 GitHub Actions (Settings → Secrets and variables → Actions):
@@ -107,7 +115,10 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
 
 * [x] Both API keys added as app settings; balances show in Admin → Data.
 * [x] API-Football Pro for a one-month trial (from 2026-10-03). **Review with Ivo around 2026-11-03**: keep Pro only if he uses the Pro-only data (injuries, line-ups, team stats, extra markets), otherwise drop to football-data.org + our own stored history.
-* [ ] **AI match analysis, the next session's work** (see "AI predictions: plan" below).
+* [x] Prices for every market from API-Football (2026-10-07). **This makes Pro load-bearing**: dropping it takes the board back to match result and totals from The Odds API.
+* [x] AI match analysis built (2026-10-07), see "AI analysis" below.
+* [ ] **Ivo's method in his own words** → `backend/app/ai/prompts/v2.md` (copy v1, fill the "Ivo's method" section, bump `PROMPT_VERSION`).
+* [ ] Back-test: run Claude on ~30 settled matches played after its training cutoff and compare Brier scores with the market.
 * [ ] Move from SQLite to a database we can browse and monitor (see below).
 * [ ] Price-movement chart from odds history; closing-line value per pick.
 
@@ -135,12 +146,78 @@ Plan: move to **Azure Database for PostgreSQL Flexible Server**, Burstable B1ms
 | App Service B1 Linux, UK South | 9.93 (Azure retail price £0.0136/hr) |
 | API-Football Pro ($19) | ~14–15 |
 | The Odds API (free) | 0 |
-| Claude API for AI analysis (see below) | ~5–12 at a few matches a day |
+| Claude Sonnet 5.5 on Foundry (measured ~$0.15 per match) | ~10–16 at 4–5 matches a day |
 | Postgres Flexible B1ms (future) | ~10–13 |
 
-Today that's about £25/month, or about £35 once AI analysis is running.
+About £35–40/month with AI analysis running. The resource group's budget alert is set at 50.
 
-## AI predictions: plan (next session)
+## Prices: every market from API-Football (built 2026-10-07)
+
+* API-Football's `/odds` (Pro) carries 100–150 markets per match: result, double chance, draw no bet, goals and
+  team goals, halves, HT/FT, exact scores, Asian and European handicaps, corners, cards, offsides, scorers, player
+  shots and fouls. We keep five bookmakers (`ODDS_BOOKMAKERS`); Bet365 carries most of the breadth, the others
+  mainly the core markets.
+* **Admin → Data → Prices, all markets** pulls every upcoming match in the chosen leagues: 1 request per 10 matches
+  (EPL: 2). A match page's **Refresh prices** costs 1 request.
+* Storage: `market_books` holds the latest full book per match as JSON (~100 KB), frozen at kick-off, so it doubles
+  as the closing book. Result, totals and BTTS prices are also appended to `odds_snapshots` (history, fixture list).
+* Picks can be made on any market. Result/totals/BTTS are stored as our codes; anything else keeps API-Football's
+  market and value names. Auto-settlement covers everything decidable from the full-time and half-time scores
+  (result, double chance, draw no bet, goals lines, team totals, BTTS, exact score, HT/FT, halves, odd/even, clean
+  sheet, win to nil, result+goals combos). Corners, cards, scorers and Asian quarter lines are settled by hand in
+  Admin → Picks.
+* The Odds API stays wired in as a backup (Admin → Data, right-hand card). A match page uses it only if it has no
+  API-Football book.
+
+## AI analysis (built 2026-10-07)
+
+**How it works.** On a match page (signed in), **Analyse with Claude** builds the match bundle (the same data as the
+page: every market's best and fair price, form, H2H, injuries, season stats, API-Football's prediction, line-ups,
+table), starts a conversation, and asks for an analysis. Claude records it through a strict `record_analysis` tool
+(probabilities, suggested bets with minimum prices, stakes, confidence, reasoning, key factors, data gaps, no-bet
+flag), then writes a summary. Follow-up questions continue the same conversation: the stored history is resent
+unchanged each turn (append-only, thinking blocks included) and prompt caching makes the repeated bundle cheap, so
+there is no memory framework to maintain. **Fresh analysis with latest data** starts a new conversation with a
+rebuilt bundle; old ones stay readable.
+
+* Code: `backend/app/ai/` (`client.py` is the only place the client is built, `bundle.py`, `service.py`,
+  `prompts/v1.md`), endpoints in `routers/ai.py`, UI in `AiPanel.jsx` and Admin → AI.
+* Tables: `ai_threads` (bundle as sent, its hash, model, prompt version), `ai_messages` (every API message as sent and
+  received, with tokens and cost), `ai_predictions` (each recorded analysis plus the market's margin-free
+  probabilities at that moment).
+* **Privacy:** suggestions are never published. Each suggested bet whose best current price is at or above Claude's
+  minimum becomes a `tips` row with `source='ai'`, `published=false`, at the best price available then. A new analysis
+  replaces the match's earlier pending AI tips. Public endpoints only return `source='ivo'`, published tips.
+  "Use this" opens the normal pick form, pre-filled, so a published pick is Ivo's.
+* **Scoring:** Admin → AI shows Claude's settled record next to Ivo's (P/L, ROI, strike rate, closing-price
+  comparison) and Brier scores for result, over 2.5 and BTTS against the market's fair probabilities, using the
+  last analysis before kick-off.
+* **Refusals:** checked on every call and shown as an error on the run. There's no automatic fallback model: on
+  Foundry that needs the SDK's client-side middleware and a second deployment, and a betting analysis is unlikely to
+  be declined. Revisit if it happens.
+
+**Measured cost (Arsenal v Leeds, 2026-10-07).** Bundle ~48k tokens. First analysis $0.15 (two calls: the tool call,
+then the summary; most of it is writing the bundle to the cache). Each follow-up question ~$0.015 (cache reads). So
+about $0.15 per match analysed, or about $20/month at 4–5 matches a day. Trimming the bundle (e.g. dropping
+the halves or players markets) is the lever if that's too much.
+
+**Foundry setup gotchas.**
+* Claude deployments need `modelProviderData` (organisationName, countryCode, industry in lowercase), which the
+  CLI (2.70) can't pass, so deploy through ARM REST, api-version `2025-10-01-preview`:
+  `az rest --method put --url .../accounts/foundry-football-sa/deployments/<name>?api-version=2025-10-01-preview --body @deploy.json`
+  with `{"sku":{"name":"GlobalStandard","capacity":80},"properties":{"model":{"format":"Anthropic","name":"claude-sonnet-5-5","version":"2"},"modelProviderData":{"organizationName":"Samrudh Anavatti","countryCode":"GB","industry":"other"}}}`.
+* The first attempt failed with "This purchase cannot be completed" (Marketplace). Deleting the failed deployment
+  and recreating it worked.
+* Default capacity 1 means 1 request a minute; set 80 (the quota).
+
+## Running the analysis locally
+
+Copy the prod DB from Kudu (`/api/vfs/data/football.db` plus `-wal`/`-shm`, bearer token from
+`az account get-access-token`) into a scratch folder, set `DATA_DIR` to it, the API keys, and
+`FOUNDRY_RESOURCE`/`FOUNDRY_API_KEY`, then run uvicorn. Never point local code at `/home/data`.
+
+## AI predictions: original plan (2026-10-04, kept for reference)
+
 
 **Goal.** For any upcoming match, Claude reads exactly what Ivo sees (the match
 bundle) and returns probabilities and value bets in a fixed structure. Those
