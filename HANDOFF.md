@@ -107,7 +107,7 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
   downloaded `football.db` + `-wal` + `-shm` from Kudu, opened them locally (integrity_check ok, WAL folded in),
   uploaded the single file, deleted `-wal`/`-shm`, started the app. Nothing of ours was lost. Since then SQLite
   uses the rollback journal (`SQLITE_JOURNAL_MODE`, default DELETE) and only the process holding the
-  `schedule_lease` row in `settings` runs the schedule. **There are no backups yet.**
+  `schedule_lease` row in `settings` runs the schedule. **There are no backups yet** (plan: [DATABASE.md](DATABASE.md)).
 
 * After changing App Service settings, **restart the app** (`az webapp restart -g rg-football-betting -n football-betting-api-sa`).
   The automatic restart can lag, and the app reads settings at startup.
@@ -130,28 +130,18 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
 * [x] AI match analysis built (2026-10-07), see "AI analysis" below. Switched to GPT-5.6 Luna the same day (~10x cheaper, same verdicts in testing).
 * [ ] **Ivo's method in his own words** → `backend/app/ai/prompts/v3.md` (copy v2, fill the "Ivo's method" section, bump `PROMPT_VERSION` in `ai/service.py`).
 * [ ] Back-test: run the AI on ~30 settled matches played after its training cutoff and compare Brier scores with the market.
-* [ ] Move from SQLite to a database we can browse and monitor (see below).
+* [ ] **Nightly database backups to Blob storage** (~£0.01/month): plan in [DATABASE.md](DATABASE.md). Do this soon;
+  there are no backups today.
+* [ ] Postgres when there's a reason to (see [DATABASE.md](DATABASE.md)).
 * [ ] Price-movement chart from odds history; closing-line value per pick. (The schedule now captures a closing
   book 5–10 min before every kick-off, so the data for this is there.)
 * [x] Refresh schedule (2026-10-12). **Check real usage on the Schedule card after a full weekend** against the
   estimates below, before adding leagues.
 
-## Future: a database we can browse
+## Database: backups and Postgres
 
-Today the data is a **SQLite file on App Service's persistent disk**
-(`/home/data/football.db`). It's on disk, not in memory, so it survives restarts and
-deploys, but the only way to look at it is to download it (Kudu → `/home/data`)
-and open it in a tool like DB Browser for SQLite.
-
-Plan: move to **Azure Database for PostgreSQL Flexible Server**, Burstable B1ms
-(about £10–13/month), in `rg-football-betting`.
-* Browse and query it from the portal, VS Code (PostgreSQL extension), pgAdmin or
-  DBeaver. Azure Monitor gives CPU/storage/connection metrics and slow-query insights.
-* Code change is small: set `DATABASE_URL=postgresql+psycopg://…`, add `psycopg[binary]`,
-  and drop the SQLite-only pragmas. Add Alembic for migrations at the same time.
-* One-off copy of existing picks/bets from SQLite. The provider cache can just be re-synced.
-* A cheaper alternative is the Azure SQL Database free offer (£0, serverless,
-  auto-pause), at the cost of ODBC driver setup and a slower first query after a pause.
+See [DATABASE.md](DATABASE.md): current size and growth, the 2026-10-12 outage, the nightly Blob backup plan
+(next), and when and how to move to Postgres (~£13–14/month, 2–3 hours).
 
 ## Running costs (estimate, Oct 2026)
 
@@ -161,7 +151,8 @@ Plan: move to **Azure Database for PostgreSQL Flexible Server**, Burstable B1ms
 | API-Football Pro ($19) | ~14–15 |
 | The Odds API (free) | 0 |
 | GPT-5.6 Luna on Foundry (~$0.012 per analysis; the schedule runs 2 per match) | ~8–11 ($10–14), capped at $20 |
-| Postgres Flexible B1ms (future) | ~10–13 |
+| Postgres Flexible B1ms (future, see DATABASE.md) | ~13–14 |
+| Blob storage for nightly DB backups (next) | ~0.01 |
 
 About £33–36/month including scheduled AI analysis. The resource group's budget alert is set at 50.
 
