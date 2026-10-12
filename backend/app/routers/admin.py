@@ -14,7 +14,7 @@ from ..security import make_token, verify_password
 from ..serialize import bet_dict, iso, league_dict, run_dict, tip_dict
 from ..services import sync
 from ..services.markets import parse_value, to_code
-from ..services.settlement import MARKETS, apply_result, settle_fixture
+from ..services.settlement import MARKETS, apply_result, settle_pending
 from ..services.stats import account_summary, tip_record
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -378,8 +378,4 @@ def set_bankroll(body: BankrollIn, db: Session = Depends(get_db), user: User = D
 @router.post("/settle")
 def settle_all(db: Session = Depends(get_db)):
     """Re-run auto-settlement over finished fixtures with pending tips/bets (no API calls)."""
-    ids = set(db.scalars(select(Tip.fixture_id).where(Tip.status == "pending"))) | set(
-        db.scalars(select(Bet.fixture_id).where(Bet.status == "pending")))
-    n = sum(settle_fixture(db, db.get(Fixture, i)) for i in ids)
-    db.commit()
-    return {"settled": n}
+    return {"settled": settle_pending(db)}

@@ -162,9 +162,13 @@ About £25–27/month including AI analysis. The resource group's budget alert i
   as the closing book. Result, totals and BTTS prices are also appended to `odds_snapshots` (history, fixture list).
 * Picks can be made on any market. Result/totals/BTTS are stored as our codes; anything else keeps API-Football's
   market and value names. Auto-settlement covers everything decidable from the full-time and half-time scores
-  (result, double chance, draw no bet, goals lines, team totals, BTTS, exact score, HT/FT, halves, odd/even, clean
-  sheet, win to nil, result+goals combos). Corners, cards, scorers and Asian quarter lines are settled by hand in
-  Admin → Picks.
+  (result, double chance, draw no bet, goals lines, team totals, BTTS, team to score, exact score and exact goals,
+  HT/FT, halves, odd/even, clean sheet, win to nil, winning margin, European and Asian handicaps, result+goals combos).
+  Corners, cards, scorers, minute bands and Asian quarter lines are settled by hand in Admin → Picks.
+  In both handicap markets API-Football's line is the **home** team's on every selection ("Away -1" = away +1).
+* Settlement re-runs over all pending picks at startup (no API calls), so a deploy that adds a market rule settles
+  matches that already finished. Before 2026-10-12 "Home Team Score a Goal" and "Handicap Result" had no rule and
+  sat pending.
 * The Odds API stays wired in as a backup (Admin → Data, right-hand card). A match page uses it only if it has no
   API-Football book.
 

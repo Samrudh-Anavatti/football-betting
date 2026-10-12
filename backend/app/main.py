@@ -8,6 +8,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from .database import Base, SessionLocal, add_missing_columns, engine
 from .routers import admin, ai, public
 from .seed import sync_users
+from .services.settlement import settle_pending
 from .services.sync import ensure_leagues, fail_interrupted_runs
 
 app = FastAPI(title="Football Betting API", version="0.1.0")
@@ -41,6 +42,7 @@ def on_startup():
     try:
         ensure_leagues(db)
         fail_interrupted_runs(db)
+        settle_pending(db)
     finally:
         db.close()
 

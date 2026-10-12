@@ -51,6 +51,27 @@ def test_market_outcomes():
     assert market_outcome("Anytime Goal Scorer", "Haaland", 2, 1, 1, 1) is None  # by hand
 
 
+def test_handicap_and_team_goal_outcomes():
+    # Rizespor 0-3 Fenerbahçe, Lazio 3-1 Monza: the two picks that sat pending
+    assert market_outcome("Home Team Score a Goal", "No", 0, 3, 0, 1) == "won"
+    assert market_outcome("Handicap Result", "Home -1", 3, 1, 1, 0) == "won"
+    # Handicap lines are the home team's, whichever side is picked
+    assert market_outcome("Handicap Result", "Draw -1", 2, 1, 1, 0) == "won"
+    assert market_outcome("Handicap Result", "Away -1", 2, 1, 1, 0) == "lost"
+    assert market_outcome("Handicap Result", "Away +1", 0, 2, 0, 0) == "won"
+    assert market_outcome("Asian Handicap", "Away -1.5", 2, 1, 1, 1) == "won"  # away +1.5
+    assert market_outcome("Asian Handicap", "Home -1", 2, 1, 1, 1) == "void"
+    assert market_outcome("Asian Handicap", "Home -0.75", 2, 1, 1, 1) is None  # quarter line, by hand
+    assert market_outcome("Handicap Result - First Half", "Home -1", 2, 1, 1, 0) == "lost"
+    assert market_outcome("Away Team Score a Goal (2nd Half)", "Yes", 2, 1, 1, 1) == "lost"
+    assert market_outcome("Winning Margin", "1 by 1", 2, 1, 1, 1) == "won"
+    assert market_outcome("Winning Margin", "2 by 4+", 0, 5, 0, 1) == "won"
+    assert market_outcome("Winning Margin", "Draw", 1, 1, 0, 0) == "lost"
+    assert market_outcome("Number Of Goals In Match", "2 or 3 goals", 2, 1, 1, 1) == "won"
+    assert market_outcome("Exact Goals Number", "more 4", 3, 2, 1, 1) == "won"
+    assert market_outcome("Second Half Exact Goals Number", "1", 2, 1, 1, 1) == "won"
+
+
 def test_value_parsing_and_codes():
     assert parse_value("Over 2.5") == ("Over", 2.5)
     assert parse_value("Home -1.25") == ("Home", -1.25)

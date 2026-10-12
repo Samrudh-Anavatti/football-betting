@@ -81,10 +81,11 @@ Bookkeeping: `sync_runs`, `provider_quota`.
 ### Settlement
 
 When a fixtures sync sees a match finished (`FT`/`AET`/`PEN`), pending tips and bets
-on it settle on the 90-minute score. Supported markets are match result, over/under
-on whole and half lines (whole lines push = void), and both teams to score.
-Postponed/cancelled/abandoned matches void the bet. Quarter lines and anything odd
-are settled by hand in Admin → Picks.
+on it settle on the 90-minute and half-time scores. `services/settlement.py` knows every
+market decidable from those (results, goal lines, team goals, handicaps, exact scores,
+halves...); whole-line pushes are void. Postponed/cancelled/abandoned matches void the
+bet. Quarter lines, corners, cards and scorers are settled by hand in Admin → Picks.
+Startup re-runs settlement over pending picks, so new rules apply retroactively.
 
 ### The market board
 

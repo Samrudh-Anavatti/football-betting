@@ -5,6 +5,7 @@ for everything else on the board. Anything that needs more than the full-time
 and half-time scores (scorers, corners, cards, Asian quarter lines...) returns
 None and is settled by hand in Admin, Picks.
 """
+import re
 from datetime import datetime
 
 from sqlalchemy import select
@@ -63,6 +64,67 @@ def _wl(ok: bool) -> str:
     return "won" if ok else "lost"
 
 
+def _exact(v: str, n: int) -> str | None:
+    """'2' or 'more 4' (4 or more)."""
+    if v.isdigit():
+        return _wl(n == int(v))
+    if v.startswith("more ") and v[5:].isdigit():
+        return _wl(n >= int(v[5:]))
+    return None
+
+
+def _european(v: str, h: int, a: int) -> str | None:
+    """Three-way handicap. The line is the home team's: 'Away -1' means away +1."""
+    from .markets import parse_value
+
+    side, line = parse_value(v)
+    if side not in ("Home", "Draw", "Away") or line is None or line != int(line):
+        return None
+    return _wl(side == _res(h + int(line), a))
+
+
+def _asian(v: str, h: int, a: int) -> str | None:
+    """The line is the home team's. Quarter lines (half win/loss) are settled by hand."""
+    from .markets import parse_value
+
+    side, line = parse_value(v)
+    if side not in ("Home", "Away") or line is None or line * 4 % 2 == 1:
+        return None
+    diff = h + line - a
+    if diff == 0:
+        return "void"
+    return _wl((side == "Home") == (diff > 0))
+
+
+def _margin(v: str, h: int, a: int) -> str | None:
+    """'1 by 2' (home by 2), '2 by 4+' (away by 4 or more), 'Score Draw', 'Draw' (0-0)."""
+    if v == "Draw":
+        return _wl(h == a == 0)
+    if v == "Score Draw":
+        return _wl(h == a > 0)
+    m = re.fullmatch(r"([12]) by (\d+)(\+?)", v)
+    if not m:
+        return None
+    won_by = h - a if m[1] == "1" else a - h
+    n = int(m[2])
+    return _wl(won_by >= n if m[3] else won_by == n)
+
+
+def _goal_band(v: str, total: int) -> str | None:
+    """'Under 2 goals', '2 or 3 goals', 'Over 3 goals'."""
+    if m := re.fullmatch(r"Under (\d+) goals", v):
+        return _wl(total < int(m[1]))
+    if m := re.fullmatch(r"Over (\d+) goals", v):
+        return _wl(total > int(m[1]))
+    if m := re.fullmatch(r"(\d+) or (\d+) goals", v):
+        return _wl(total in (int(m[1]), int(m[2])))
+    return None
+
+
+def _half(first: int, second: int) -> str:
+    return "1st Half" if first > second else "2nd Half" if second > first else "Draw"
+
+
 def _score(v: str) -> tuple[int, int] | None:
     try:
         h, a = v.split(":")
@@ -96,7 +158,16 @@ def market_outcome(market: str, value: str, h: int, a: int, hh: int | None, ha: 
         "Odd/Even": lambda: _wl(v == ("Odd" if total % 2 else "Even")),
         "Home Odd/Even": lambda: _wl(v == ("Odd" if h % 2 else "Even")),
         "Away Odd/Even": lambda: _wl(v == ("Odd" if a % 2 else "Even")),
-        "Exact Goals Number": lambda: _wl(int(v) == total) if v.isdigit() else None,
+        "Exact Goals Number": lambda: _exact(v, total),
+        "Home Team Exact Goals Number": lambda: _exact(v, h),
+        "Away Team Exact Goals Number": lambda: _exact(v, a),
+        "Home Team Score a Goal": lambda: _yn(v, h > 0),
+        "Away Team Score a Goal": lambda: _yn(v, a > 0),
+        "Handicap Result": lambda: _european(v, h, a),
+        "Asian Handicap": lambda: _asian(v, h, a),
+        "Goal Line": lambda: _ou(total, side, line),
+        "Winning Margin": lambda: _margin(v, h, a),
+        "Number Of Goals In Match": lambda: _goal_band(v, total),
         "Results/Both Teams Score": lambda: (
             _wl(v == f"{_res(h, a)}/{'Yes' if h > 0 and a > 0 else 'No'}") if "/" in v else None),
         "Result/Total Goals": lambda: _result_total(v, h, a),
@@ -114,7 +185,26 @@ def market_outcome(market: str, value: str, h: int, a: int, hh: int | None, ha: 
         "Odd/Even - First Half": lambda: _wl(v == ("Odd" if (hh + ha) % 2 else "Even")),
         "Win Both Halves": lambda: _wl((v == "Home" and hh > ha and sh > sa) or (v == "Away" and ha > hh and sa > sh)),
         "To Win Either Half": lambda: _wl((v == "Home" and (hh > ha or sh > sa)) or (v == "Away" and (ha > hh or sa > sh))),
-        "Highest Scoring Half": lambda: _wl(v == ("1st Half" if hh + ha > sh + sa else "2nd Half" if sh + sa > hh + ha else "Draw")),
+        "Highest Scoring Half": lambda: _wl(v == _half(hh + ha, sh + sa)),
+        "Home Highest Scoring Half": lambda: _wl(v == _half(hh, sh)),
+        "Away Highest Scoring Half": lambda: _wl(v == _half(ha, sa)),
+        "Handicap Result - First Half": lambda: _european(v, hh, ha),
+        "Asian Handicap First Half": lambda: _asian(v, hh, ha),
+        "Double Chance - First Half": lambda: _wl(_res(hh, ha) in v.split("/")) if "/" in v else None,
+        "Double Chance - Second Half": lambda: _wl(_res(sh, sa) in v.split("/")) if "/" in v else None,
+        "Exact Goals Number - First Half": lambda: _exact(v, hh + ha),
+        "Second Half Exact Goals Number": lambda: _exact(v, sh + sa),
+        "Correct Score - Second Half": lambda: _wl(_score(v) == (sh, sa)) if _score(v) else None,
+        "Odd/Even - Second Half": lambda: _wl(v == ("Odd" if (sh + sa) % 2 else "Even")),
+        "Goal Line (1st Half)": lambda: _ou(hh + ha, side, line),
+        "Home Team Total Goals(1st Half)": lambda: _ou(hh, side, line),
+        "Away Team Total Goals(1st Half)": lambda: _ou(ha, side, line),
+        "Home Team Score a Goal (1st Half)": lambda: _yn(v, hh > 0),
+        "Away Team Score a Goal (1st Half)": lambda: _yn(v, ha > 0),
+        "Home Team Score a Goal (2nd Half)": lambda: _yn(v, sh > 0),
+        "Away Team Score a Goal (2nd Half)": lambda: _yn(v, sa > 0),
+        "Home team will score in both halves": lambda: _yn(v, hh > 0 and sh > 0),
+        "Away team will score in both halves": lambda: _yn(v, ha > 0 and sa > 0),
     }
     if market in full:
         return full[market]()
@@ -189,4 +279,16 @@ def settle_fixture(db: Session, fx: Fixture) -> int:
         if (res := result_for(bet.market, bet.selection, bet.line)) is not None:
             apply_result(bet, res, bet.stake)
             n += 1
+    return n
+
+
+def settle_pending(db: Session) -> int:
+    """Re-run settlement over every fixture with pending tips/bets (no API calls).
+
+    Runs at startup, so new settlement rules apply to matches that already finished.
+    """
+    ids = set(db.scalars(select(Tip.fixture_id).where(Tip.status == "pending"))) | set(
+        db.scalars(select(Bet.fixture_id).where(Bet.status == "pending")))
+    n = sum(settle_fixture(db, db.get(Fixture, i)) for i in ids)
+    db.commit()
     return n
