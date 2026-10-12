@@ -20,15 +20,23 @@ reserve set on the Schedule card (results keep going: they're cheap and they
 settle picks). Scheduled AI stops at AI_AUTO_BUDGET_SHARE of the monthly
 budget, leaving the rest for the Analyse button.
 
+Only one process runs the schedule at a time: a deploy briefly runs the old and
+new app side by side, so each tick first renews a lease row in `settings`
+(LEASE), and a second process waits until the first lets it lapse. Two
+schedulers writing the same SQLite file over App Service's network share
+corrupted the database's view of itself on 2026-10-12.
+
 See HANDOFF.md → "Refresh schedule" for the costs.
 """
 import logging
+import os
 import secrets
+import socket
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from sqlalchemy import delete, func, select
+from sqlalchemy import delete, func, select, text
 from sqlalchemy.orm import Session
 
 from .. import config
@@ -55,6 +63,8 @@ LINEUPS_FROM, LINEUPS_UNTIL, LINEUPS_EVERY = timedelta(minutes=75), timedelta(mi
 AI_REFRESH_AT = timedelta(hours=6)
 AI_RETRY_AFTER = timedelta(hours=1)
 KEEP_RUNS = timedelta(days=14)
+LEASE = timedelta(minutes=5)
+INSTANCE = f"{socket.gethostname()}:{os.getpid()}:{secrets.token_hex(3)}"
 
 
 @dataclass(frozen=True)
@@ -380,11 +390,25 @@ def _threads_alive() -> bool:
     return any(t.is_alive() for t in _threads)
 
 
+def hold_lease(db: Session, now: datetime | None = None, instance: str = INSTANCE) -> bool:
+    """Take or renew the schedule's lease; False while another process holds it.
+    One UPDATE, so two processes can't both win."""
+    now = now or datetime.utcnow()
+    value = f"{instance}|{(now + LEASE).isoformat()}"
+    db.execute(text("INSERT OR IGNORE INTO settings (key, value) VALUES ('schedule_lease', '|')"))
+    won = db.execute(text(
+        "UPDATE settings SET value = :value WHERE key = 'schedule_lease' "
+        "AND (substr(value, 1, instr(value, '|') - 1) = :me OR substr(value, instr(value, '|') + 1) < :now)"),
+        {"value": value, "me": instance, "now": now.isoformat()}).rowcount == 1
+    db.commit()
+    return won
+
+
 def _loop(name: str, tick, every: float = 60) -> None:
     while not _stop.is_set():
         db = SessionLocal()
         try:
-            if get_settings(db)["enabled"]:
+            if hold_lease(db) and get_settings(db)["enabled"]:
                 tick(db)
         except Exception:  # keep the schedule alive; the run row (if any) has the details
             log.exception("scheduler %s tick failed", name)

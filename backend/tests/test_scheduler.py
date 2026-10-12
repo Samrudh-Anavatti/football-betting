@@ -8,7 +8,7 @@ from sqlalchemy import func, select
 from app import config
 from app.ai import service
 from app.database import SessionLocal
-from app.models import AiThread, League, OddsSnapshot, ProviderQuota, SyncRun, Tip, User
+from app.models import AiThread, League, OddsSnapshot, ProviderQuota, Setting, SyncRun, Tip, User
 from app.services import scheduler, sync
 
 from .conftest import KICKOFF, af_fixture
@@ -166,3 +166,14 @@ def test_supplementary_leagues_get_data_but_no_research_or_ai(client, db, fake, 
     assert [f["id"] for f in more] == [2001]
     lg = next(x for x in client.get(f"{API}/leagues").json() if x["id"] == 40)
     assert lg["supplementary"] is True
+
+
+def test_only_one_process_runs_the_schedule(db):
+    now = datetime.utcnow()
+    db.execute(Setting.__table__.delete().where(Setting.key == "schedule_lease"))
+    db.commit()
+    assert scheduler.hold_lease(db, now, instance="old")
+    assert not scheduler.hold_lease(db, now + timedelta(minutes=1), instance="new")  # deploy overlap
+    assert scheduler.hold_lease(db, now + timedelta(minutes=1), instance="old")  # renews
+    assert scheduler.hold_lease(db, now + timedelta(minutes=7), instance="new")  # old one gone quiet
+    assert not scheduler.hold_lease(db, now + timedelta(minutes=8), instance="old")

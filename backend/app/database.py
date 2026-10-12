@@ -20,12 +20,17 @@ _connect_args = {"check_same_thread": False, "timeout": 30} if _is_sqlite else {
 engine = create_engine(DATABASE_URL, connect_args=_connect_args)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
+# WAL needs shared memory between processes, which App Service's /home (a network
+# share) can't provide: two overlapping processes during a deploy corrupted the
+# database's view of itself on 2026-10-12. The default rollback journal locks the
+# file instead, which works there. SQLITE_JOURNAL_MODE=WAL is fine on a local disk.
+JOURNAL_MODE = os.getenv("SQLITE_JOURNAL_MODE", "DELETE").upper()
+
 if _is_sqlite:
-    # WAL lets the site keep reading while a background sync is writing.
     @event.listens_for(engine, "connect")
     def _sqlite_pragmas(dbapi_conn, _):
         cur = dbapi_conn.cursor()
-        cur.execute("PRAGMA journal_mode=WAL")
+        cur.execute(f"PRAGMA journal_mode={JOURNAL_MODE}")
         cur.execute("PRAGMA foreign_keys=ON")
         cur.close()
 
