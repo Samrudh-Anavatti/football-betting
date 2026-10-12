@@ -101,6 +101,14 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
 
 ## Gotchas
 
+* **SQLite on `/home` (2026-10-12 outage).** `/home` is a network share. In WAL mode two processes (the old and new
+  app overlap for a minute or two on every deploy, each running the schedule) corrupted SQLite's shared-memory
+  index and every query failed with "file is not a database". The files themselves were intact: stopped the app,
+  downloaded `football.db` + `-wal` + `-shm` from Kudu, opened them locally (integrity_check ok, WAL folded in),
+  uploaded the single file, deleted `-wal`/`-shm`, started the app. Nothing of ours was lost. Since then SQLite
+  uses the rollback journal (`SQLITE_JOURNAL_MODE`, default DELETE) and only the process holding the
+  `schedule_lease` row in `settings` runs the schedule. **There are no backups yet.**
+
 * After changing App Service settings, **restart the app** (`az webapp restart -g rg-football-betting -n football-betting-api-sa`).
   The automatic restart can lag, and the app reads settings at startup.
 
@@ -162,11 +170,11 @@ About £33–36/month including scheduled AI analysis. The resource group's budg
 **13 main leagues**: top flights of England, Spain, Italy, Germany, France, Portugal, Netherlands, Turkey, Belgium,
 USA (MLS), plus the Champions, Europa and Conference Leagues. Everything runs for these.
 
-**29 supplementary leagues** (`supplementary=True` in `config.LEAGUES`): the 2nd and 3rd tiers of those ten
+**28 supplementary leagues** (`supplementary=True` in `config.LEAGUES`): the 2nd and 3rd tiers of those ten
 countries (Spain's Primera RFEF and Italy's Serie C are regional groups, so 2 and 3 entries), Brazil Série A/B,
 Argentina's Liga Profesional and Primera Nacional, and the Scottish Premiership. They show on the Fixtures/Results
 tabs under "More leagues", never on the home page. The schedule gives them fixtures + tables, live scores and a
-3-hourly price sweep only, about 20 requests/day each (~600 total); research, line-ups and AI run only from the
+3-hourly price sweep only, about 20 requests/day each (~560 total); research, line-ups and AI run only from the
 match page's buttons. The 17 that The Odds API doesn't cover have `odds_key=""`, so they have no backup prices.
 
 To add a league: find its id with `GET /leagues?search=` (or the list of 602 active competitions pulled on
