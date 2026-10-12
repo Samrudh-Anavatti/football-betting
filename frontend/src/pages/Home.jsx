@@ -14,7 +14,7 @@ function Ledger({ record }) {
   if (!record || record.tips === 0) return null
   const profit = record.profit_units * UNIT
   const items = [
-    ['Current profit, could go up or down', `${profit < 0 ? '−' : '+'}${pounds(profit)}`, profit >= 0 ? 'text-pitch' : 'text-red'],
+    ['Current profit, will vary', `${profit < 0 ? '−' : '+'}${pounds(profit)}`, profit >= 0 ? 'text-pitch' : 'text-red'],
     [`Every £${UNIT} staked returned`, record.roi == null ? '–' : pounds(UNIT * (1 + record.roi), 2), ''],
     ['Won / lost', `${record.won}–${record.lost}`, ''],
     ['Strike rate', pct(record.strike_rate, 0), ''],
@@ -23,7 +23,7 @@ function Ledger({ record }) {
   return (
     <dl className="mt-6 grid grid-cols-2 sm:grid-cols-5 border-t border-white/15">
       {items.map(([k, v, tone]) => (
-        <div key={k} className="pt-3 pr-4">
+        <div key={k} className="pt-3 pr-4 flex flex-col justify-between">
           <dt className="text-sm text-white/60">{k}</dt>
           <dd className={`num text-2xl font-semibold ${tone || 'text-white'}`}>{v}</dd>
         </div>
