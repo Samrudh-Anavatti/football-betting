@@ -230,6 +230,25 @@ function Conversation({ thread, busy, readOnly, onSend }) {
   )
 }
 
+// What visitors see: the AI's latest analysis before kick-off, read-only.
+export function PublicAi({ ai, fx, board }) {
+  if (!ai) return null
+  return (
+    <section className="panel overflow-hidden">
+      <header className="px-5 pt-4 pb-3 border-b border-ink/10">
+        <h2 className="text-2xl">AI analysis</h2>
+        <p className="text-sm text-ink-soft max-w-2xl">
+          The AI reads everything on this page (prices, form, injuries, stats, the table) and gives its own view. It's
+          separate from Ivo's picks, which are his own judgement.
+        </p>
+      </header>
+      <div className="px-5 py-4">
+        <Prediction pred={ai} fx={fx} board={board} tips={[]} onPick={null} />
+      </div>
+    </section>
+  )
+}
+
 export default function AiPanel({ fx, board, onPick }) {
   const { data, loading, error, reload } = useApi(() => api.matchAi(fx.id), [fx.id])
   const r = useRun(() => reload())

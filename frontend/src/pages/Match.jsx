@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import AiPanel from '../components/AiPanel.jsx'
+import AiPanel, { PublicAi } from '../components/AiPanel.jsx'
 import MarketBoard from '../components/MarketBoard.jsx'
 import PickForm from '../components/PickForm.jsx'
 import RunStatus from '../components/RunStatus.jsx'
@@ -261,6 +261,7 @@ export default function Match() {
           </div>
         </section>
       )}
+      {!user && <PublicAi ai={data.ai} fx={fx} board={data.odds} />}
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <section className="space-y-3 min-w-0">

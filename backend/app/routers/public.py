@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Fixture, League, MatchContext, Tip
+from ..models import AiPrediction, Fixture, League, MatchContext, Tip
 from ..serialize import fixture_dict, iso, league_dict, tip_dict
 from ..services.board import best_1x2, latest_snapshots, match_board
 from ..services.settlement import FINISHED
@@ -69,7 +69,47 @@ def match(fixture_id: int, db: Session = Depends(get_db)):
         "standings": {"synced_at": iso(fx.league.standings_synced_at), "rows": _standing_rows(fx)},
         "tips": [tip_dict(t, with_fixture=False) for t in
                  db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.published.is_(True)))],
+        "ai": ai_dict(latest_prediction(db, fx)),
     }
+
+
+def latest_prediction(db: Session, fx: Fixture) -> AiPrediction | None:
+    """The AI's last analysis before kick-off (the one its record is judged on)."""
+    return db.scalar(select(AiPrediction).where(AiPrediction.fixture_id == fx.id, AiPrediction.created_at < fx.kickoff)
+                     .order_by(AiPrediction.id.desc()).limit(1))
+
+
+def ai_dict(pred: AiPrediction | None) -> dict | None:
+    """Public view of an analysis: the read, probabilities and suggested bets. Read-only:
+    nobody outside can start one, and the AI's tracked tips stay private."""
+    if pred is None:
+        return None
+    return {"id": pred.id, "created_at": iso(pred.created_at), "model": pred.model,
+            "analysis": json.loads(pred.analysis_json),
+            "market_probs": json.loads(pred.market_probs_json) if pred.market_probs_json else None, "tips": []}
+
+
+# The home page's preview card prefers these competitions, then the next kick-off anywhere.
+FEATURED_LEAGUES = [39, 2, 140, 135, 78, 61, 3]
+
+
+@router.get("/featured")
+def featured(db: Session = Depends(get_db)):
+    """One upcoming match with an AI analysis, for the home page's preview card."""
+    now = datetime.utcnow()
+    rows = list(db.scalars(
+        select(Fixture).join(AiPrediction, AiPrediction.fixture_id == Fixture.id)
+        .where(Fixture.status.in_(("NS", "TBD")), Fixture.kickoff > now + timedelta(minutes=10),
+               Fixture.kickoff <= now + timedelta(days=3))
+        .group_by(Fixture.id).order_by(Fixture.kickoff)))
+    if not rows:
+        return None
+    fx = min(rows, key=lambda f: (FEATURED_LEAGUES.index(f.league_id) if f.league_id in FEATURED_LEAGUES
+                                  else len(FEATURED_LEAGUES), f.kickoff))
+    if fx.kickoff > rows[0].kickoff + timedelta(hours=36):
+        fx = rows[0]  # don't feature Sunday's big game on a Tuesday when something kicks off sooner
+    snaps = latest_snapshots(db, [fx.id]).get(fx.id, [])
+    return {"fixture": fixture_dict(fx, best_1x2(snaps)), "ai": ai_dict(latest_prediction(db, fx))}
 
 
 def context_dict(ctx: MatchContext | None) -> dict:

@@ -61,6 +61,7 @@ export const api = {
   match: (id) => request(`/matches/${id}`),
   tips: (status = 'open') => request(`/tips${qs({ status })}`),
   record: () => request('/record'),
+  featured: () => request('/featured'),
 
   // auth
   login: (username, password) => request('/auth/login', { method: 'POST', body: { username, password } }),

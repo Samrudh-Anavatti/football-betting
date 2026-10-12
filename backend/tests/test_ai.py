@@ -157,3 +157,21 @@ def test_budget_blocks_analysis(client, auth, fake, monkeypatch):
     r = client.post(f"{API}/admin/matches/1001/ai", headers=auth)
     assert r.status_code == 402 and "budget" in r.json()["detail"]
     assert ai_client.configured()
+
+
+def test_public_sees_the_latest_analysis(client, auth, fake, monkeypatch):
+    model = FakeModel()
+    monkeypatch.setattr(service, "make_client", lambda: model)
+    _connect(monkeypatch)
+    assert client.get(f"{API}/featured").json() is None
+    client.post(f"{API}/admin/sync/fixtures", json={"league_ids": [39]}, headers=auth)
+    client.post(f"{API}/admin/sync/markets", json={"league_ids": [39]}, headers=auth)
+    assert client.get(f"{API}/matches/1001").json()["ai"] is None
+    client.post(f"{API}/admin/matches/1001/ai", headers=auth)
+
+    ai = client.get(f"{API}/matches/1001").json()["ai"]  # no login
+    assert ai["analysis"]["probabilities"]["home_win"] == 0.7 and ai["analysis"]["suggested_bets"]
+    assert ai["market_probs"]["result"]["home"] > 0.5
+    f = client.get(f"{API}/featured").json()
+    assert f["fixture"]["id"] == 1001 and f["ai"]["id"] == ai["id"]
+    assert client.get(f"{API}/tips").json() == []  # the AI's tracked tips stay private

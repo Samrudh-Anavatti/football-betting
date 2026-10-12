@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import FeaturedMatch from '../components/FeaturedMatch.jsx'
 import FixtureList from '../components/FixtureList.jsx'
 import TipCard from '../components/TipCard.jsx'
 import { Empty, ErrorNote, Loading, SectionHead } from '../components/ui.jsx'
@@ -36,19 +37,25 @@ export default function Home() {
   const tips = useApi(() => api.tips('open'), [])
   const settled = useApi(() => api.tips('settled'), [])
   const record = useApi(() => api.record(), [])
+  const featured = useApi(() => api.featured(), [])
   const upcoming = useApi(() => api.fixtures({ days: 2, limit: 40 }), [])
   const results = useApi(() => api.fixtures({ when: 'results', days: 3, limit: 30 }), [])
 
   return (
     <div className="space-y-10">
       <section className="-mx-4 sm:mx-0 sm:rounded-lg bg-ink text-white px-5 sm:px-8 py-8">
-        <h1 className="text-4xl sm:text-5xl font-bold leading-[1.05] max-w-3xl">
-          Expert football picks from Ivo, every one of them on the record.
-        </h1>
-        <p className="mt-3 max-w-xl text-white/75 text-lg">
-          Simple, confident picks: single bets, no long-odds accumulators. Each one is posted before kick-off with the price taken and the thinking behind it, then settled against the
-          final score. No deleting the losers.
-        </p>
+        <div className={`grid gap-8 ${featured.data?.ai ? 'lg:grid-cols-[1fr_24rem] lg:items-center' : ''}`}>
+          <div>
+            <h1 className="text-4xl sm:text-5xl font-bold leading-[1.05] max-w-3xl">
+              Expert football picks from Ivo, every one of them on the record.
+            </h1>
+            <p className="mt-3 max-w-xl text-white/75 text-lg">
+              Simple, confident picks: single bets, no long-odds accumulators. Each one is posted before kick-off with
+              the price taken and the thinking behind it, then settled against the final score. No deleting the losers.
+            </p>
+          </div>
+          <FeaturedMatch data={featured.data} />
+        </div>
         <Ledger record={record.data} />
       </section>
 
