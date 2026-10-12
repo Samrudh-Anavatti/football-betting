@@ -18,7 +18,7 @@ export default function Shell({ children }) {
         <div className="mx-auto max-w-6xl px-4 h-14 flex items-center gap-2 sm:gap-4">
           <NavLink to="/" className="flex items-center gap-2 sm:mr-2 shrink-0">
             <span className="h-6 w-[18px] rounded-[3px] bg-amber rotate-[8deg]" aria-hidden />
-            <span className="font-display text-xl font-bold hidden sm:inline">Ivo's Picks</span>
+            <span className="font-display text-xl font-bold hidden sm:inline">Bet Predictions AI</span>
           </NavLink>
           <nav className="flex items-center gap-1 min-w-0 overflow-x-auto">
             {NAV.map((n) => (

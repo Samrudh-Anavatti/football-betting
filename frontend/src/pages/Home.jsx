@@ -4,13 +4,18 @@ import TipCard from '../components/TipCard.jsx'
 import { Empty, ErrorNote, Loading, SectionHead } from '../components/ui.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { api } from '../lib/api.js'
-import { pct, signed } from '../lib/format.js'
+import { pct } from '../lib/format.js'
+
+// The record in money rather than units: a unit is £10, Ivo's standard stake.
+const UNIT = 10
+const pounds = (v, dp = 0) => `£${Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp })}`
 
 function Ledger({ record }) {
   if (!record || record.tips === 0) return null
+  const profit = record.profit_units * UNIT
   const items = [
-    ['Profit', `${signed(record.profit_units)} units`, record.profit_units >= 0 ? 'text-pitch' : 'text-red'],
-    ['Return on stake', pct(record.roi), ''],
+    [`Profit at £${UNIT} a unit`, `${profit < 0 ? '−' : '+'}${pounds(profit)}`, profit >= 0 ? 'text-pitch' : 'text-red'],
+    [`Every £${UNIT} staked returned`, record.roi == null ? '–' : pounds(UNIT * (1 + record.roi), 2), ''],
     ['Won / lost', `${record.won}–${record.lost}`, ''],
     ['Strike rate', pct(record.strike_rate, 0), ''],
     ['Average odds', record.avg_odds ?? '–', ''],
@@ -37,11 +42,11 @@ export default function Home() {
   return (
     <div className="space-y-10">
       <section className="-mx-4 sm:mx-0 sm:rounded-lg bg-ink text-white px-5 sm:px-8 py-8">
-        <h1 className="text-4xl sm:text-5xl font-bold leading-[1.05] max-w-2xl">
-          Football picks from Ivo, every one of them on the record.
+        <h1 className="text-4xl sm:text-5xl font-bold leading-[1.05] max-w-3xl">
+          Football picks from Ivo, researched with live data and AI analysis, every one of them on the record.
         </h1>
         <p className="mt-3 max-w-xl text-white/75 text-lg">
-          Each pick is posted before kick-off with the price taken and the thinking behind it, then settled against the
+          Simple, confident picks: single bets, no long-odds accumulators. Each one is posted before kick-off with the price taken and the thinking behind it, then settled against the
           final score. No deleting the losers.
         </p>
         <Ledger record={record.data} />
