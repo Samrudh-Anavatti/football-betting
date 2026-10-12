@@ -8,7 +8,7 @@ export default {
       colors: {
         chalk: '#EEF2EE',
         ink: { DEFAULT: '#13233A', soft: '#4A5A70', faint: '#8794A6' },
-        pitch: { DEFAULT: '#1F7A4D', light: '#E3F1E8' },
+        pitch: { DEFAULT: '#1F7A4D', light: '#E3F1E8', bright: '#5FCF94' }, // bright: on ink
         amber: { DEFAULT: '#F2B705', dark: '#9A7400', light: '#FDF4D3' },
         red: { DEFAULT: '#D64545', light: '#FBE6E6' },
       },

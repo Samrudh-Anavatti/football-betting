@@ -13,7 +13,7 @@ export default function FeaturedMatch({ data }) {
   return (
     <Link
       to={`/match/${fx.id}`}
-      className="group block rounded-md bg-chalk text-ink border-t-[6px] border-amber px-4 pt-3 pb-4 space-y-3 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.5)] lg:rotate-[1.5deg] transition-transform hover:rotate-0 focus-visible:rotate-0 focus-visible:ring-offset-ink"
+      className="group block min-w-0 rounded-md bg-chalk text-ink border-t-[6px] border-amber px-4 pt-3 pb-4 space-y-3 shadow-[0_12px_32px_-12px_rgba(0,0,0,0.5)] lg:rotate-[1.5deg] transition-transform hover:rotate-0 focus-visible:rotate-0 focus-visible:ring-offset-ink"
     >
       <p className="flex items-center gap-1.5 text-sm text-ink-soft">
         <LeagueBadge league={fx.league} />
@@ -23,8 +23,8 @@ export default function FeaturedMatch({ data }) {
         </span>
       </p>
       <div className="font-display text-2xl font-semibold leading-tight space-y-0.5">
-        <TeamName team={fx.home} />
-        <TeamName team={fx.away} />
+        <TeamName team={fx.home} className="flex" />
+        <TeamName team={fx.away} className="flex" />
       </div>
       <ProbabilityStrip ai={a.probabilities} market={ai.market_probs?.result} fx={fx} />
       {best && (
@@ -40,7 +40,7 @@ export default function FeaturedMatch({ data }) {
         {a.summary}
       </p>
       <p className="text-sm font-semibold underline decoration-amber decoration-2 underline-offset-4 group-hover:decoration-ink">
-        Open any match for every market, stats and the full AI analysis
+        Open any match for odds, stats and AI analysis
       </p>
     </Link>
   )
