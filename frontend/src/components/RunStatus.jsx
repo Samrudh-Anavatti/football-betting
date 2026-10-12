@@ -11,10 +11,16 @@ export const KIND = {
   context_light: 'Match-day research',
   lineups: 'Line-ups',
   analysis: 'AI analysis',
+  backup: 'Database backup',
   chat: 'AI reply',
 }
 
 export function runSummary(run) {
+  if (run.provider === 'backup') {
+    if (run.status === 'running') return 'Backing up…'
+    const d = run.details
+    return d ? `Saved ${d.blob}, ${(d.compressed_bytes / 1e6).toFixed(1)} MB compressed` : 'Not saved'
+  }
   if (run.provider === 'claude') {
     if (run.status === 'running') return 'The AI is thinking…'
     const c = run.details?.cost_usd

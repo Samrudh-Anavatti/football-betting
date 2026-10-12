@@ -22,6 +22,29 @@ function LastRun({ run }) {
 }
 
 // The background refresh schedule: on/off, the credit reserve, and what each job did today.
+function BackupNow({ onDone }) {
+  const [state, setState] = useState(null)
+  const go = async () => {
+    setState('busy')
+    try {
+      await api.backupNow()
+      setState(null)
+    } catch (e) {
+      setState(e)
+    }
+    // The backup runs in the background; refresh shortly to show it.
+    setTimeout(onDone, 4000)
+  }
+  return (
+    <span className="block mt-1">
+      <button type="button" className="font-semibold underline underline-offset-4 disabled:opacity-50" disabled={state === 'busy'} onClick={go}>
+        {state === 'busy' ? 'Backing up…' : 'Back up now'}
+      </button>
+      {state instanceof Error && <span className="block text-red">{state.message}</span>}
+    </span>
+  )
+}
+
 export default function ScheduleCard({ provider }) {
   const { data, loading, error, reload, setData } = useApi(() => api.schedule(), [])
   const [reserve, setReserve] = useState('')
@@ -136,12 +159,15 @@ export default function ScheduleCard({ provider }) {
           <tbody className="divide-y divide-ink/5 align-top">
             {data.jobs.map((j) => (
               <tr key={j.kind}>
-                <td className="px-5 py-2 font-semibold whitespace-nowrap">{j.label}</td>
+                <td className="px-5 py-2 font-semibold whitespace-nowrap">
+                  {j.label}
+                  {j.kind === 'backup' && <BackupNow onDone={reload} />}
+                </td>
                 <td className="py-2 pr-4 text-ink-soft min-w-[14rem]">{j.cadence}</td>
                 <td className="py-2 pr-4 min-w-[12rem]"><LastRun run={j.last_run} /></td>
                 <td className="py-2 pr-5 text-right whitespace-nowrap num">
                   {j.runs_today} run{j.runs_today === 1 ? '' : 's'}
-                  {j.kind !== 'analysis' && <span className="block text-ink-faint">{j.requests_today} requests</span>}
+                  {!['analysis', 'backup'].includes(j.kind) && <span className="block text-ink-faint">{j.requests_today} requests</span>}
                 </td>
               </tr>
             ))}

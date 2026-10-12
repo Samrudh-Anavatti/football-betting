@@ -44,7 +44,7 @@ from ..database import SessionLocal
 from ..models import AiThread, Fixture, League, MarketBook, MatchContext, ProviderQuota, Setting, SyncRun, User
 from ..providers.base import ProviderError
 from ..serialize import run_dict
-from . import sync
+from . import backup, sync
 from .settlement import FINISHED, VOIDED
 
 log = logging.getLogger(__name__)
@@ -63,6 +63,7 @@ LINEUPS_FROM, LINEUPS_UNTIL, LINEUPS_EVERY = timedelta(minutes=75), timedelta(mi
 AI_REFRESH_AT = timedelta(hours=6)
 AI_RETRY_AFTER = timedelta(hours=1)
 KEEP_RUNS = timedelta(days=14)
+BACKUP_HOUR = 3  # UTC: no matches on
 LEASE = timedelta(minutes=5)
 INSTANCE = f"{socket.gethostname()}:{os.getpid()}:{secrets.token_hex(3)}"
 
@@ -82,6 +83,7 @@ JOBS = [
     Job("context", "Research", "Main leagues: when a match comes within 7 days, and again 24 h before"),
     Job("context_light", "Match-day research", "Main leagues: hourly from 8 h before, injuries and prediction"),
     Job("lineups", "Line-ups", "Main leagues: every 10 min from 75 min before until they're out"),
+    Job("backup", "Database backup", "Daily at 03:00 UTC to Azure Blob storage, kept 30 days"),
     Job("analysis", "AI analysis", "Main leagues: when a match comes within 7 days, and again 6 h before"),
 ]
 
@@ -262,10 +264,20 @@ def _fetch_lineups(db: Session, af, fx: Fixture) -> bool:
     return sync.fetch_lineups(db, af, fx.id)
 
 
+def due_backup(db: Session, now: datetime) -> bool:
+    slot = now.replace(hour=BACKUP_HOUR, minute=0, second=0, microsecond=0)
+    if slot > now:
+        slot -= timedelta(days=1)
+    last = db.scalar(select(func.max(SyncRun.started_at)).where(SyncRun.kind == "backup", SyncRun.status == "ok"))
+    return last is None or last < slot
+
+
 def data_tick(db: Session, now: datetime | None = None) -> None:
     """One pass over the data jobs, most urgent first."""
     now = now or datetime.utcnow()
     db.expire_all()
+    if backup.configured() and due_backup(db, now) and _attempt_ok(("backup",), now, timedelta(hours=1)):
+        _run(db, "backup", "Database to Blob storage", 1, backup.job_backup, provider="backup")
     if not sync.configured("api_football"):
         return
     left = _api_allowance(db, now)

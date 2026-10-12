@@ -177,3 +177,42 @@ def test_only_one_process_runs_the_schedule(db):
     assert scheduler.hold_lease(db, now + timedelta(minutes=1), instance="old")  # renews
     assert scheduler.hold_lease(db, now + timedelta(minutes=7), instance="new")  # old one gone quiet
     assert not scheduler.hold_lease(db, now + timedelta(minutes=8), instance="old")
+
+
+class FakeContainer:
+    def __init__(self):
+        self.blobs = {}
+
+    def upload_blob(self, name, data, overwrite=False):
+        self.blobs[name] = data.read()
+
+
+def test_nightly_backup_is_a_working_database(client, auth, db, monkeypatch, tmp_path):
+    import gzip
+    import sqlite3
+
+    from app.services import backup
+
+    container = FakeContainer()
+    monkeypatch.setattr(config, "BACKUP_CONTAINER_URL", "https://example.blob.core.windows.net/db-backups")
+    monkeypatch.setattr(backup, "make_container", lambda: container)
+    db.execute(SyncRun.__table__.delete().where(SyncRun.kind == "backup"))
+    db.commit()
+
+    four_am = datetime.utcnow().replace(hour=4, minute=0, second=0, microsecond=0)
+    scheduler.data_tick(db, four_am)
+    run = db.scalar(select(SyncRun).where(SyncRun.kind == "backup"))
+    assert run.status == "ok" and run.triggered_by == sync.AUTO
+    (name, data), = container.blobs.items()
+    restored = tmp_path / "restored.db"
+    restored.write_bytes(gzip.decompress(data))
+    con = sqlite3.connect(restored)
+    assert con.execute("pragma integrity_check").fetchone() == ("ok",)
+    assert con.execute("select count(*) from users").fetchone()[0] >= 1
+    con.close()
+
+    scheduler._attempts.clear()
+    scheduler.data_tick(db, four_am + timedelta(hours=2))
+    assert len(container.blobs) == 1  # once a day
+    r = client.post(f"{API}/admin/backup", headers=auth).json()
+    assert r["status"] == "ok" and r["triggered_by"] == "Ivo"

@@ -12,7 +12,7 @@ from ..deps import current_user
 from ..models import Bet, Fixture, League, ProviderQuota, SyncRun, Tip, User
 from ..security import make_token, verify_password
 from ..serialize import bet_dict, iso, league_dict, run_dict, tip_dict
-from ..services import scheduler, sync
+from ..services import backup, scheduler, sync
 from .public import LEAGUE_ORDER
 from ..services.markets import parse_value, to_code
 from ..services.settlement import MARKETS, apply_result, settle_pending
@@ -95,6 +95,17 @@ def sync_runs(limit: int = 30, scheduled: bool = False, db: Session = Depends(ge
     if not scheduled:
         q = q.where(SyncRun.triggered_by.is_distinct_from(sync.AUTO))
     return [run_dict(r) for r in db.scalars(q)]
+
+
+@router.post("/backup")
+def backup_now(db: Session = Depends(get_db), user: User = Depends(current_user)):
+    """Back the database up to Blob storage now (the schedule does it nightly)."""
+    if not backup.configured():
+        raise HTTPException(400, "Backups aren't set up: set BACKUP_CONTAINER_URL in the App Service settings")
+    if sync.running_run(db, "backup"):
+        raise HTTPException(409, "A backup is already running")
+    return run_dict(sync.start_run(db, "backup", "backup", "Database to Blob storage", 1, user.display_name,
+                                   backup.job_backup))
 
 
 class ScheduleIn(BaseModel):

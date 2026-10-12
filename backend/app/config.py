@@ -21,6 +21,8 @@ API_FOOTBALL_MIN_INTERVAL = float(os.getenv("API_FOOTBALL_MIN_INTERVAL", "6.5"))
 # entirely; the on/off switch and credit reserve in Admin → Data are stored in the DB.
 SCHEDULER = os.getenv("SCHEDULER", "on").strip().lower()
 SCHEDULE_RESERVE = int(os.getenv("SCHEDULE_RESERVE", "2000"))
+# Nightly SQLite backups (services/backup.py): the container's URL; the app signs in with its managed identity.
+BACKUP_CONTAINER_URL = os.getenv("BACKUP_CONTAINER_URL", "").strip()
 
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-secret")
 TOKEN_DAYS = int(os.getenv("TOKEN_DAYS", "14"))

@@ -72,6 +72,7 @@ export const api = {
   checkQuota: (provider) => request(`/admin/integrations/${provider}/check`, { method: 'POST' }),
   syncRuns: (limit = 30, scheduled = false) => request(`/admin/sync-runs${qs({ limit, scheduled })}`),
   schedule: () => request('/admin/schedule'),
+  backupNow: () => request('/admin/backup', { method: 'POST' }),
   updateSchedule: (body) => request('/admin/schedule', { method: 'PUT', body }),
   syncRun: (id) => request(`/admin/sync-runs/${id}`),
   syncFixtures: (body) => request('/admin/sync/fixtures', { method: 'POST', body }),
