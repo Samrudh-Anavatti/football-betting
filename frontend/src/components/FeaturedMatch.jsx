@@ -23,8 +23,8 @@ export default function FeaturedMatch({ data }) {
         </span>
       </p>
       <div className="font-display text-2xl font-semibold leading-tight space-y-0.5">
-        <TeamName team={fx.home} className="flex" />
-        <TeamName team={fx.away} className="flex" />
+        <div><TeamName team={fx.home} className="max-w-full" /></div>
+        <div><TeamName team={fx.away} className="max-w-full" /></div>
       </div>
       <ProbabilityStrip ai={a.probabilities} market={ai.market_probs?.result} fx={fx} />
       {best && (

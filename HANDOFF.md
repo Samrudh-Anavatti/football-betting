@@ -9,7 +9,7 @@ _Last updated: 2026-10-12 (**refresh schedule** built: results, prices, research
 
 | Thing | Value |
 |---|---|
-| Frontend | https://samrudh-anavatti.github.io/football-betting/ (GitHub Pages, deploys on push to `main`) |
+| Frontend | https://samrudh-anavatti.github.io/football-betting/ (GitHub Pages, deploys on push to `main`). Branded **Bet Predictions AI** as a placeholder until the domain is chosen: change it in `frontend/src/components/Shell.jsx` and `frontend/index.html`. |
 | Backend | https://football-betting-api-sa.azurewebsites.net (API base `/api/v1`, docs at `/docs`) |
 | Resource group | `rg-football-betting` (UK South), **separate from PongPoints** |
 | App Service plan | `plan-football-betting`, Linux **B1**, Always On |
@@ -246,7 +246,11 @@ rebuilt bundle; old ones stay readable.
 * Tables: `ai_threads` (bundle as sent, its hash, model, prompt version), `ai_messages` (every API message as sent and
   received, with tokens and cost), `ai_predictions` (each recorded analysis plus the market's margin-free
   probabilities at that moment).
-* **Privacy:** suggestions are never published. Each suggested bet whose best current price is at or above the AI's
+* **Public view (since 2026-10-12, Sam's call):** every match page shows visitors the AI's latest pre-kick-off
+  analysis read-only (read, probabilities vs market, suggested bets), labelled as separate from Ivo's picks; the
+  home banner previews one match (`GET /featured`). Visitors can't start analyses, so this costs nothing extra.
+  The AI's tracked tips below stay private.
+* **Privacy of the record:** the AI's tips are never published. Each suggested bet whose best current price is at or above the AI's
   minimum becomes a `tips` row with `source='ai'`, `published=false`, at the best price available then. A new analysis
   replaces the match's earlier pending AI tips. Public endpoints only return `source='ivo'`, published tips.
   "Use this" opens the normal pick form, pre-filled, so a published pick is Ivo's.
@@ -370,4 +374,5 @@ Per-token prices are the same as Anthropic's own API (billed through the Microso
 1. **Ivo's method in his own words:** what he looks at first, what makes him bet or pass, his staking and price thresholds. This becomes the system prompt, so it's the single most important input.
 2. **Monthly AI budget** (suggest $20 to start).
 3. **Opus 5.5 vs Sonnet 5.5:** default to Opus 5.5, and compare once there's a track record.
-4. **Should AI suggestions ever be visible publicly** (e.g. "Ivo vs the AI")? Default: no.
+4. **Should AI suggestions ever be visible publicly** (e.g. "Ivo vs the AI")? Default: no. **Decided 2026-10-12:
+   yes, the analysis (bets included) shows on match pages; the AI's tracked record stays private.**
