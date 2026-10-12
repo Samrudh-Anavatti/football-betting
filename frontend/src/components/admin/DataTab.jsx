@@ -252,6 +252,11 @@ function LeagueTable({ leagues, selected, setSelected }) {
                     <span className="inline-flex items-center gap-1.5">
                       <LeagueBadge league={lg} />
                       <span className="font-semibold">{lg.name}</span> <span className="text-ink-faint">{lg.country}</span>
+                      {lg.supplementary && (
+                        <span className="rounded bg-ink/5 px-1.5 py-0.5 text-xs text-ink-soft" title="Fixtures, results and prices only; not on the home page">
+                          Supplementary
+                        </span>
+                      )}
                     </span>
                   </td>
                   <td className="py-2 pr-4"><Freshness at={lg.fixtures_synced_at} prefix="Synced" warnAfter={24 * 4} staleAfter={24 * 8} /></td>
@@ -353,7 +358,8 @@ export default function DataTab() {
   }
 
   useEffect(() => {
-    if (data && selected == null) setSelected(data.leagues.map((l) => l.id))
+    // Main leagues by default; the schedule keeps supplementary ones current.
+    if (data && selected == null) setSelected(data.leagues.filter((l) => !l.supplementary).map((l) => l.id))
   }, [data, selected])
 
   if (loading && !data) return <Loading />

@@ -29,7 +29,8 @@ class League(Base):
     country: Mapped[str] = mapped_column(String(40))
     flag: Mapped[str] = mapped_column(String(16), default="")
     logo: Mapped[str | None] = mapped_column(String(255))
-    odds_key: Mapped[str] = mapped_column(String(60))
+    odds_key: Mapped[str] = mapped_column(String(60))  # "" when The Odds API doesn't cover it
+    supplementary: Mapped[bool] = mapped_column(Boolean, default=False)  # see config.LeagueDef
     season: Mapped[int] = mapped_column(Integer)
     fixtures_synced_at: Mapped[datetime | None] = mapped_column(DateTime)
     odds_synced_at: Mapped[datetime | None] = mapped_column(DateTime)

@@ -76,6 +76,7 @@ def ensure_leagues(db: Session) -> None:
             row = League(id=lg.id, season=config.FOOTBALL_SEASON)
             db.add(row)
         row.name, row.country, row.flag, row.odds_key = lg.name, lg.country, lg.flag, lg.odds_key
+        row.supplementary = lg.supplementary
         row.season = config.FOOTBALL_SEASON
     db.commit()
 
@@ -336,6 +337,10 @@ def job_odds(db: Session, run: SyncRun, league_ids: list[int], regions: list[str
     errors, per_league, all_unmatched = [], {}, []
     for lid in league_ids:
         lg = db.get(League, lid)
+        if not lg.odds_key:
+            per_league[lg.name] = {"error": "Not covered by The Odds API"}
+            run.progress += 1
+            continue
         try:
             events = api.odds(lg.odds_key, regions, markets)
             pulled_at = datetime.utcnow()
@@ -361,6 +366,8 @@ def job_match_odds(db: Session, run: SyncRun, fixture_id: int, regions: list[str
     fx = db.get(Fixture, fixture_id)
     errors = []
     try:
+        if not fx.league.odds_key:
+            raise ProviderError(f"The Odds API doesn't cover {fx.league.name}")
         if fx.odds_event_id:
             ev = api.event_odds(fx.league.odds_key, fx.odds_event_id, regions, markets)
             events = [ev]

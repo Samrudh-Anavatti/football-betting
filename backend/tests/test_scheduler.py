@@ -39,7 +39,7 @@ def _last_id(db):
 
 def test_first_tick_syncs_everything_then_rests(db, fake):
     scheduler.data_tick(db)
-    # 12 leagues of fixtures + tables, 12 of prices, research for the match 2 days out.
+    # Every league's fixtures + tables and prices, research for the match 2 days out.
     assert _kinds(db) == ["context", "fixtures", "markets"]
     research = db.scalar(select(SyncRun).where(SyncRun.kind == "context"))
     assert research.items == 1 and research.requests_made == 9 and research.status == "ok"
@@ -102,8 +102,9 @@ def test_scheduled_runs_stay_out_of_the_buttons_way(client, auth, db, fake):
     assert len(client.get(f"{API}/admin/sync-runs?scheduled=true", headers=auth).json()) == 3
     s = client.get(f"{API}/admin/schedule", headers=auth).json()
     jobs = {j["kind"]: j for j in s["jobs"]}
-    assert jobs["fixtures"]["requests_today"] == 24 and jobs["context"]["runs_today"] == 1
-    assert s["requests_today"] == 24 + 12 + 9 and s["reserve"] == 0
+    n = len(config.LEAGUES)
+    assert jobs["fixtures"]["requests_today"] == 2 * n and jobs["context"]["runs_today"] == 1
+    assert s["requests_today"] == 2 * n + n + 9 and s["reserve"] == 0
     s = client.put(f"{API}/admin/schedule", headers=auth, json={"enabled": False, "reserve": 1500}).json()
     assert s["enabled"] is False and s["reserve"] == 1500
 
@@ -138,3 +139,30 @@ def test_auto_user_is_not_an_account(client, auth, db):
     names = [a["username"] for a in client.get(f"{API}/admin/accounts", headers=auth).json()["accounts"]]
     assert "auto" not in names
     assert client.post(f"{API}/auth/login", json={"username": "auto", "password": ""}).status_code == 401
+
+
+def test_supplementary_leagues_get_data_but_no_research_or_ai(client, db, fake, monkeypatch):
+    model = FakeModel()
+    monkeypatch.setattr(service, "make_client", lambda: model)
+    _connect(monkeypatch)
+    fake.af_fixtures = [af_fixture(2001, (60, "Leeds"), (61, "Hull"), KICKOFF, league=40)]
+    scheduler.data_tick(db)
+    assert {"fixtures", "markets"} <= set(_kinds(db))
+    researched = [r.details_json for r in db.scalars(select(SyncRun).where(SyncRun.kind == "context"))]
+    assert not any("Leeds" in (d or "") for d in researched)  # no research for a Championship match
+    scheduler._attempts.clear()
+    scheduler.ai_tick(db)
+    assert db.scalar(select(func.count(AiThread.id)).where(AiThread.fixture_id == 2001)) == 0
+
+    # Supplementary prices every 3 hours, main hourly.
+    mark = _last_id(db)
+    scheduler.data_tick(db, datetime.utcnow() + timedelta(minutes=61))
+    run = db.scalar(select(SyncRun).where(SyncRun.id > mark, SyncRun.kind == "markets"))
+    assert run.total == sum(1 for lg in config.LEAGUES if not lg.supplementary)
+
+    # Kept off the home page's lists, shown under "more leagues".
+    assert 2001 not in [f["id"] for f in client.get(f"{API}/fixtures", params={"tier": "main"}).json()]
+    more = client.get(f"{API}/fixtures", params={"tier": "more"}).json()
+    assert [f["id"] for f in more] == [2001]
+    lg = next(x for x in client.get(f"{API}/leagues").json() if x["id"] == 40)
+    assert lg["supplementary"] is True

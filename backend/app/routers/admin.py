@@ -13,6 +13,7 @@ from ..models import Bet, Fixture, League, ProviderQuota, SyncRun, Tip, User
 from ..security import make_token, verify_password
 from ..serialize import bet_dict, iso, league_dict, run_dict, tip_dict
 from ..services import scheduler, sync
+from .public import LEAGUE_ORDER
 from ..services.markets import parse_value, to_code
 from ..services.settlement import MARKETS, apply_result, settle_pending
 from ..services.stats import account_summary, tip_record
@@ -73,7 +74,7 @@ def integrations(db: Session = Depends(get_db)):
         })
     return {
         "providers": providers,
-        "leagues": [league_dict(lg) for lg in db.scalars(select(League).order_by(League.id.in_([2, 3]), League.country))],
+        "leagues": [league_dict(lg) for lg in db.scalars(select(League).order_by(*LEAGUE_ORDER))],
         "odds_options": {"regions": config.ODDS_REGIONS, "markets": config.ODDS_MARKETS},
         "pacing_seconds": config.API_FOOTBALL_MIN_INTERVAL,
         "season": config.FOOTBALL_SEASON,

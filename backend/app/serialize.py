@@ -12,7 +12,7 @@ def iso(dt: datetime | None) -> str | None:
 def league_dict(lg: League) -> dict:
     return {
         "id": lg.id, "name": lg.name, "country": lg.country, "flag": lg.flag, "logo": lg.logo,
-        "season": lg.season, "fixtures_synced_at": iso(lg.fixtures_synced_at),
+        "season": lg.season, "supplementary": bool(lg.supplementary), "fixtures_synced_at": iso(lg.fixtures_synced_at),
         "odds_synced_at": iso(lg.odds_synced_at), "standings_synced_at": iso(lg.standings_synced_at),
         "last_error": lg.last_error,
     }

@@ -56,11 +56,14 @@ class LeagueDef:
     id: int  # API-Football league id (our primary key)
     name: str
     country: str
-    odds_key: str  # The Odds API sport key
+    odds_key: str  # The Odds API sport key ("" = The Odds API doesn't cover it)
     flag: str  # emoji flag, used as a lightweight badge
+    # Supplementary leagues: fixtures, results and prices only. Not on the home page;
+    # research, line-ups and AI analysis only from the match page's buttons.
+    supplementary: bool = False
 
 
-# Ivo's leagues: top flight of ten countries plus the two big UEFA comps.
+# Main leagues: top flight of ten countries plus the three UEFA club competitions.
 LEAGUES: list[LeagueDef] = [
     LeagueDef(39, "Premier League", "England", "soccer_epl", "🏴󠁧󠁢󠁥󠁮󠁧󠁿"),
     LeagueDef(140, "La Liga", "Spain", "soccer_spain_la_liga", "🇪🇸"),
@@ -74,6 +77,40 @@ LEAGUES: list[LeagueDef] = [
     LeagueDef(253, "MLS", "USA", "soccer_usa_mls", "🇺🇸"),
     LeagueDef(2, "Champions League", "Europe", "soccer_uefa_champs_league", "🇪🇺"),
     LeagueDef(3, "Europa League", "Europe", "soccer_uefa_europa_league", "🇪🇺"),
+    LeagueDef(848, "Conference League", "Europe", "soccer_uefa_europa_conference_league", "🇪🇺"),
+] + [
+    LeagueDef(i, name, country, key, flag, supplementary=True) for i, name, country, key, flag in [
+        # Second and third tiers of the ten countries above (Spain's and Italy's third tiers are regional groups).
+        (40, "Championship", "England", "soccer_efl_champ", "🏴󠁧󠁢󠁥󠁮󠁧󠁿"),
+        (41, "League One", "England", "soccer_england_league1", "🏴󠁧󠁢󠁥󠁮󠁧󠁿"),
+        (141, "Segunda División", "Spain", "soccer_spain_segunda_division", "🇪🇸"),
+        (435, "Primera RFEF Group 1", "Spain", "", "🇪🇸"),
+        (436, "Primera RFEF Group 2", "Spain", "", "🇪🇸"),
+        (136, "Serie B", "Italy", "soccer_italy_serie_b", "🇮🇹"),
+        (138, "Serie C Girone A", "Italy", "", "🇮🇹"),
+        (942, "Serie C Girone B", "Italy", "", "🇮🇹"),
+        (943, "Serie C Girone C", "Italy", "", "🇮🇹"),
+        (79, "2. Bundesliga", "Germany", "soccer_germany_bundesliga2", "🇩🇪"),
+        (80, "3. Liga", "Germany", "soccer_germany_liga3", "🇩🇪"),
+        (62, "Ligue 2", "France", "soccer_france_ligue_two", "🇫🇷"),
+        (63, "Ligue 3", "France", "", "🇫🇷"),
+        (95, "Liga Portugal 2", "Portugal", "", "🇵🇹"),
+        (865, "Liga 3", "Portugal", "", "🇵🇹"),
+        (89, "Eerste Divisie", "Netherlands", "", "🇳🇱"),
+        (492, "Tweede Divisie", "Netherlands", "", "🇳🇱"),
+        (204, "1. Lig", "Turkey", "", "🇹🇷"),
+        (205, "2. Lig", "Turkey", "", "🇹🇷"),
+        (145, "Challenger Pro League", "Belgium", "", "🇧🇪"),
+        (487, "First Amateur Division", "Belgium", "", "🇧🇪"),
+        (255, "USL Championship", "USA", "", "🇺🇸"),
+        (489, "USL League One", "USA", "", "🇺🇸"),
+        # South America and Scotland.
+        (71, "Brasileirão Série A", "Brazil", "soccer_brazil_campeonato", "🇧🇷"),
+        (72, "Brasileirão Série B", "Brazil", "soccer_brazil_serie_b", "🇧🇷"),
+        (128, "Liga Profesional", "Argentina", "soccer_argentina_primera_division", "🇦🇷"),
+        (129, "Primera Nacional", "Argentina", "", "🇦🇷"),
+        (179, "Scottish Premiership", "Scotland", "soccer_spl", "🏴󠁧󠁢󠁳󠁣󠁴󠁿"),
+    ]
 ]
 
 LEAGUES_BY_ID = {lg.id: lg for lg in LEAGUES}

@@ -24,11 +24,11 @@ from app.services import sync  # noqa: E402
 KICKOFF = (datetime.utcnow() + timedelta(days=2)).replace(microsecond=0)
 
 
-def af_fixture(fid, home, away, kickoff, status="NS", hg=None, ag=None):
+def af_fixture(fid, home, away, kickoff, status="NS", hg=None, ag=None, league=39):
     return {
         "fixture": {"id": fid, "date": kickoff.isoformat() + "+00:00", "venue": {"name": "Ground"},
                     "status": {"short": status, "long": status}},
-        "league": {"id": 39, "season": 2026, "round": "Regular Season - 7", "logo": "x.png"},
+        "league": {"id": league, "season": 2026, "round": "Regular Season - 7", "logo": "x.png"},
         "teams": {"home": {"id": home[0], "name": home[1]}, "away": {"id": away[0], "name": away[1]}},
         "goals": {"home": hg, "away": ag},
         "score": {"fulltime": {"home": hg, "away": ag},

@@ -7,6 +7,9 @@ worker), each ticking once a minute:
 * data: results, fixtures, odds, research and line-ups (API-Football);
 * AI: one analysis at a time, since a model call takes a minute or so.
 
+Supplementary leagues (config.LeagueDef) get fixtures, live scores and a 3-hourly
+price sweep only: no near-kick-off prices, research, line-ups or AI analysis.
+
 Every job works out what's due from the database (kick-off times and when each
 thing was last fetched), so a restart or deploy simply picks up where it left
 off. Each tick's work is one SyncRun per job, triggered_by "Schedule", so its
@@ -42,6 +45,7 @@ UPCOMING = ("NS", "TBD")
 FIXTURE_SLOTS = (6, 18)  # UTC hours for the full fixtures + tables sync
 RESULTS_EVERY = timedelta(minutes=5)
 ODDS_SWEEP_EVERY = timedelta(minutes=55)  # hourly, with slack for tick timing
+SUPPLEMENTARY_ODDS_EVERY = timedelta(minutes=175)  # every 3 hours
 NEAR_ODDS_WINDOW, NEAR_ODDS_EVERY = timedelta(hours=3), timedelta(minutes=15)
 CLOSING_WINDOW, CLOSING_EVERY = timedelta(minutes=10), timedelta(minutes=5)
 RESEARCH_WINDOW, RESEARCH_REFRESH = timedelta(days=7), timedelta(hours=24)
@@ -62,13 +66,13 @@ class Job:
 
 JOBS = [
     Job("results", "Live scores and results", "Every 5 min while one of our matches is in play; settles picks at full time"),
-    Job("fixtures", "Fixtures and tables", "06:00 and 18:00 UTC, all leagues"),
-    Job("markets", "Prices, all leagues", "Hourly (unchanged books add no history)"),
-    Job("match_markets", "Prices near kick-off", "Every 15 min in the last 3 h, plus a closing pull 5 to 10 min before"),
-    Job("context", "Research", "When a match comes within 7 days, and again 24 h before"),
-    Job("context_light", "Match-day research", "Hourly from 8 h before: injuries and prediction"),
-    Job("lineups", "Line-ups", "Every 10 min from 75 min before until they're out"),
-    Job("analysis", "AI analysis", "When a match comes within 7 days, and again 6 h before"),
+    Job("fixtures", "Fixtures and tables", "06:00 and 18:00 UTC, all leagues including supplementary"),
+    Job("markets", "Prices, all leagues", "Hourly; every 3 h for supplementary leagues (unchanged books add no history)"),
+    Job("match_markets", "Prices near kick-off", "Main leagues: every 15 min in the last 3 h, plus a closing pull 5 to 10 min before"),
+    Job("context", "Research", "Main leagues: when a match comes within 7 days, and again 24 h before"),
+    Job("context_light", "Match-day research", "Main leagues: hourly from 8 h before, injuries and prediction"),
+    Job("lineups", "Line-ups", "Main leagues: every 10 min from 75 min before until they're out"),
+    Job("analysis", "AI analysis", "Main leagues: when a match comes within 7 days, and again 6 h before"),
 ]
 
 
@@ -159,14 +163,22 @@ def due_fixture_leagues(db: Session, now: datetime) -> list[int]:
 
 
 def due_odds_leagues(db: Session, now: datetime) -> list[int]:
+    def every(lg):
+        return SUPPLEMENTARY_ODDS_EVERY if lg.supplementary else ODDS_SWEEP_EVERY
     return [lg.id for lg in db.scalars(select(League).order_by(League.id))
-            if lg.odds_synced_at is None or lg.odds_synced_at < now - ODDS_SWEEP_EVERY]
+            if lg.odds_synced_at is None or lg.odds_synced_at < now - every(lg)]
+
+
+def _main_upcoming(now: datetime, window: timedelta):
+    """Upcoming main-league fixtures kicking off within the window, soonest first."""
+    return (select(Fixture).join(League).where(League.supplementary.is_(False), Fixture.status.in_(UPCOMING),
+                                               Fixture.kickoff > now, Fixture.kickoff <= now + window)
+            .order_by(Fixture.kickoff))
 
 
 def due_near_odds(db: Session, now: datetime) -> list[Fixture]:
     out = []
-    for fx in db.scalars(select(Fixture).where(Fixture.status.in_(UPCOMING), Fixture.kickoff > now,
-                                               Fixture.kickoff <= now + NEAR_ODDS_WINDOW).order_by(Fixture.kickoff)):
+    for fx in db.scalars(_main_upcoming(now, NEAR_ODDS_WINDOW)):
         every = CLOSING_EVERY if fx.kickoff - now <= CLOSING_WINDOW else NEAR_ODDS_EVERY
         last = db.scalar(select(MarketBook.pulled_at).where(MarketBook.fixture_id == fx.id))
         if (last is None or last <= now - every) and _attempt_ok(("odds", fx.id), now, every):
@@ -176,8 +188,7 @@ def due_near_odds(db: Session, now: datetime) -> list[Fixture]:
 
 def due_research(db: Session, now: datetime) -> list[Fixture]:
     out = []
-    for fx in db.scalars(select(Fixture).where(Fixture.status.in_(UPCOMING), Fixture.kickoff > now,
-                                               Fixture.kickoff <= now + RESEARCH_WINDOW).order_by(Fixture.kickoff)):
+    for fx in db.scalars(_main_upcoming(now, RESEARCH_WINDOW)):
         ctx = db.get(MatchContext, fx.id)
         stale = ctx is None or (fx.kickoff - now <= RESEARCH_REFRESH and ctx.fetched_at < fx.kickoff - RESEARCH_REFRESH)
         if stale and _attempt_ok(("research", fx.id), now, timedelta(hours=1)):
@@ -189,8 +200,7 @@ def due_research(db: Session, now: datetime) -> list[Fixture]:
 
 def due_light(db: Session, now: datetime) -> list[Fixture]:
     out = []
-    for fx in db.scalars(select(Fixture).where(Fixture.status.in_(UPCOMING), Fixture.kickoff > now,
-                                               Fixture.kickoff <= now + LIGHT_WINDOW).order_by(Fixture.kickoff)):
+    for fx in db.scalars(_main_upcoming(now, LIGHT_WINDOW)):
         ctx = db.get(MatchContext, fx.id)
         if ctx is None:
             continue  # the full research job gets there first
@@ -202,9 +212,9 @@ def due_light(db: Session, now: datetime) -> list[Fixture]:
 
 def due_lineups(db: Session, now: datetime) -> list[Fixture]:
     out = []
-    for fx in db.scalars(select(Fixture).where(Fixture.kickoff > now - LINEUPS_UNTIL,
-                                               Fixture.kickoff <= now + LINEUPS_FROM,
-                                               Fixture.status.not_in(FINISHED | VOIDED))):
+    for fx in db.scalars(select(Fixture).join(League).where(
+            League.supplementary.is_(False), Fixture.kickoff > now - LINEUPS_UNTIL,
+            Fixture.kickoff <= now + LINEUPS_FROM, Fixture.status.not_in(FINISHED | VOIDED))):
         ctx = db.get(MatchContext, fx.id)
         if ctx is not None and ctx.lineups_json:
             continue
@@ -300,8 +310,8 @@ def due_analysis(db: Session, now: datetime) -> Fixture | None:
     """The next match to analyse: priced and researched, and either never
     analysed or last analysed before its 6-hours-out refresh."""
     q = (select(Fixture).join(MarketBook, MarketBook.fixture_id == Fixture.id)
-         .join(MatchContext, MatchContext.fixture_id == Fixture.id)
-         .where(Fixture.status.in_(UPCOMING), Fixture.kickoff > now + timedelta(minutes=15),
+         .join(MatchContext, MatchContext.fixture_id == Fixture.id).join(League)
+         .where(League.supplementary.is_(False), Fixture.status.in_(UPCOMING), Fixture.kickoff > now + timedelta(minutes=15),
                 Fixture.kickoff <= now + RESEARCH_WINDOW)
          .order_by(Fixture.kickoff))
     for fx in db.scalars(q):

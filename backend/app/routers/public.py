@@ -16,9 +16,13 @@ from ..services.stats import tip_record
 router = APIRouter(tags=["public"])
 
 
+# Main leagues first (UEFA competitions after the countries), then supplementary by country.
+LEAGUE_ORDER = (League.supplementary, League.id.in_([2, 3, 848]), League.country, League.id)
+
+
 @router.get("/leagues")
 def leagues(db: Session = Depends(get_db)):
-    return [league_dict(lg) for lg in db.scalars(select(League).order_by(League.id.in_([2, 3]), League.country))]
+    return [league_dict(lg) for lg in db.scalars(select(League).order_by(*LEAGUE_ORDER))]
 
 
 @router.get("/fixtures")
@@ -26,6 +30,7 @@ def fixtures(
     when: str = Query("upcoming", pattern="^(upcoming|results)$"),
     league_id: list[int] | None = Query(None),
     country: str | None = None,
+    tier: str = Query("all", pattern="^(all|main|more)$"),  # more = supplementary leagues
     days: int = Query(7, ge=1, le=60),
     limit: int = Query(300, le=1000),
     db: Session = Depends(get_db),
@@ -42,6 +47,8 @@ def fixtures(
         q = q.where(Fixture.league_id.in_(league_id))
     if country:
         q = q.where(League.country == country)
+    if tier != "all":
+        q = q.where(League.supplementary.is_(tier == "more"))
     rows = list(db.scalars(q.limit(limit)))
     odds = latest_snapshots(db, [f.id for f in rows]) if when == "upcoming" else {}
     return [fixture_dict(f, best_1x2(odds.get(f.id, []))) for f in rows]
@@ -98,8 +105,8 @@ def featured(db: Session = Depends(get_db)):
     """One upcoming match with an AI analysis, for the home page's preview card."""
     now = datetime.utcnow()
     rows = list(db.scalars(
-        select(Fixture).join(AiPrediction, AiPrediction.fixture_id == Fixture.id)
-        .where(Fixture.status.in_(("NS", "TBD")), Fixture.kickoff > now + timedelta(minutes=10),
+        select(Fixture).join(AiPrediction, AiPrediction.fixture_id == Fixture.id).join(League)
+        .where(League.supplementary.is_(False), Fixture.status.in_(("NS", "TBD")), Fixture.kickoff > now + timedelta(minutes=10),
                Fixture.kickoff <= now + timedelta(days=3))
         .group_by(Fixture.id).order_by(Fixture.kickoff)))
     if not rows:

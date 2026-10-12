@@ -38,8 +38,8 @@ export default function Home() {
   const settled = useApi(() => api.tips('settled'), [])
   const record = useApi(() => api.record(), [])
   const featured = useApi(() => api.featured(), [])
-  const upcoming = useApi(() => api.fixtures({ days: 2, limit: 40 }), [])
-  const results = useApi(() => api.fixtures({ when: 'results', days: 3, limit: 30 }), [])
+  const upcoming = useApi(() => api.fixtures({ days: 2, limit: 40, tier: 'main' }), [])
+  const results = useApi(() => api.fixtures({ when: 'results', days: 3, limit: 30, tier: 'main' }), [])
 
   return (
     <div className="space-y-10">

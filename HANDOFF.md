@@ -157,6 +157,22 @@ Plan: move to **Azure Database for PostgreSQL Flexible Server**, Burstable B1ms
 
 About £33–36/month including scheduled AI analysis. The resource group's budget alert is set at 50.
 
+## Leagues (2026-10-12)
+
+**13 main leagues**: top flights of England, Spain, Italy, Germany, France, Portugal, Netherlands, Turkey, Belgium,
+USA (MLS), plus the Champions, Europa and Conference Leagues. Everything runs for these.
+
+**29 supplementary leagues** (`supplementary=True` in `config.LEAGUES`): the 2nd and 3rd tiers of those ten
+countries (Spain's Primera RFEF and Italy's Serie C are regional groups, so 2 and 3 entries), Brazil Série A/B,
+Argentina's Liga Profesional and Primera Nacional, and the Scottish Premiership. They show on the Fixtures/Results
+tabs under "More leagues", never on the home page. The schedule gives them fixtures + tables, live scores and a
+3-hourly price sweep only, about 20 requests/day each (~600 total); research, line-ups and AI run only from the
+match page's buttons. The 17 that The Odds API doesn't cover have `odds_key=""`, so they have no backup prices.
+
+To add a league: find its id with `GET /leagues?search=` (or the list of 602 active competitions pulled on
+2026-10-12: 419 have odds coverage), add a `LeagueDef`, deploy; startup adds the row and the schedule syncs it.
+Calendar-year leagues (Brazil, Argentina, USA) use the same `FOOTBALL_SEASON`, which is right for them too.
+
 ## Refresh schedule (built 2026-10-12)
 
 `backend/app/services/scheduler.py`: two daemon threads in the web process (data and AI), ticking every minute.
@@ -176,8 +192,8 @@ They never block the buttons.
 | Line-ups | Every 10 min from 75 min before until they're out (or 15 min after kick-off) | ~4 per match |
 | AI analysis | Within 7 days (needs prices + research), and again 6 h before. One at a time. Author "Auto". | ~$0.012 each |
 
-**Estimate on the current 12 leagues:** about 3,000 requests on a busy weekend day, 1,800 on a quiet one, out of
-7,500. API-Football jobs stop for the day at the reserve (default 2,000; live scores keep going while > 50). Each
+**Estimate:** about 3,000 requests on a busy weekend day for the main leagues, plus ~600 for the supplementary
+ones, out of 7,500. API-Football jobs stop for the day at the reserve (default 2,000; live scores keep going while > 50). Each
 extra league would add roughly 100 requests/day plus ~35 per match.
 
 **AI:** ~420–560 matches/month × 2 × $0.012 ≈ $10–14 (worst case ~$17). Scheduled analyses stop at 85% of the
