@@ -43,7 +43,7 @@ export default function Home() {
     <div className="space-y-10">
       <section className="-mx-4 sm:mx-0 sm:rounded-lg bg-ink text-white px-5 sm:px-8 py-8">
         <h1 className="text-4xl sm:text-5xl font-bold leading-[1.05] max-w-3xl">
-          Football picks from Ivo, researched with live data and AI analysis, every one of them on the record.
+          Expert football picks from Ivo, every one of them on the record.
         </h1>
         <p className="mt-3 max-w-xl text-white/75 text-lg">
           Simple, confident picks: single bets, no long-odds accumulators. Each one is posted before kick-off with the price taken and the thinking behind it, then settled against the
