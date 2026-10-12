@@ -12,7 +12,7 @@ from ..deps import current_user
 from ..models import Bet, Fixture, League, ProviderQuota, SyncRun, Tip, User
 from ..security import make_token, verify_password
 from ..serialize import bet_dict, iso, league_dict, run_dict, tip_dict
-from ..services import sync
+from ..services import scheduler, sync
 from ..services.markets import parse_value, to_code
 from ..services.settlement import MARKETS, apply_result, settle_pending
 from ..services.stats import account_summary, tip_record
@@ -88,8 +88,28 @@ def check(provider: str, db: Session = Depends(get_db)):
 
 
 @router.get("/sync-runs")
-def sync_runs(limit: int = 30, db: Session = Depends(get_db)):
-    return [run_dict(r) for r in db.scalars(select(SyncRun).order_by(SyncRun.id.desc()).limit(limit))]
+def sync_runs(limit: int = 30, scheduled: bool = False, db: Session = Depends(get_db)):
+    """Recent runs; scheduled ones (several an hour) only when asked for."""
+    q = select(SyncRun).order_by(SyncRun.id.desc()).limit(limit)
+    if not scheduled:
+        q = q.where(SyncRun.triggered_by.is_distinct_from(sync.AUTO))
+    return [run_dict(r) for r in db.scalars(q)]
+
+
+class ScheduleIn(BaseModel):
+    enabled: bool | None = None
+    reserve: int | None = Field(None, ge=0, le=100_000)
+
+
+@router.get("/schedule")
+def schedule(db: Session = Depends(get_db)):
+    return scheduler.status(db)
+
+
+@router.put("/schedule")
+def update_schedule(body: ScheduleIn, db: Session = Depends(get_db)):
+    scheduler.save_settings(db, body.enabled, body.reserve)
+    return scheduler.status(db)
 
 
 @router.get("/sync-runs/{run_id}")
@@ -337,7 +357,7 @@ class BetIn(Selection):
 
 @router.get("/accounts")
 def accounts(db: Session = Depends(get_db)):
-    users = list(db.scalars(select(User).order_by(User.id)))
+    users = list(db.scalars(select(User).where(User.username != "auto").order_by(User.id)))
     bets = list(db.scalars(select(Bet).join(Fixture).order_by(Fixture.kickoff.desc()).limit(200)))
     return {"accounts": [account_summary(db, u) for u in users], "bets": [bet_dict(b) for b in bets]}
 

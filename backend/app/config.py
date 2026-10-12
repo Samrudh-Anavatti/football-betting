@@ -17,6 +17,11 @@ FOOTBALL_SEASON = int(os.getenv("FOOTBALL_SEASON", "2026"))
 # Free API-Football plan: 10 requests/minute. Calls are spaced by this many seconds.
 API_FOOTBALL_MIN_INTERVAL = float(os.getenv("API_FOOTBALL_MIN_INTERVAL", "6.5"))
 
+# Background refresh schedule (services/scheduler.py). "off" stops the threads
+# entirely; the on/off switch and credit reserve in Admin → Data are stored in the DB.
+SCHEDULER = os.getenv("SCHEDULER", "on").strip().lower()
+SCHEDULE_RESERVE = int(os.getenv("SCHEDULE_RESERVE", "2000"))
+
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-secret")
 TOKEN_DAYS = int(os.getenv("TOKEN_DAYS", "14"))
 
@@ -37,6 +42,8 @@ DEFAULT_AI_MODEL = "gpt-5.6-luna"
 AI_MODEL = os.getenv("AI_MODEL", DEFAULT_AI_MODEL)  # the Foundry deployment name
 AI_EFFORT = os.getenv("AI_EFFORT", "high")  # reasoning effort: low | medium | high
 AI_MONTHLY_BUDGET_USD = float(os.getenv("AI_MONTHLY_BUDGET_USD", "20"))
+# Scheduled analyses stop at this share of the budget, so the rest stays free for the Analyse button.
+AI_AUTO_BUDGET_SHARE = float(os.getenv("AI_AUTO_BUDGET_SHARE", "0.85"))
 # USD per million tokens (Azure Global Standard, short context): input, output, cached input.
 AI_PRICES = {
     "gpt-5.6-luna": (0.20, 1.20, 0.02),

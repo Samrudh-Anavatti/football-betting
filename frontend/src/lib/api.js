@@ -69,7 +69,9 @@ export const api = {
   // integrations
   integrations: () => request('/admin/integrations'),
   checkQuota: (provider) => request(`/admin/integrations/${provider}/check`, { method: 'POST' }),
-  syncRuns: (limit = 30) => request(`/admin/sync-runs${qs({ limit })}`),
+  syncRuns: (limit = 30, scheduled = false) => request(`/admin/sync-runs${qs({ limit, scheduled })}`),
+  schedule: () => request('/admin/schedule'),
+  updateSchedule: (body) => request('/admin/schedule', { method: 'PUT', body }),
   syncRun: (id) => request(`/admin/sync-runs/${id}`),
   syncFixtures: (body) => request('/admin/sync/fixtures', { method: 'POST', body }),
   syncOdds: (body) => request('/admin/sync/odds', { method: 'POST', body }),

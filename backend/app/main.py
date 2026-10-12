@@ -8,6 +8,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from .database import Base, SessionLocal, add_missing_columns, engine
 from .routers import admin, ai, public
 from .seed import sync_users
+from .services import scheduler
 from .services.settlement import settle_pending
 from .services.sync import ensure_leagues, fail_interrupted_runs
 
@@ -45,6 +46,7 @@ def on_startup():
         settle_pending(db)
     finally:
         db.close()
+    scheduler.start()
 
 
 @app.get("/api/v1/health", tags=["meta"])

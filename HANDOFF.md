@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-10-07 (prices now come from API-Football for every market; AI analysis on Microsoft Foundry, switched from Claude Sonnet 5.5 to **GPT-5.6 Luna** the same day; **next: Ivo's method for the prompt**)._
+_Last updated: 2026-10-12 (**refresh schedule** built: results, prices, research and AI analyses now refresh in the background; settlement now covers handicaps and team-to-score; **next: Ivo's method for the prompt**)._
 
 ## Live resources
 
@@ -49,14 +49,18 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 | `AI_MODEL` | gpt-5.6-luna | A Foundry deployment name that speaks the Responses API (e.g. `gpt-5.6-terra` after deploying it). Add its price to `AI_PRICES` in `config.py`. |
 | `AI_EFFORT` | high | Reasoning effort per call (low / medium / high). |
 | `AI_MONTHLY_BUDGET_USD` | 20 | The Analyse/chat buttons refuse once this month's AI spend reaches it. |
+| `AI_AUTO_BUDGET_SHARE` | 0.85 | Scheduled analyses stop at this share of the budget ($17 of $20), leaving the rest for the buttons. |
+| `SCHEDULER` | on | `off` stops the refresh schedule's threads entirely (the Schedule card then says "Not running"). Pausing from the card is the normal way. |
+| `SCHEDULE_RESERVE` | 2000 | Default for the card's "stop for the day when this many are left". The card's value (stored in the DB) wins once saved. |
 | `SCM_DO_BUILD_DURING_DEPLOYMENT` | true | Azure pip-installs requirements on deploy. |
 
 GitHub Actions (Settings → Secrets and variables → Actions):
 `AZURE_WEBAPP_NAME` (variable), `AZURE_WEBAPP_PUBLISH_PROFILE` (secret),
 `VITE_API_URL` (variable, `https://football-betting-api-sa.azurewebsites.net/api/v1`).
 
-**Keep uvicorn to a single worker.** Syncs run in background threads inside the
-web process, and SQLite prefers one writer.
+**Keep uvicorn to a single worker.** Syncs and the refresh schedule run in
+background threads inside the web process (two workers would mean two schedules),
+and SQLite prefers one writer.
 
 ## Moving the backend (new plan, region or host)
 
@@ -119,7 +123,10 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
 * [ ] **Ivo's method in his own words** → `backend/app/ai/prompts/v3.md` (copy v2, fill the "Ivo's method" section, bump `PROMPT_VERSION` in `ai/service.py`).
 * [ ] Back-test: run the AI on ~30 settled matches played after its training cutoff and compare Brier scores with the market.
 * [ ] Move from SQLite to a database we can browse and monitor (see below).
-* [ ] Price-movement chart from odds history; closing-line value per pick.
+* [ ] Price-movement chart from odds history; closing-line value per pick. (The schedule now captures a closing
+  book 5–10 min before every kick-off, so the data for this is there.)
+* [x] Refresh schedule (2026-10-12). **Check real usage on the Schedule card after a full weekend** against the
+  estimates below, before adding leagues.
 
 ## Future: a database we can browse
 
@@ -145,10 +152,44 @@ Plan: move to **Azure Database for PostgreSQL Flexible Server**, Burstable B1ms
 | App Service B1 Linux, UK South | 9.93 (Azure retail price £0.0136/hr) |
 | API-Football Pro ($19) | ~14–15 |
 | The Odds API (free) | 0 |
-| GPT-5.6 Luna on Foundry (measured ~$0.01 per match) | ~1–2 even with heavy use |
+| GPT-5.6 Luna on Foundry (~$0.012 per analysis; the schedule runs 2 per match) | ~8–11 ($10–14), capped at $20 |
 | Postgres Flexible B1ms (future) | ~10–13 |
 
-About £25–27/month including AI analysis. The resource group's budget alert is set at 50.
+About £33–36/month including scheduled AI analysis. The resource group's budget alert is set at 50.
+
+## Refresh schedule (built 2026-10-12)
+
+`backend/app/services/scheduler.py`: two daemon threads in the web process (data and AI), ticking every minute.
+Each job decides what's due from the DB, so deploys and restarts just carry on. Admin → Data → **Refresh schedule**
+has the on/off switch, the reserve, and each job's last run and usage today. Scheduled runs are SyncRuns with
+`triggered_by = "Schedule"`, hidden from the history unless "Include scheduled runs" is ticked, pruned after 14 days.
+They never block the buttons.
+
+| Job | When | Requests |
+|---|---|---|
+| Live scores | Every 5 min while one of our matches is in play (kicked off < 12 h ago, not finished): `/fixtures?ids=` (20 per request). Settles at full time and refreshes that league's table. | ~100–300 on a busy day |
+| Fixtures + tables | 06:00 and 18:00 UTC, all leagues | ~50/day |
+| Prices, all leagues | Hourly | ~35 per sweep, ~850/day |
+| Prices near kick-off | Each match every 15 min in its last 3 h, every 5 min in the last 10 min (the closing book) | ~13 per match |
+| Research | When a match comes within 7 days (10 matches per tick), and again 24 h before | ~8–9 per match each time |
+| Match-day research | Hourly from 8 h before: injuries + prediction only | 2 per match per hour |
+| Line-ups | Every 10 min from 75 min before until they're out (or 15 min after kick-off) | ~4 per match |
+| AI analysis | Within 7 days (needs prices + research), and again 6 h before. One at a time. Author "Auto". | ~$0.012 each |
+
+**Estimate on the current 12 leagues:** about 3,000 requests on a busy weekend day, 1,800 on a quiet one, out of
+7,500. API-Football jobs stop for the day at the reserve (default 2,000; live scores keep going while > 50). Each
+extra league would add roughly 100 requests/day plus ~35 per match.
+
+**AI:** ~420–560 matches/month × 2 × $0.012 ≈ $10–14 (worst case ~$17). Scheduled analyses stop at 85% of the
+budget. Their tips are private `source='ai'` tips authored by the `auto` user (random password, can't sign in,
+hidden from Accounts), which replace that match's earlier pending AI tips as before.
+
+**Measured 2026-10-12:** at 21:05 UTC every upcoming EPL book was last updated by API-Football at 16:34, so odds
+update every few hours far out and more often near kick-off; that's why the sweep is hourly and the effort goes on
+the last 3 hours. A pull whose `update` time hasn't changed adds no `odds_snapshots` rows.
+
+**First deploy:** the backlog runs at once: research for ~130 matches (~1,100 requests over ~15 min) and ~130 AI
+analyses (~$1.60, a couple of hours one at a time).
 
 ## Prices: every market from API-Football (built 2026-10-07)
 

@@ -90,6 +90,10 @@ class ApiFootball:
     def fixtures(self, league: int, season: int) -> list:
         return self.get("/fixtures", {"league": league, "season": season})
 
+    def fixtures_by_ids(self, ids: list[int]) -> list:
+        """Up to 20 fixtures in one request: the cheap way to follow live scores."""
+        return self.get("/fixtures", {"ids": "-".join(map(str, ids[:20]))})
+
     def standings(self, league: int, season: int) -> list:
         return self.get("/standings", {"league": league, "season": season})
 

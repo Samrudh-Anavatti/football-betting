@@ -129,6 +129,8 @@ class MatchContext(Base):
     away_stats_json: Mapped[str | None] = mapped_column(Text)
     lineups_json: Mapped[str | None] = mapped_column(Text)
     lineups_fetched_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # Match-day refresh of the parts that change on the day (injuries, prediction).
+    light_fetched_at: Mapped[datetime | None] = mapped_column(DateTime)
     errors_json: Mapped[str | None] = mapped_column(Text)
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
@@ -151,6 +153,15 @@ class ProviderQuota(Base):
     last_error: Mapped[str | None] = mapped_column(Text)
 
 
+class Setting(Base):
+    """Small key/value store for settings changed from the admin panel (the schedule)."""
+
+    __tablename__ = "settings"
+
+    key: Mapped[str] = mapped_column(String(40), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+
+
 class SyncRun(Base):
     """One press of a sync button: what ran, what it cost, what happened."""
 
@@ -158,7 +169,8 @@ class SyncRun(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     provider: Mapped[str] = mapped_column(String(20))  # api_football | odds_api | claude
-    # fixtures | odds | context | match_odds | markets | match_markets | lineups | analysis | chat
+    # fixtures | results | odds | context | context_light | match_odds | markets | match_markets | lineups
+    # | analysis | chat
     kind: Mapped[str] = mapped_column(String(20))
     scope: Mapped[str] = mapped_column(String(255), default="")  # human description
     status: Mapped[str] = mapped_column(String(10), default="running")  # running|ok|partial|error
@@ -169,7 +181,7 @@ class SyncRun(Base):
     items: Mapped[int] = mapped_column(Integer, default=0)
     message: Mapped[str | None] = mapped_column(Text)
     details_json: Mapped[str | None] = mapped_column(Text)
-    triggered_by: Mapped[str | None] = mapped_column(String(40))
+    triggered_by: Mapped[str | None] = mapped_column(String(40))  # display name, or "Schedule"
     started_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime)
 

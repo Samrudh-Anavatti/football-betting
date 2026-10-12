@@ -14,18 +14,24 @@
 ## Data flow
 
 ```
- Admin buttons ──► SyncRun (background thread) ──► provider client ──► SQLite cache
+ Admin buttons ──► SyncRun (background thread) ──┐
+ Schedule (1-min ticks) ──► SyncRun (inline) ────┴──► provider client ──► SQLite cache
                                                         │
                                        quota headers ───┘──► ProviderQuota
  Public site ◄── FastAPI read endpoints ◄── SQLite cache (never calls providers)
 ```
 
-* **Nothing calls a provider automatically.** Every request is spent from a
-  button: Admin → Data (whole leagues) or a match page (one match). This keeps the
-  free tiers usable and makes cost visible.
-* Each button press is a **SyncRun** row: who, what, progress, requests/credits
-  spent, per-league outcome and errors. The admin panel polls it for a live
-  progress bar and keeps it as history.
+* **The refresh schedule** (`services/scheduler.py`) keeps scores, prices, research and AI
+  analyses current: two daemon threads in the web process tick once a minute and work out
+  what's due from the database (kick-off times, when each thing was last fetched), so restarts
+  are harmless. It stops spending API-Football requests for the day at a reserve, so the
+  buttons always have room. Cadences and costs: [HANDOFF.md → Refresh schedule](HANDOFF.md#refresh-schedule-built-2026-10-12).
+* The buttons (Admin → Data for whole leagues, a match page for one match) still
+  fetch anything on demand.
+* Each button press, and each scheduled job's work in a tick, is a **SyncRun** row: who
+  (or "Schedule"), what, progress, requests/credits spent, outcome and errors. The admin
+  panel polls it for a live progress bar and keeps it as history (scheduled runs are
+  hidden unless asked for, and pruned after 14 days).
 * **Quota** is read from response headers on every call (`x-ratelimit-requests-*`
   for API-Football, `x-requests-*` for The Odds API) and can be refreshed for
   free (`/status` and `/sports` don't cost anything).
@@ -65,7 +71,7 @@ don't match are listed in the run details. Add an alias when that happens.
 
 Provider cache (overwritten by syncs): `leagues`, `teams`, `fixtures`,
 `match_context` (H2H/form/injuries/prediction/stats/line-ups as JSON), `market_books` (latest full book per
-match, frozen at kick-off), `odds_snapshots`.
+match, frozen at kick-off), `odds_snapshots` (a pull whose book API-Football hasn't updated adds no rows).
 
 `odds_snapshots` is **append-only**: every pull adds rows stamped with `pulled_at`,
 and "current prices" means the latest pull. Keeping history lets us compute
@@ -76,7 +82,7 @@ price movement later.
 Our data (never touched by syncs): `users`, `tips` (Ivo's and the AI's, by `source`), `bets`,
 `ai_threads`, `ai_messages`, `ai_predictions`.
 
-Bookkeeping: `sync_runs`, `provider_quota`.
+Bookkeeping: `sync_runs`, `provider_quota`, `settings` (the schedule's on/off and reserve).
 
 ### Settlement
 

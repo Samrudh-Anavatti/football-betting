@@ -2,11 +2,13 @@ import { ago } from '../lib/format.js'
 
 export const KIND = {
   fixtures: 'Fixtures and results',
+  results: 'Live scores',
   odds: 'Prices (The Odds API)',
   match_odds: 'Match prices (The Odds API)',
   markets: 'Prices, all markets',
   match_markets: 'Match prices',
   context: 'Match research',
+  context_light: 'Match-day research',
   lineups: 'Line-ups',
   analysis: 'AI analysis',
   chat: 'AI reply',
@@ -21,7 +23,11 @@ export function runSummary(run) {
   }
   const cost = run.provider === 'odds_api' ? `${run.credits_used} credit${run.credits_used === 1 ? '' : 's'}` : `${run.requests_made} request${run.requests_made === 1 ? '' : 's'}`
   if (run.status === 'running') return `Working… ${run.progress} of ${run.total}`
+  // Scheduled per-match jobs cover several matches in one run.
+  const batch = run.triggered_by === 'Schedule' && ['match_markets', 'context', 'context_light', 'lineups'].includes(run.kind)
   const what =
+    batch ? `${run.items} of ${run.total} matches updated` :
+    run.kind === 'results' ? `${run.items} matches updated, ${run.details?.settled ?? 0} picks or bets settled` :
     run.kind === 'fixtures' ? `${run.items} fixtures saved` :
     run.kind === 'odds' || run.kind === 'markets' ? `${run.items} matches priced` :
     run.kind === 'lineups' ? (run.items ? 'Line-ups saved' : 'No line-ups yet') :

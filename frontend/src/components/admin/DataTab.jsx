@@ -4,6 +4,7 @@ import { useRun } from '../../hooks/useRun.js'
 import { api } from '../../lib/api.js'
 import { ago } from '../../lib/format.js'
 import RunStatus, { KIND, runSummary } from '../RunStatus.jsx'
+import ScheduleCard from './ScheduleCard.jsx'
 import { ErrorNote, Freshness, LeagueBadge, Loading } from '../ui.jsx'
 
 const MARKET_NAMES = { h2h: 'Match result', totals: 'Total goals' }
@@ -132,7 +133,8 @@ function FixturesAction({ provider, selected, pacing, onChange }) {
       <h4 className="font-display text-xl font-semibold">Fixtures and results</h4>
       <p className="text-sm text-ink-soft">
         Pulls the whole season for each selected league: upcoming fixtures, final scores (which settle tips and bets) and,
-        if ticked, the league tables. Once a week is plenty, plus after a matchday to settle results.
+        if ticked, the league tables. The schedule does this twice a day and follows live scores itself, so use this
+        after adding a league or if something looks out of date.
       </p>
       <label className="flex items-center gap-2 text-sm font-medium">
         <input type="checkbox" checked={standings} onChange={(e) => setStandings(e.target.checked)} className="h-4 w-4 accent-ink" />
@@ -164,8 +166,8 @@ function MarketsAction({ provider, selected, onChange }) {
       <h4 className="font-display text-xl font-semibold">Prices, all markets</h4>
       <p className="text-sm text-ink-soft">
         Every market (result, goals, halves, handicaps, corners, cards, scorers and more) from our five bookmakers for
-        every upcoming match that has prices, usually up to two weeks ahead. Pull fixtures first. Daily is plenty, plus
-        on the day for the matches you're looking at.
+        every upcoming match that has prices, usually up to two weeks ahead. The schedule pulls these hourly, and every
+        15 minutes in the last 3 hours before a match.
       </p>
       <CostLine cost={cost} provider={provider} extra="About 1 to 3 per league, depending on how many matches are priced." />
       <button
@@ -276,13 +278,22 @@ const STATUS_STYLE = { ok: 'bg-pitch-light text-pitch', partial: 'bg-amber-light
 const STATUS_NAMES = { ok: 'Done', partial: 'Partly failed', error: 'Failed', running: 'Running' }
 
 function History({ version }) {
-  const runs = useApi(() => api.syncRuns(30), [version])
+  const [scheduled, setScheduled] = useState(false)
+  const runs = useApi(() => api.syncRuns(scheduled ? 60 : 30, scheduled), [version, scheduled])
   const [open, setOpen] = useState(null)
   return (
     <section className="panel overflow-hidden">
-      <header className="px-5 py-3 border-b border-ink/10">
-        <h3 className="text-2xl">Sync history</h3>
-        <p className="text-sm text-ink-soft">Every button press, what it fetched and what it cost.</p>
+      <header className="px-5 py-3 border-b border-ink/10 flex flex-wrap items-end gap-3">
+        <div>
+          <h3 className="text-2xl">Sync history</h3>
+          <p className="text-sm text-ink-soft">
+            Every button press{scheduled ? ' and scheduled run' : ''}, what it fetched and what it cost.
+          </p>
+        </div>
+        <label className="ml-auto flex items-center gap-2 text-sm font-medium">
+          <input type="checkbox" className="h-4 w-4 accent-ink" checked={scheduled} onChange={(e) => setScheduled(e.target.checked)} />
+          Include scheduled runs
+        </label>
       </header>
       {runs.loading && !runs.data ? (
         <div className="px-5"><Loading /></div>
@@ -305,6 +316,7 @@ function History({ version }) {
                 <div className="mt-2 ml-0 sm:ml-[7.75rem] space-y-1 text-ink-soft">
                   <p>{runSummary(r)}.</p>
                   {r.message && <p className={r.status === 'ok' ? '' : 'text-red'}>{r.message}</p>}
+                  {r.details?.matches?.length > 0 && <p>{r.details.matches.join(', ')}</p>}
                   {r.details?.leagues && (
                     <ul className="space-y-0.5">
                       {Object.entries(r.details.leagues).map(([name, d]) => (
@@ -352,9 +364,10 @@ export default function DataTab() {
   return (
     <div className="space-y-6">
       <p className="text-ink-soft max-w-3xl">
-        The site only shows what's been pulled into our database. Nothing calls the providers automatically, so every
-        request is spent from a button on this page or on a match page. Season {data.season}.
+        The site only shows what's been pulled into our database. The refresh schedule keeps it current; the buttons
+        here and on match pages fetch anything sooner. Season {data.season}.
       </p>
+      <ScheduleCard provider={af} />
       <div className="grid gap-6 lg:grid-cols-2">
         <ProviderCard provider={af} onChecked={refresh}>
           <FixturesAction provider={af} selected={sel} pacing={data.pacing_seconds} onChange={refresh} />

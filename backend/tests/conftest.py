@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 
 os.environ["DATA_DIR"] = tempfile.mkdtemp()
 os.environ["SYNC_INLINE"] = "1"
+os.environ["SCHEDULER"] = "off"  # tests call the ticks directly
 os.environ["API_FOOTBALL_KEY"] = "test"
 os.environ["ODDS_API_KEY"] = "test"
 os.environ["API_FOOTBALL_MIN_INTERVAL"] = "0"

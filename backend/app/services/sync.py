@@ -1,9 +1,11 @@
-"""Data pulls: every provider call happens here, triggered from the admin panel.
+"""Data pulls: every provider call happens here, from an admin button or the
+schedule (services/scheduler.py).
 
 Each button press creates a SyncRun row and then runs in a background thread
 (API-Football's free plan allows 10 calls/minute, so a 12-league sync takes a
 couple of minutes). The admin panel polls the run for progress. Set
-SYNC_INLINE=1 to run synchronously (tests).
+SYNC_INLINE=1 to run synchronously (tests). Scheduled runs are SyncRuns too,
+triggered_by AUTO, and run inline on the scheduler's own thread.
 """
 import json
 import logging
@@ -22,9 +24,11 @@ from ..providers.base import ProviderError
 from ..providers.odds_api import OddsApi
 from .markets import filter_bookmakers, snapshots_from_book
 from .matching import best_fixture_for_event
-from .settlement import settle_fixture
+from .settlement import FINISHED, settle_fixture
 
 log = logging.getLogger(__name__)
+
+AUTO = "Schedule"  # triggered_by for scheduled runs
 
 PROVIDERS = {
     "api_football": {
@@ -119,10 +123,13 @@ def check_quota(db: Session, provider: str) -> ProviderQuota:
 
 
 def running_run(db: Session, provider: str) -> SyncRun | None:
-    return db.scalar(select(SyncRun).where(SyncRun.provider == provider, SyncRun.status == "running"))
+    """A button-started run in progress. Scheduled runs don't block the buttons."""
+    return db.scalar(select(SyncRun).where(SyncRun.provider == provider, SyncRun.status == "running",
+                                           SyncRun.triggered_by.is_distinct_from(AUTO)).limit(1))
 
 
-def start_run(db: Session, provider: str, kind: str, scope: str, total: int, user: str | None, job, *args) -> SyncRun:
+def start_run(db: Session, provider: str, kind: str, scope: str, total: int, user: str | None, job, *args,
+              inline: bool = False) -> SyncRun:
     run = SyncRun(provider=provider, kind=kind, scope=scope, total=total, triggered_by=user)
     db.add(run)
     db.commit()
@@ -141,7 +148,7 @@ def start_run(db: Session, provider: str, kind: str, scope: str, total: int, use
         finally:
             s.close()
 
-    if os.getenv("SYNC_INLINE") == "1":
+    if inline or os.getenv("SYNC_INLINE") == "1":
         _target()
     else:
         threading.Thread(target=_target, daemon=True, name=f"sync-{run_id}").start()
@@ -215,6 +222,39 @@ def _compact_standings(resp: list) -> list:
     return out
 
 
+def _refresh_standings(af: ApiFootball, lg: League) -> None:
+    lg.standings_json = json.dumps(_compact_standings(af.standings(lg.id, lg.season)))
+    lg.standings_synced_at = datetime.utcnow()
+
+
+def job_results(db: Session, run: SyncRun, fixture_ids: list[int]) -> None:
+    """Scores for matches in play, 20 per request. A match that finishes settles at
+    once and refreshes its league's table."""
+    af = make_api_football()
+    errors, finished_leagues, settled = [], set(), 0
+    for i in range(0, len(fixture_ids), 20):
+        try:
+            for item in af.fixtures_by_ids(fixture_ids[i:i + 20]):
+                was = (db.get(Fixture, item["fixture"]["id"]) or Fixture()).status
+                fx = upsert_fixture(db, item)
+                settled += settle_fixture(db, fx)
+                if fx.status in FINISHED and was not in FINISHED:
+                    finished_leagues.add(fx.league_id)
+                run.items += 1
+        except ProviderError as e:
+            errors.append(str(e))
+        run.progress += 1
+        db.commit()
+    for lid in finished_leagues:
+        try:
+            _refresh_standings(af, db.get(League, lid))
+        except ProviderError as e:
+            errors.append(f"table: {e}")
+    db.commit()
+    names = [db.get(League, lid).name for lid in finished_leagues]
+    _finish(db, run, af, errors, {"settled": settled, "finished_in": names})
+
+
 def job_fixtures(db: Session, run: SyncRun, league_ids: list[int], include_standings: bool) -> None:
     af = make_api_football()
     errors, per_league = [], {}
@@ -233,8 +273,7 @@ def job_fixtures(db: Session, run: SyncRun, league_ids: list[int], include_stand
             run.items += len(resp)
             per_league[lg.name] = {"fixtures": len(resp), "settled": settled}
             if include_standings:
-                lg.standings_json = json.dumps(_compact_standings(af.standings(lid, lg.season)))
-                lg.standings_synced_at = datetime.utcnow()
+                _refresh_standings(af, lg)
         except ProviderError as e:
             lg.last_error = str(e)
             errors.append(f"{lg.name}: {e}")
@@ -345,7 +384,8 @@ def job_match_odds(db: Session, run: SyncRun, fixture_id: int, regions: list[str
 
 def ingest_market_items(db: Session, items: list[dict], pulled_at: datetime) -> int:
     """Store each fixture's book (our bookmakers only). Returns fixtures priced.
-    Books freeze at kick-off: the last one before it is the closing book."""
+    Books freeze at kick-off: the last one before it is the closing book. A book
+    API-Football hasn't updated since our last pull adds no history rows."""
     n = 0
     for item in items:
         fx = db.get(Fixture, item["fixture"]["id"])
@@ -354,14 +394,18 @@ def ingest_market_items(db: Session, items: list[dict], pulled_at: datetime) -> 
         books = filter_bookmakers(item.get("bookmakers", []), config.ODDS_BOOKMAKERS)
         if not books:
             continue
+        updated = _utc_naive(item["update"]) if item.get("update") else None
+        fx.odds_synced_at = pulled_at
+        n += 1
+        old = db.get(MarketBook, fx.id)
+        if old is not None and updated is not None and old.provider_updated_at == updated:
+            old.pulled_at = pulled_at  # unchanged since the last pull: no new history rows
+            continue
         db.merge(MarketBook(
-            fixture_id=fx.id, provider="api_football", pulled_at=pulled_at,
-            provider_updated_at=_utc_naive(item["update"]) if item.get("update") else None,
+            fixture_id=fx.id, provider="api_football", pulled_at=pulled_at, provider_updated_at=updated,
             bookmakers_json=json.dumps(books, separators=(",", ":")),
         ))
         db.add_all(snapshots_from_book(books, fx, pulled_at))
-        fx.odds_synced_at = pulled_at
-        n += 1
     return n
 
 
@@ -432,21 +476,23 @@ def _form(team_id: int, rows: list[dict]) -> list[dict]:
     return out
 
 
-def job_context(db: Session, run: SyncRun, fixture_id: int) -> None:
-    af = make_api_football()
-    fx = db.get(Fixture, fixture_id)
-    ctx = db.get(MatchContext, fixture_id) or MatchContext(fixture_id=fixture_id)
+def fetch_context(db: Session, af: ApiFootball, fx: Fixture, light: bool = False, on_step=None) -> dict:
+    """Pull a match's research into match_context. Returns {step: error}.
+
+    light=True is the match-day refresh: only injuries and API-Football's
+    prediction, the parts that change on the day (2 requests instead of 7+)."""
+    ctx = db.get(MatchContext, fx.id) or MatchContext(fixture_id=fx.id)
+    old_errors = json.loads(ctx.errors_json) if light and ctx.errors_json else {}
     errors = {}
 
     def step(name, fn):
+        ok = True
         try:
             fn()
-            run.items += 1
         except ProviderError as e:
-            errors[name] = str(e)
-        run.progress += 1
-        run.requests_made = af.requests_made
-        db.commit()
+            errors[name], ok = str(e), False
+        if on_step:
+            on_step(ok)
 
     def h2h():
         ctx.h2h_json = json.dumps(_played(af.head_to_head(fx.home_team_id, fx.away_team_id))[:10])
@@ -476,17 +522,36 @@ def job_context(db: Session, run: SyncRun, fixture_id: int) -> None:
             setattr(ctx, attr, json.dumps(_compact_team_stats(af.team_statistics(fx.league_id, fx.season, team_id))))
         return _go
 
-    step("h2h", h2h)
-    step("home_form", form(fx.home_team_id, "home_form_json"))
-    step("away_form", form(fx.away_team_id, "away_form_json"))
+    if not light:
+        step("h2h", h2h)
+        step("home_form", form(fx.home_team_id, "home_form_json"))
+        step("away_form", form(fx.away_team_id, "away_form_json"))
     step("injuries", injuries)
     step("prediction", prediction)
-    step("home_stats", stats(fx.home_team_id, "home_stats_json"))
-    step("away_stats", stats(fx.away_team_id, "away_stats_json"))
+    if not light:
+        step("home_stats", stats(fx.home_team_id, "home_stats_json"))
+        step("away_stats", stats(fx.away_team_id, "away_stats_json"))
+    if light:  # keep errors from the full pull's other steps
+        errors = {**{k: v for k, v in old_errors.items() if k not in ("injuries", "prediction")}, **errors}
+        ctx.light_fetched_at = datetime.utcnow()
+    else:
+        ctx.fetched_at = datetime.utcnow()
     ctx.errors_json = json.dumps(errors) if errors else None
-    ctx.fetched_at = datetime.utcnow()
     db.merge(ctx)
     db.commit()
+    return errors
+
+
+def job_context(db: Session, run: SyncRun, fixture_id: int) -> None:
+    af = make_api_football()
+
+    def on_step(ok):
+        run.items += ok
+        run.progress += 1
+        run.requests_made = af.requests_made
+        db.commit()
+
+    errors = fetch_context(db, af, db.get(Fixture, fixture_id), on_step=on_step)
     _finish(db, run, af, [f"{k}: {v}" for k, v in errors.items()])
 
 
@@ -554,18 +619,23 @@ def _lineup(t: dict) -> dict:
     }
 
 
+def fetch_lineups(db: Session, af: ApiFootball, fixture_id: int) -> bool:
+    """Store a match's line-ups. True if they're out."""
+    ctx = db.get(MatchContext, fixture_id) or MatchContext(fixture_id=fixture_id)
+    resp = af.lineups(fixture_id)
+    ctx.lineups_json = json.dumps([_lineup(t) for t in resp]) if resp else None
+    ctx.lineups_fetched_at = datetime.utcnow()
+    db.merge(ctx)
+    return bool(resp)
+
+
 def job_lineups(db: Session, run: SyncRun, fixture_id: int) -> None:
     af = make_api_football()
-    ctx = db.get(MatchContext, fixture_id) or MatchContext(fixture_id=fixture_id)
     errors = []
     try:
-        resp = af.lineups(fixture_id)
-        ctx.lineups_json = json.dumps([_lineup(t) for t in resp]) if resp else None
-        ctx.lineups_fetched_at = datetime.utcnow()
-        run.items = 1 if resp else 0
-        if not resp:
+        run.items = int(fetch_lineups(db, af, fixture_id))
+        if not run.items:
             errors.append("Line-ups aren't out yet (usually 20 to 40 minutes before kick-off)")
-        db.merge(ctx)
     except ProviderError as e:
         errors.append(str(e))
     run.progress = 1
