@@ -14,7 +14,7 @@ function Ledger({ record }) {
   if (!record || record.tips === 0) return null
   const profit = record.profit_units * UNIT
   const items = [
-    [`Profit at £${UNIT} a unit`, `${profit < 0 ? '−' : '+'}${pounds(profit)}`, profit >= 0 ? 'text-pitch' : 'text-red'],
+    ['Current profit, could go up or down', `${profit < 0 ? '−' : '+'}${pounds(profit)}`, profit >= 0 ? 'text-pitch' : 'text-red'],
     [`Every £${UNIT} staked returned`, record.roi == null ? '–' : pounds(UNIT * (1 + record.roi), 2), ''],
     ['Won / lost', `${record.won}–${record.lost}`, ''],
     ['Strike rate', pct(record.strike_rate, 0), ''],
