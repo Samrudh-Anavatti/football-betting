@@ -136,6 +136,20 @@ class MatchContext(Base):
     fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
+class Lineup(Base):
+    """One match's line-ups as API-Football gives them: players with shirt numbers and
+    pitch-grid positions, formation, kit colours. Kept for upcoming matches (confirmed
+    XIs) and for each team's previous match (the pitch card's "last XI"). A finished
+    match's line-ups never change, so a row is fetched once. No foreign key: a team's
+    previous match can be a cup tie we don't otherwise track."""
+
+    __tablename__ = "lineups"
+
+    fixture_id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=False)
+    data_json: Mapped[str] = mapped_column(Text)  # [] when API-Football has none
+    fetched_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
 # ── Integration bookkeeping ──────────────────────────────────────────────────
 
 

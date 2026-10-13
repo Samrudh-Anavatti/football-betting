@@ -24,7 +24,7 @@ def test_full_flow(client, auth, fake):
     assert fixtures[0]["best_1x2"] == {"home": 1.45, "away": 7.5, "draw": 5.0}
 
     run = client.post(f"{API}/admin/matches/1001/context", headers=auth).json()
-    assert run["status"] == "ok" and run["requests_made"] == 7 + 2  # +2: early-season form top-up
+    assert run["status"] == "ok" and run["requests_made"] == 8 + 2  # +2: early-season form top-up; 8 includes the previous XI
 
     # Before an API-Football pull the board falls back to The Odds API's snapshots.
     m = client.get(f"{API}/matches/1001").json()
@@ -119,3 +119,30 @@ def test_lineups(client, auth, fake):
     run = client.post(f"{API}/admin/matches/1001/lineups", headers=auth).json()
     assert run["status"] == "ok"
     assert client.get(f"{API}/matches/1001").json()["context"]["lineups"][0]["start_xi"] == ["Haaland (F)"]
+
+
+def test_pitch_card_previous_then_confirmed_xi(client, auth, fake):
+    from app.services.sync import fix_text
+
+    assert fix_text("Gabriel MagalhÃ£es") == "Gabriel Magalhães"
+    assert fix_text("Oâ€™Neill") == "O’Neill"
+    assert fix_text("Fenerbahçe") == "Fenerbahçe"  # already right: unchanged
+
+    client.post(f"{API}/admin/sync/fixtures", json={"league_ids": [39]}, headers=auth)
+    client.post(f"{API}/admin/matches/1001/context", headers=auth)
+    m = client.get(f"{API}/matches/1001").json()
+    assert [i["player"] for i in m["context"]["injuries"]] == ["R. Dias"]  # duplicate dropped
+    home, away = m["pitch"]["home"], m["pitch"]["away"]
+    # City's previous match was fixture 1000; the fake has line-ups for City only.
+    assert home["source"] == "previous" and home["previous_match"]["opponent"] == "Wolves"
+    assert home["start_xi"][0] == {"id": 1, "name": "Haaland", "number": 9, "pos": "F", "grid": "4:2"}
+    assert home["substitutes"][0]["name"] == "Gabriel Magalhães"
+    assert home["transfermarkt"].endswith("/manchester-city/startseite/verein/281")
+    assert away["source"] is None and away["transfermarkt"].endswith("schnellsuche?query=Wolves")  # not in the map
+    calls = fake.calls.count("/fixtures/lineups")
+
+    client.post(f"{API}/admin/matches/1001/context", headers=auth)
+    assert fake.calls.count("/fixtures/lineups") == calls  # a finished match's XI is fetched once
+
+    client.post(f"{API}/admin/matches/1001/lineups", headers=auth)
+    assert client.get(f"{API}/matches/1001").json()["pitch"]["home"]["source"] == "confirmed"

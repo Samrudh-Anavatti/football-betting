@@ -42,7 +42,7 @@ def test_first_tick_syncs_everything_then_rests(db, fake):
     # Every league's fixtures + tables and prices, research for the match 2 days out.
     assert _kinds(db) == ["context", "fixtures", "markets"]
     research = db.scalar(select(SyncRun).where(SyncRun.kind == "context"))
-    assert research.items == 1 and research.requests_made == 9 and research.status == "ok"
+    assert research.items == 1 and research.requests_made == 10 and research.status == "ok"
 
     mark, snapshots = _last_id(db), db.scalar(select(func.count(OddsSnapshot.id)))
     scheduler.data_tick(db)
@@ -104,7 +104,7 @@ def test_scheduled_runs_stay_out_of_the_buttons_way(client, auth, db, fake):
     jobs = {j["kind"]: j for j in s["jobs"]}
     n = len(config.LEAGUES)
     assert jobs["fixtures"]["requests_today"] == 2 * n and jobs["context"]["runs_today"] == 1
-    assert s["requests_today"] == 2 * n + n + 9 and s["reserve"] == 0
+    assert s["requests_today"] == 2 * n + n + 10 and s["reserve"] == 0
     s = client.put(f"{API}/admin/schedule", headers=auth, json={"enabled": False, "reserve": 1500}).json()
     assert s["enabled"] is False and s["reserve"] == 1500
 

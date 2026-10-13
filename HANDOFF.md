@@ -192,7 +192,7 @@ They never block the buttons.
 | Fixtures + tables | 06:00 and 18:00 UTC, all leagues | ~50/day |
 | Prices, all leagues | Hourly | ~35 per sweep, ~850/day |
 | Prices near kick-off | Each match every 15 min in its last 3 h, every 5 min in the last 10 min (the closing book) | ~13 per match |
-| Research | When a match comes within 7 days (10 matches per tick), and again 24 h before | ~8–9 per match each time |
+| Research | When a match comes within 7 days (10 matches per tick), and again 24 h before. Includes each team's last XI for the pitch card (once per finished match, cached) | ~9–11 per match each time |
 | Match-day research | Hourly from 8 h before: injuries + prediction only | 2 per match per hour |
 | Line-ups | Every 10 min from 75 min before until they're out (or 15 min after kick-off) | ~4 per match |
 | AI analysis | Within 7 days (needs prices + research), and again 6 h before. One at a time. Author "Auto". | ~$0.012 each |

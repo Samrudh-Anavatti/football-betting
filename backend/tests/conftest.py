@@ -82,7 +82,8 @@ class FakeProviders:
         elif p == "/fixtures/headtohead":
             body = [af_fixture(900, (39, "Wolves"), (50, "Manchester City"), KICKOFF - timedelta(days=200), "FT", 1, 3)]
         elif p == "/injuries":
-            body = [{"player": {"name": "R. Dias", "type": "Missing Fixture", "reason": "Hamstring"}, "team": {"id": 50}}]
+            dias = {"player": {"id": 2, "name": "R. Dias", "type": "Missing Fixture", "reason": "Hamstring"}, "team": {"id": 50}}
+            body = [dias, dias]  # API-Football repeats players
         elif p == "/odds":
             body = [af_odds_item(1001)]
         elif p == "/predictions":
@@ -93,8 +94,12 @@ class FakeProviders:
             body = {"form": "WWDLW", "fixtures": {"played": {"home": 3, "away": 3, "total": 6}},
                     "goals": {"for": {"total": {"home": 7, "away": 4, "total": 11}}}}
         elif p == "/fixtures/lineups":
-            body = [{"team": {"id": 50, "name": "Manchester City"}, "formation": "4-3-3", "coach": {"name": "P"},
-                     "startXI": [{"player": {"name": "Haaland", "pos": "F"}}], "substitutes": []}]
+            body = [{"team": {"id": 50, "name": "Manchester City",
+                              "colors": {"player": {"primary": "6cabdd", "number": "ffffff", "border": "6cabdd"}}},
+                     "formation": "4-3-3", "coach": {"name": "P"},
+                     "startXI": [{"player": {"id": 1, "name": "Haaland", "number": 9, "pos": "F", "grid": "4:2"}}],
+                     "substitutes": [{"player": {"id": 3, "name": "Gabriel MagalhÃ£es", "number": 6, "pos": "D",
+                                                 "grid": None}}]}]
         else:
             return httpx.Response(404)
         return httpx.Response(200, json={"errors": [], "response": body, "paging": {"current": 1, "total": 1}},
@@ -128,11 +133,11 @@ class FakeProviders:
 def _wipe():
     """Tests share one database file; start each from no provider data or picks."""
     from app.database import Base, SessionLocal, engine
-    from app.models import AiMessage, AiPrediction, AiThread, Bet, MarketBook, MatchContext, OddsSnapshot, SyncRun, Tip
+    from app.models import AiMessage, AiPrediction, AiThread, Bet, Lineup, MarketBook, MatchContext, OddsSnapshot, SyncRun, Tip
 
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
-    for model in (Bet, Tip, AiMessage, AiPrediction, AiThread, MarketBook, MatchContext, OddsSnapshot, SyncRun):
+    for model in (Bet, Tip, AiMessage, AiPrediction, AiThread, Lineup, MarketBook, MatchContext, OddsSnapshot, SyncRun):
         db.query(model).delete()
     db.commit()
     db.close()

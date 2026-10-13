@@ -18,7 +18,7 @@ from sqlalchemy.orm import Session
 
 from .. import config
 from ..database import SessionLocal
-from ..models import Fixture, League, MarketBook, MatchContext, OddsSnapshot, ProviderQuota, SyncRun, Team
+from ..models import Fixture, League, Lineup, MarketBook, MatchContext, OddsSnapshot, ProviderQuota, SyncRun, Team
 from ..providers.api_football import ApiFootball
 from ..providers.base import ProviderError
 from ..providers.odds_api import OddsApi
@@ -514,15 +514,26 @@ def fetch_context(db: Session, af: ApiFootball, fx: Fixture, light: bool = False
         return _go
 
     def injuries():
-        ctx.injuries_json = json.dumps([
-            {"player": i["player"]["name"], "team_id": i["team"]["id"], "type": i["player"].get("type"),
-             "reason": i["player"].get("reason")}
-            for i in af.injuries(fx.id)
-        ])
+        rows, seen = [], set()
+        for i in af.injuries(fx.id):
+            key = (i["team"]["id"], i["player"].get("id") or i["player"]["name"])
+            if key in seen:  # API-Football can list a player twice
+                continue
+            seen.add(key)
+            rows.append({"player": fix_text(i["player"]["name"]), "player_id": i["player"].get("id"),
+                         "team_id": i["team"]["id"], "type": i["player"].get("type"), "reason": i["player"].get("reason")})
+        ctx.injuries_json = json.dumps(rows)
 
     def prediction():
         resp = af.prediction(fx.id)
         ctx.prediction_json = json.dumps(_compact_prediction(resp[0])) if resp else None
+
+    def previous_xi():
+        # Each team's XI from its last match, for the pitch card until line-ups are out.
+        for attr in ("home_form_json", "away_form_json"):
+            rows = json.loads(getattr(ctx, attr) or "[]")
+            if rows and db.get(Lineup, rows[0]["id"]) is None:
+                store_lineups(db, rows[0]["id"], af.lineups(rows[0]["id"]))
 
     def stats(team_id, attr):
         def _go():
@@ -533,6 +544,7 @@ def fetch_context(db: Session, af: ApiFootball, fx: Fixture, light: bool = False
         step("h2h", h2h)
         step("home_form", form(fx.home_team_id, "home_form_json"))
         step("away_form", form(fx.away_team_id, "away_form_json"))
+        step("previous_xi", previous_xi)
     step("injuries", injuries)
     step("prediction", prediction)
     if not light:
@@ -562,7 +574,7 @@ def job_context(db: Session, run: SyncRun, fixture_id: int) -> None:
     _finish(db, run, af, [f"{k}: {v}" for k, v in errors.items()])
 
 
-CONTEXT_STEPS = 7
+CONTEXT_STEPS = 8
 
 
 def _compact_prediction(p: dict) -> dict:
@@ -613,10 +625,25 @@ def _compact_team_stats(s: dict) -> dict:
     }
 
 
+def fix_text(s: str | None) -> str | None:
+    """Repair names API-Football sends double-encoded ("MagalhÃ£es" for "Magalhães",
+    "Oâ€™Neill" for "O’Neill"). Text that is already right fails the round trip and is
+    returned unchanged."""
+    if not s or not any(c in s for c in "ÃÂâÅÄ"):
+        return s
+    for enc in ("cp1252", "latin-1"):
+        try:
+            return s.encode(enc).decode("utf-8")
+        except UnicodeError:
+            continue
+    return s
+
+
 def _lineup(t: dict) -> dict:
     def name(p):
         pl = p.get("player") or {}
-        return f"{pl.get('name')} ({pl.get('pos')})" if pl.get("pos") else pl.get("name")
+        n = fix_text(pl.get("name"))
+        return f"{n} ({pl.get('pos')})" if pl.get("pos") else n
 
     return {
         "team_id": t["team"]["id"], "team": t["team"]["name"], "formation": t.get("formation"),
@@ -626,10 +653,38 @@ def _lineup(t: dict) -> dict:
     }
 
 
+def _pitch_team(t: dict) -> dict:
+    """A team's line-up for the pitch card: who plays where, in which kit."""
+    def player(p):
+        pl = p.get("player") or {}
+        return {"id": pl.get("id"), "name": fix_text(pl.get("name")), "number": pl.get("number"),
+                "pos": pl.get("pos"), "grid": pl.get("grid")}
+
+    return {
+        "team_id": t["team"]["id"], "formation": t.get("formation"),
+        "coach": fix_text((t.get("coach") or {}).get("name")),
+        "colors": t["team"].get("colors"),
+        "start_xi": [player(p) for p in t.get("startXI", [])],
+        "substitutes": [player(p) for p in t.get("substitutes", [])],
+    }
+
+
+def store_lineups(db: Session, fixture_id: int, resp: list) -> None:
+    row = db.get(Lineup, fixture_id)
+    if row is None:
+        row = Lineup(fixture_id=fixture_id)
+        db.add(row)
+    row.data_json = json.dumps([_pitch_team(t) for t in resp or []])
+    row.fetched_at = datetime.utcnow()
+    db.flush()  # both teams' previous match can be the same fixture
+
+
 def fetch_lineups(db: Session, af: ApiFootball, fixture_id: int) -> bool:
     """Store a match's line-ups. True if they're out."""
     ctx = db.get(MatchContext, fixture_id) or MatchContext(fixture_id=fixture_id)
     resp = af.lineups(fixture_id)
+    if resp:
+        store_lineups(db, fixture_id, resp)
     ctx.lineups_json = json.dumps([_lineup(t) for t in resp]) if resp else None
     ctx.lineups_fetched_at = datetime.utcnow()
     db.merge(ctx)

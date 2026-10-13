@@ -7,11 +7,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import AiPrediction, Fixture, League, MatchContext, Tip
+from ..models import AiPrediction, Fixture, League, Lineup, MatchContext, Tip
 from ..serialize import fixture_dict, iso, league_dict, tip_dict
 from ..services.board import best_1x2, latest_snapshots, match_board
 from ..services.settlement import FINISHED
 from ..services.stats import tip_record
+from ..services.transfermarkt import team_url
 
 router = APIRouter(tags=["public"])
 
@@ -77,7 +78,34 @@ def match(fixture_id: int, db: Session = Depends(get_db)):
         "tips": [tip_dict(t, with_fixture=False) for t in
                  db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.published.is_(True)))],
         "ai": ai_dict(latest_prediction(db, fx)),
+        "pitch": pitch_dict(db, fx),
     }
+
+
+def pitch_dict(db: Session, fx: Fixture) -> dict:
+    """Each team's XI for the pitch card: the confirmed one once it's out, otherwise the
+    one it started its previous match with (from the research's last-five list)."""
+    ctx = db.get(MatchContext, fx.id)
+    own = db.get(Lineup, fx.id)
+    confirmed = json.loads(own.data_json) if own else []
+
+    def side(team, form_json):
+        xi = next((t for t in confirmed if t["team_id"] == team.id), None)
+        source, last = ("confirmed", None) if xi else (None, None)
+        rows = json.loads(form_json) if form_json else []
+        if xi is None and rows:
+            prev = db.get(Lineup, rows[0]["id"])
+            xi = next((t for t in json.loads(prev.data_json) if t["team_id"] == team.id), None) if prev else None
+            if xi:
+                m = rows[0]
+                source = "previous"
+                last = {"date": m["date"], "league": m["league"], "venue": m["venue"], "gf": m["gf"], "ga": m["ga"],
+                        "result": m["result"], "opponent": m["away"] if m["venue"] == "H" else m["home"]}
+        return {"team_id": team.id, "transfermarkt": team_url(team.id, team.name), "source": source,
+                "previous_match": last, **(xi or {})}
+
+    return {"home": side(fx.home_team, ctx.home_form_json if ctx else None),
+            "away": side(fx.away_team, ctx.away_form_json if ctx else None)}
 
 
 def latest_prediction(db: Session, fx: Fixture) -> AiPrediction | None:

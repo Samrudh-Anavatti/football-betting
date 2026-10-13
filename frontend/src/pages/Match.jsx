@@ -83,7 +83,7 @@ function ResearchBar({ fx, data, reload }) {
           <Freshness at={data.context.fetched_at} warnAfter={24} staleAfter={72} />
         </div>
         <p className="text-sm text-ink-soft">
-          Form, head-to-head, injuries, season stats and API-Football's prediction. Uses 7 to 9 requests.
+          Form, head-to-head, injuries, season stats, API-Football's prediction and each team's last XI. Uses 8 to 11 requests.
         </p>
         <RunStatus run={ctx.run} error={ctx.error} />
       </div>
