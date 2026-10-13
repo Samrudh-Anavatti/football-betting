@@ -40,8 +40,8 @@ function PriceButton({ sel, market, onPick, size = 'md' }) {
       type={pick ? 'button' : undefined}
       onClick={pick}
       title={`Best price ${odds(sel.best)} at ${sel.best_bookmaker}${pick ? ', click to use it' : ''}`}
-      className={`price ${size === 'sm' ? 'min-w-[3rem] py-1' : ''} ${sel.edge > 0 ? 'ring-2 ring-pitch' : ''} ${
-        pick ? 'hover:bg-ink/85 cursor-pointer' : ''
+      className={`price ${size === 'sm' ? 'min-w-[3rem] py-1' : ''} ${sel.edge > 0 ? 'bg-pitch-light ring-2 ring-pitch' : ''} ${
+        pick ? 'price-hit' : ''
       }`}
     >
       <span className={size === 'sm' ? 'text-base' : 'text-lg'}>{odds(sel.best)}</span>
@@ -52,7 +52,7 @@ function PriceButton({ sel, market, onPick, size = 'md' }) {
 // One selection: label, best price, and fair/edge underneath.
 function SelTile({ sel, market, fx, onPick, label }) {
   return (
-    <div className="flex items-center gap-3 rounded-md border border-ink/10 px-3 py-2 min-w-0">
+    <div className="flex items-center gap-3 rounded-lg bg-chalk/60 px-3 py-2 min-w-0">
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium leading-tight truncate" title={teamify(sel.value, fx)}>
           {label ?? teamify(sel.value, fx)}

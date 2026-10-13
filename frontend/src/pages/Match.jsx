@@ -12,28 +12,59 @@ import { api } from '../lib/api.js'
 import { dayLabel, kickoffTime, shortDate } from '../lib/format.js'
 import { useAuth } from '../lib/auth.jsx'
 
+const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT'])
+
+// The match as a scoreboard: league and kick-off above, teams either side of the score.
 function Header({ fx }) {
   const played = fx.home_goals != null
   return (
-    <section className="panel px-5 py-5">
-      <p className="text-sm text-ink-soft flex flex-wrap items-center gap-x-3">
-        <span className="inline-flex items-center gap-1.5">
-          <LeagueBadge league={fx.league} />
+    <section className="relative overflow-hidden -mx-4 sm:mx-0 sm:rounded-2xl bg-ink text-white px-5 sm:px-8 pt-5 pb-7">
+      <p className="text-sm text-white/60 flex flex-wrap items-center gap-x-4 gap-y-1">
+        <span className="inline-flex items-center gap-1.5 text-white/85 font-medium">
+          <span className="grid h-5 w-5 place-items-center rounded-[4px] bg-white">
+            <LeagueBadge league={fx.league} className="h-3.5 w-3.5" />
+          </span>
           {fx.league.name}
           {fx.round ? `, ${fx.round.replace('Regular Season - ', 'matchday ')}` : ''}
         </span>
-        <span>
+        <span className="num">
           {dayLabel(fx.kickoff)}, {kickoffTime(fx.kickoff)}
         </span>
         {fx.venue && <span>{fx.venue}</span>}
       </p>
-      <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-4">
-        <TeamName team={fx.home} align="right" className="font-display text-xl sm:text-4xl font-semibold" />
-        <span className="num text-3xl sm:text-5xl font-bold">{played ? `${fx.home_goals}–${fx.away_goals}` : 'v'}</span>
-        <TeamName team={fx.away} className="font-display text-xl sm:text-4xl font-semibold" />
+      <div className="mt-6 grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 sm:gap-6">
+        <Crest team={fx.home} align="right" />
+        {played ? (
+          <span className="num wide rounded-lg bg-white/[0.08] px-3 sm:px-5 py-1.5 text-3xl sm:text-6xl font-black tracking-tight text-amber">
+            {fx.home_goals}–{fx.away_goals}
+          </span>
+        ) : (
+          <span className="num text-xl sm:text-2xl font-bold text-white/40 px-2">v</span>
+        )}
+        <Crest team={fx.away} />
       </div>
-      {fx.status !== 'NS' && <p className="text-center text-sm text-ink-soft mt-1">{fx.status_long}</p>}
+      {fx.status !== 'NS' && (
+        <p className={`mt-3 flex items-center justify-center gap-1.5 text-sm ${LIVE.has(fx.status) ? 'text-white font-semibold' : 'text-white/60'}`}>
+          {LIVE.has(fx.status) && <span className="h-2 w-2 rounded-full bg-red animate-live" aria-hidden />}
+          {fx.status_long}
+        </p>
+      )}
     </section>
+  )
+}
+
+// A team's crest on a white disc with its name, stacked on small screens.
+function Crest({ team, align = 'left' }) {
+  const right = align === 'right'
+  return (
+    <div className={`flex min-w-0 flex-col sm:flex-row items-center gap-2 sm:gap-4 ${right ? 'sm:flex-row-reverse sm:text-right' : ''} text-center`}>
+      <span className="grid h-12 w-12 sm:h-16 sm:w-16 shrink-0 place-items-center rounded-full bg-white shadow-[inset_0_-3px_0_rgba(15,31,54,0.12)]">
+        {team.logo ? <img src={team.logo} alt="" className="h-8 w-8 sm:h-11 sm:w-11 object-contain" /> : null}
+      </span>
+      <span className="font-display text-lg sm:text-[2.4rem] font-extrabold leading-[1.05] tracking-tight [font-stretch:110%] min-w-0 break-words">
+        {team.name}
+      </span>
+    </div>
   )
 }
 
@@ -43,7 +74,7 @@ function ResearchBar({ fx, data, reload }) {
   const prices = useRun(() => reload())
   const lineups = useRun(() => reload())
   return (
-    <section className="panel px-5 py-4 grid gap-4 sm:grid-cols-3 border-amber/60 bg-amber-light/40">
+    <section className="panel px-5 py-4 grid gap-4 sm:grid-cols-3 bg-amber-light/60 shadow-none ring-1 ring-inset ring-amber/50">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" className="btn-primary" disabled={ctx.busy} onClick={() => ctx.start(() => api.refreshContext(fx.id))}>
@@ -244,8 +275,8 @@ export default function Match() {
 
   return (
     <div className="space-y-6">
-      <Link to="/fixtures" className="text-sm font-semibold text-ink-soft hover:text-ink">
-        Back to fixtures
+      <Link to="/fixtures" className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft hover:text-ink transition-colors">
+        <span aria-hidden>‹</span> Back to fixtures
       </Link>
       <Header fx={fx} />
       {user && <ResearchBar fx={fx} data={data} reload={reload} />}

@@ -56,28 +56,28 @@ export default function Fixtures({ results = false }) {
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-end gap-3">
-        <h1 className="text-4xl">{results ? 'Results' : 'Fixtures'}</h1>
-        <div className="ml-auto inline-flex rounded-md bg-ink/5 p-0.5" role="group" aria-label="Date range">
+        <h1 className="text-4xl sm:text-5xl leading-none">{results ? 'Results' : 'Fixtures'}</h1>
+        <div className="ml-auto segmented" role="group" aria-label="Date range">
           {RANGES.map((d) => (
             <button
               key={d}
               type="button"
               onClick={() => setDays(d)}
-              className={`px-3 py-1 rounded text-sm font-semibold ${days === d ? 'bg-white shadow-sm' : 'text-ink-soft'}`}
+              className={`segment ${days === d ? 'segment-on' : ''}`}
             >
               {d} days
             </button>
           ))}
         </div>
       </div>
-      <div className="inline-flex rounded-md bg-ink/5 p-0.5" role="group" aria-label="Which leagues">
+      <div className="segmented" role="group" aria-label="Which leagues">
         {TIERS.map(([t, label]) => (
           <button
             key={t}
             type="button"
             aria-pressed={tier === t}
             onClick={() => switchTier(t)}
-            className={`px-3 py-1 rounded text-sm font-semibold ${tier === t ? 'bg-white shadow-sm' : 'text-ink-soft'}`}
+            className={`segment ${tier === t ? 'segment-on' : ''}`}
           >
             {label}
           </button>

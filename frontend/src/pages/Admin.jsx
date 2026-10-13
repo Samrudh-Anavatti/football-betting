@@ -64,15 +64,15 @@ export default function Admin() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-4xl">Admin</h1>
-        <nav className="flex gap-1 rounded-md bg-ink/5 p-0.5" aria-label="Admin sections">
+        <h1 className="text-4xl sm:text-5xl leading-none">Admin</h1>
+        <nav className="segmented" aria-label="Admin sections">
           {TABS.map((t) => (
             <button
               key={t.key}
               type="button"
               aria-current={t.key === active.key ? 'page' : undefined}
               onClick={() => setParams({ tab: t.key })}
-              className={`px-4 py-1.5 rounded text-sm font-semibold ${t.key === active.key ? 'bg-white shadow-sm' : 'text-ink-soft hover:text-ink'}`}
+              className={`segment px-4 ${t.key === active.key ? 'segment-on' : ''}`}
             >
               {t.label}
             </button>

@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-10-12 (**refresh schedule** built: results, prices, research and AI analyses now refresh in the background; settlement now covers handicaps and team-to-score; **next: Ivo's method for the prompt**)._
+_Last updated: 2026-10-13 (**UI uplift** first cut; **refresh schedule** built: results, prices, research and AI analyses now refresh in the background; settlement now covers handicaps and team-to-score; **next: Ivo's method for the prompt**)._
 
 ## Live resources
 
@@ -133,6 +133,11 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
 * [ ] **Ivo's method in his own words** → `backend/app/ai/prompts/v3.md` (copy v2, fill the "Ivo's method" section, bump `PROMPT_VERSION` in `ai/service.py`).
 * [ ] Back-test: run the AI on ~30 settled matches played after its training cutoff and compare Brier scores with the market.
 * [x] Nightly database backups to Blob storage (2026-10-13), 30 days kept; restore steps in [DATABASE.md](DATABASE.md).
+* [ ] **UI uplift** (started 2026-10-13): first cut is a "matchday form guide" look: Archivo (variable width) for type,
+  the record as a scoreboard figure in the home banner, tips and the featured match as betting slips, light price cells
+  that flip to amber-on-navy on hover, a scoreboard match header. Iterating with Sam's opinions next. To see the live
+  data locally: `API_PROXY=https://football-betting-api-sa.azurewebsites.net npx vite` in `frontend/` (public pages only;
+  signing in through the proxy works too but acts on production).
 * [ ] Postgres when there's a reason to (see [DATABASE.md](DATABASE.md)).
 * [ ] Price-movement chart from odds history; closing-line value per pick. (The schedule now captures a closing
   book 5–10 min before every kick-off, so the data for this is there.)

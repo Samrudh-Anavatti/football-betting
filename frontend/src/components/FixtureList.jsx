@@ -1,6 +1,6 @@
 import { Link } from 'react-router-dom'
-import { dayLabel, groupBy, kickoffTime } from '../lib/format.js'
-import { LeagueBadge, Price, TeamName } from './ui.jsx'
+import { dayLabel, groupBy, kickoffTime, odds } from '../lib/format.js'
+import { LeagueBadge, TeamName } from './ui.jsx'
 
 const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT'])
 
@@ -10,22 +10,31 @@ function Row({ fx, results }) {
   return (
     <Link
       to={`/match/${fx.id}`}
-      className="grid grid-cols-[3rem_minmax(0,1fr)_auto] sm:grid-cols-[3.5rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 hover:bg-chalk/70"
+      className="group grid grid-cols-[3rem_minmax(0,1fr)_auto] sm:grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-amber-light/50"
     >
-      <span className={`num text-base ${live ? 'text-red font-semibold' : 'text-ink-soft'}`}>
+      <span className={`num text-[15px] inline-flex items-center gap-1.5 ${live ? 'text-red font-bold' : 'text-ink-soft'}`}>
+        {live && <span className="h-1.5 w-1.5 rounded-full bg-red animate-live" aria-hidden />}
         {live ? fx.status : results ? 'FT' : kickoffTime(fx.kickoff)}
       </span>
-      <span className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 min-w-0 font-medium">
+      <span className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2.5 min-w-0 font-medium">
         <TeamName team={fx.home} align="right" />
-        <span className="num text-lg font-semibold w-10 sm:w-12 text-center">
-          {showScore && fx.home_goals != null ? `${fx.home_goals}–${fx.away_goals}` : 'v'}
-        </span>
+        {showScore && fx.home_goals != null ? (
+          <span className={`num text-[15px] font-bold w-12 text-center rounded-[4px] py-0.5 ${live ? 'bg-red text-white' : 'bg-ink text-white'}`}>
+            {fx.home_goals}–{fx.away_goals}
+          </span>
+        ) : (
+          <span className="w-12 text-center text-sm text-ink-faint">v</span>
+        )}
         <TeamName team={fx.away} />
       </span>
       <span className="hidden sm:flex gap-1">
         {!results &&
           (fx.best_1x2 ? (
-            ['home', 'draw', 'away'].map((s) => <Price key={s} value={fx.best_1x2[s]} />)
+            ['home', 'draw', 'away'].map((s) => (
+              <span key={s} className="price group-hover:ring-ink/30">
+                <span className="text-[17px]">{odds(fx.best_1x2[s])}</span>
+              </span>
+            ))
           ) : (
             <span className="text-xs text-ink-faint w-[10.5rem] text-right">No prices yet</span>
           ))}
@@ -41,11 +50,11 @@ export default function FixtureList({ fixtures, results = false }) {
     <div className="space-y-6">
       {days.map((day) => (
         <section key={day.key}>
-          <h3 className="text-lg text-ink-soft mb-2">{dayLabel(day.items[0].kickoff)}</h3>
+          <h3 className="text-lg mb-2.5">{dayLabel(day.items[0].kickoff)}</h3>
           <div className="space-y-3">
             {groupBy(day.items, (f) => f.league.id).map((lg) => (
               <div key={lg.key} className="panel overflow-hidden">
-                <div className="flex items-center gap-2 px-4 py-2 bg-ink/[0.03] border-b border-ink/10 text-sm font-semibold">
+                <div className="flex items-center gap-2 px-4 pt-3 pb-2 border-b border-ink/10 text-sm font-bold">
                   <LeagueBadge league={lg.items[0].league} />
                   {lg.items[0].league.name}
                   {!results && (
@@ -56,7 +65,7 @@ export default function FixtureList({ fixtures, results = false }) {
                     </span>
                   )}
                 </div>
-                <div className="divide-y divide-ink/5">
+                <div className="divide-y divide-ink/[0.06]">
                   {lg.items.map((fx) => (
                     <Row key={fx.id} fx={fx} results={results} />
                   ))}

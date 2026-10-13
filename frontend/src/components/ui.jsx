@@ -1,15 +1,21 @@
 import { ago, ageHours, odds } from '../lib/format.js'
 
-export function Price({ value, label, best, onClick, title }) {
+// A price cell. `board` is the shop-board look (amber on ink) for a price that's been taken;
+// `best` marks the best on offer; clickable cells flip to the board look on hover.
+export function Price({ value, label, best, board, onClick, title }) {
   const Tag = onClick ? 'button' : 'span'
   return (
     <Tag
       type={onClick ? 'button' : undefined}
       onClick={onClick}
       title={title}
-      className={`price ${best ? 'ring-2 ring-amber' : ''} ${onClick ? 'hover:bg-ink/85 cursor-pointer' : ''}`}
+      className={`price group/price ${board ? 'price-board' : best ? 'price-best' : ''} ${onClick ? 'price-hit' : ''}`}
     >
-      {label && <span className="text-[10px] font-sans font-medium text-white/60 mb-0.5">{label}</span>}
+      {label && (
+        <span className={`text-[10px] font-sans font-medium mb-0.5 ${board ? 'text-white/60' : 'text-ink-soft group-hover/price:text-white/60'}`}>
+          {label}
+        </span>
+      )}
       <span className="text-lg">{odds(value)}</span>
     </Tag>
   )
@@ -29,7 +35,7 @@ export function FormStrip({ form }) {
         <span
           key={i}
           title={`${m.home} ${m.hg}–${m.ag} ${m.away}`}
-          className={`h-6 w-6 rounded-sm grid place-items-center font-display font-bold text-sm ${FORM_STYLE[m.result]}`}
+          className={`h-6 w-6 rounded-[4px] grid place-items-center font-display font-bold text-sm ${FORM_STYLE[m.result]}`}
         >
           {m.result}
         </span>
@@ -74,9 +80,9 @@ export function TeamName({ team, align = 'left', className = '' }) {
 
 export function Empty({ title, children }) {
   return (
-    <div className="panel px-5 py-8 text-center">
-      <p className="font-display text-xl font-semibold">{title}</p>
-      {children && <div className="mt-1 text-ink-soft">{children}</div>}
+    <div className="rounded-xl border border-dashed border-ink/20 px-5 py-8 text-center">
+      <p className="font-display text-lg font-bold">{title}</p>
+      {children && <div className="mt-1 text-ink-soft max-w-prose mx-auto">{children}</div>}
     </div>
   )
 }
@@ -84,21 +90,32 @@ export function Empty({ title, children }) {
 export function ErrorNote({ error, children }) {
   if (!error && !children) return null
   return (
-    <div className="rounded-md border border-red/30 bg-red-light px-3 py-2 text-sm text-red">
+    <div role="alert" className="rounded-md border-l-4 border-red bg-red-light px-3 py-2 text-sm text-red">
       {children || error.message}
     </div>
   )
 }
 
-export function Loading({ label = 'Loading' }) {
-  return <p className="text-ink-soft py-6">{label}…</p>
+// Skeleton rows in the shape of the list that's loading.
+export function Loading({ label = 'Loading', rows = 3 }) {
+  return (
+    <div className="space-y-2 py-2" aria-busy="true">
+      <span className="sr-only">{label}…</span>
+      {Array.from({ length: rows }, (_, i) => (
+        <div key={i} className="h-12 rounded-lg bg-ink/[0.06] animate-pulse" style={{ opacity: 1 - i * 0.25 }} />
+      ))}
+    </div>
+  )
 }
 
-export function SectionHead({ title, children }) {
+// Section heading ruled across the page like a form guide, with an optional count at the end of the rule.
+export function SectionHead({ title, count, children }) {
   return (
-    <div className="flex flex-wrap items-end gap-x-4 gap-y-1 mb-3">
-      <h2 className="text-2xl">{title}</h2>
-      <div className="ml-auto flex items-center gap-3">{children}</div>
+    <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 mb-4">
+      <h2 className="text-2xl sm:text-[1.7rem] leading-none">{title}</h2>
+      {count != null && <span className="num text-lg font-bold text-ink-faint">{count}</span>}
+      <span aria-hidden className="hidden sm:block flex-1 self-center border-t-2 border-ink/80" />
+      {children && <div className="ml-auto sm:ml-0 flex items-center gap-3 text-sm">{children}</div>}
     </div>
   )
 }
