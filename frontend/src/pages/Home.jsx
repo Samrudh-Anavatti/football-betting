@@ -38,7 +38,7 @@ function Ledger({ record }) {
   ]
   return (
     <div className="mt-8">
-      <p className={`num wide font-black leading-[0.85] tracking-[-0.04em] text-[clamp(3.5rem,11vw,6.5rem)] ${profit >= 0 ? 'text-pitch-bright' : 'text-red'}`}>
+      <p className={`num wide font-black leading-[0.85] tracking-[-0.04em] text-[clamp(2.75rem,8vw,4.75rem)] ${profit >= 0 ? 'text-pitch-bright' : 'text-red'}`}>
         {profit < 0 ? '−' : '+'}
         {pounds(profit)}
       </p>
