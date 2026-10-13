@@ -1,7 +1,7 @@
 # Database: where it stands, backups, and when to move
 
-_Written 2026-10-13, after the 2026-10-12 outage. Decision then: **add nightly backups to Blob storage soon; stay
-on SQLite until there's a concrete reason to move.**_
+_Written 2026-10-13, after the 2026-10-12 outage. Decision: **nightly backups to Blob storage (done 2026-10-13);
+stay on SQLite until there's a concrete reason to move.**_
 
 ## Today
 
@@ -10,7 +10,7 @@ on SQLite until there's a concrete reason to move.**_
 * Size on 2026-10-12: **45.6 MB** after about ten days (plus a write log, since removed).
 * Rollback journal (`SQLITE_JOURNAL_MODE`, default `DELETE`), and only the process holding the `schedule_lease`
   row in `settings` runs the refresh schedule. Both came out of the outage below.
-* **No backups.** The file is the only copy of Ivo's track record, the bets and the AI's record.
+* Backed up nightly to Blob storage, 30 days kept (below).
 
 ### What takes the space (measured 2026-10-12)
 
@@ -44,26 +44,34 @@ Every query failed with `sqlite3.DatabaseError: file is not a database` and the 
 * **Fix.** Rollback journal instead of WAL (file locks, which the share supports) and a lease so one process runs
   the schedule. The damaged originals are in the local scratch folder of the session that fixed it, not in the repo.
 
-## Next: nightly backups to Blob storage (~£0.01/month, ~30 min to build)
+## Nightly backups to Blob storage (live since 2026-10-13)
 
-1. **Storage account** in `rg-football-betting`, UK South, Standard LRS, a private container `db-backups`.
-   Lifecycle rule: delete blobs older than 30 days.
-2. **Access without keys:** turn on the web app's system-assigned managed identity and give it
-   *Storage Blob Data Contributor* on that container. Add `azure-identity` and `azure-storage-blob` to
-   `requirements.txt`, and an app setting `BACKUP_CONTAINER_URL`
-   (`https://<account>.blob.core.windows.net/db-backups`).
-3. **A scheduler job,** daily at about 03:00 UTC (quiet: no matches), shown on the Schedule card like the others:
-   * take a consistent copy with SQLite's online backup API (`sqlite3.connect(src).backup(dest)`) into `/tmp`
-     (local disk; never copy the live file byte by byte);
-   * gzip it (~45 MB → roughly 10–15 MB);
-   * upload as `football-YYYY-MM-DD.db.gz`;
-   * record the run (size, duration) as a SyncRun so a failure shows on the card.
-4. **Cost:** 30 copies × ~15 MB ≈ 0.5 GB at ~£0.014/GB/month (Hot LRS, UK South) ≈ **£0.01/month**, plus
-   negligible transaction charges.
-5. **Restore** (document it in HANDOFF.md once built): download the blob, gunzip, stop the app, upload to
-   `/home/data/football.db` through Kudu (`PUT /api/vfs/data/football.db` with `If-Match: *`), delete any
-   `football.db-journal`, start the app.
-6. Test the restore once, on a local copy, before relying on it.
+* **Where:** storage account `stfootballbettingsa` (`rg-football-betting`, UK South, Standard LRS, Hot), private
+  container `db-backups`. Shared-key access is off, so everything signs in with Entra ID. A lifecycle rule
+  (`delete-after-30-days`) removes blobs 30 days after they were written.
+* **Who can get in:** the web app's system-assigned managed identity has *Storage Blob Data Contributor* on the
+  container only. Sam's account has *Storage Blob Data Reader* on it, for listing and downloading.
+* **What runs:** `services/backup.py`, as the scheduler's `backup` job daily at 03:00 UTC (retried hourly if it
+  fails) and from **Back up now** on the Schedule card. It copies the database with SQLite's online backup API into
+  `/tmp`, gzips it and uploads `football-YYYY-MM-DD-HHMM.db.gz`. App setting: `BACKUP_CONTAINER_URL`
+  (`https://stfootballbettingsa.blob.core.windows.net/db-backups`). Unset = no backups.
+* **Size:** 13.5 MB compressed for an 83.5 MB database (2026-10-13). 30 of those ≈ 0.4 GB ≈ **£0.01/month**.
+* **Tested:** the first 03:00 backup was downloaded, decompressed and checked: integrity ok, all tables and Ivo's
+  record (15 settled, +85.29 units) present.
+
+### Restoring
+
+1. Pick a backup:
+   `az storage blob list --account-name stfootballbettingsa -c db-backups --auth-mode login -o table`
+2. Download and unpack it (into a scratch folder, not the repo):
+   `az storage blob download --account-name stfootballbettingsa -c db-backups --auth-mode login -n <name> -f football.db.gz`,
+   then gunzip it to `football.db`. Check it: `sqlite3 football.db "pragma integrity_check"` (or Python's `sqlite3`).
+3. `az webapp stop -g rg-football-betting -n football-betting-api-sa`
+4. Upload it over the live file through Kudu: `PUT https://football-betting-api-sa.scm.azurewebsites.net/api/vfs/data/football.db`
+   with headers `Authorization: Bearer $(az account get-access-token --query accessToken -o tsv)` and `If-Match: *`.
+   Delete `football.db-journal` (and any `-wal`/`-shm`) the same way with `DELETE`.
+5. `az webapp start ...`, then check the site and the Schedule card. Anything since the backup is lost; the
+   schedule re-syncs provider data on its own, but picks, bets and AI analyses made since then are gone.
 
 ## Later: Azure Database for PostgreSQL
 

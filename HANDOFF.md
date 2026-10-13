@@ -16,6 +16,7 @@ _Last updated: 2026-10-12 (**refresh schedule** built: results, prices, research
 | Web app | `football-betting-api-sa`, Python 3.11, startup `bash startup.sh` |
 | Database | SQLite at `/home/data/football.db` (persists across deploys) |
 | AI | Foundry resource `foundry-football-sa` (AIServices, **Sweden Central**). Deployment **`gpt-5.6-luna`** (version 2026-07-09, Global Standard, capacity 200 = 200k tokens/min), used by the app. The `claude-sonnet-5-5` deployment was deleted on 2026-10-07 (no Marketplace/SaaS resources were left behind). No fallback model: if Luna is down, analysis waits. |
+| Backups | Storage account `stfootballbettingsa` (UK South, LRS), container `db-backups`, 30-day auto-delete. See [DATABASE.md](DATABASE.md). |
 | Budget alert | `football-betting-monthly` on the resource group: 50 (billing currency) a month, emails at 80% actual and 100% forecast. |
 | Plans | API-Football **Pro** ($19/mo, 7,500 req/day, upgraded 2026-10-03 for a one-month trial). The Odds API **free** (500 credits/month), now only a backup. |
 | Repo | https://github.com/Samrudh-Anavatti/football-betting |
@@ -51,6 +52,7 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 | `AI_MONTHLY_BUDGET_USD` | 20 | The Analyse/chat buttons refuse once this month's AI spend reaches it. |
 | `AI_AUTO_BUDGET_SHARE` | 0.85 | Scheduled analyses stop at this share of the budget ($17 of $20), leaving the rest for the buttons. |
 | `SCHEDULER` | on | `off` stops the refresh schedule's threads entirely (the Schedule card then says "Not running"). Pausing from the card is the normal way. |
+| `BACKUP_CONTAINER_URL` | — | `https://stfootballbettingsa.blob.core.windows.net/db-backups`. Nightly database backups; unset = none. The app signs in with its managed identity. |
 | `SCHEDULE_RESERVE` | 2000 | Default for the card's "stop for the day when this many are left". The card's value (stored in the DB) wins once saved. |
 | `SCM_DO_BUILD_DURING_DEPLOYMENT` | true | Azure pip-installs requirements on deploy. |
 
@@ -107,7 +109,7 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
   downloaded `football.db` + `-wal` + `-shm` from Kudu, opened them locally (integrity_check ok, WAL folded in),
   uploaded the single file, deleted `-wal`/`-shm`, started the app. Nothing of ours was lost. Since then SQLite
   uses the rollback journal (`SQLITE_JOURNAL_MODE`, default DELETE) and only the process holding the
-  `schedule_lease` row in `settings` runs the schedule. **There are no backups yet** (plan: [DATABASE.md](DATABASE.md)).
+  `schedule_lease` row in `settings` runs the schedule. Nightly backups since 2026-10-13: [DATABASE.md](DATABASE.md).
 
 * After changing App Service settings, **restart the app** (`az webapp restart -g rg-football-betting -n football-betting-api-sa`).
   The automatic restart can lag, and the app reads settings at startup.
@@ -130,8 +132,7 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
 * [x] AI match analysis built (2026-10-07), see "AI analysis" below. Switched to GPT-5.6 Luna the same day (~10x cheaper, same verdicts in testing).
 * [ ] **Ivo's method in his own words** → `backend/app/ai/prompts/v3.md` (copy v2, fill the "Ivo's method" section, bump `PROMPT_VERSION` in `ai/service.py`).
 * [ ] Back-test: run the AI on ~30 settled matches played after its training cutoff and compare Brier scores with the market.
-* [ ] **Nightly database backups to Blob storage** (~£0.01/month): plan in [DATABASE.md](DATABASE.md). Do this soon;
-  there are no backups today.
+* [x] Nightly database backups to Blob storage (2026-10-13), 30 days kept; restore steps in [DATABASE.md](DATABASE.md).
 * [ ] Postgres when there's a reason to (see [DATABASE.md](DATABASE.md)).
 * [ ] Price-movement chart from odds history; closing-line value per pick. (The schedule now captures a closing
   book 5–10 min before every kick-off, so the data for this is there.)
@@ -152,7 +153,7 @@ See [DATABASE.md](DATABASE.md): current size and growth, the 2026-10-12 outage, 
 | The Odds API (free) | 0 |
 | GPT-5.6 Luna on Foundry (~$0.012 per analysis; the schedule runs 2 per match) | ~8–11 ($10–14), capped at $20 |
 | Postgres Flexible B1ms (future, see DATABASE.md) | ~13–14 |
-| Blob storage for nightly DB backups (next) | ~0.01 |
+| Blob storage for nightly DB backups (`stfootballbettingsa`) | ~0.01 |
 
 About £33–36/month including scheduled AI analysis. The resource group's budget alert is set at 50.
 
