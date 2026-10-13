@@ -212,6 +212,23 @@ the last 3 hours. A pull whose `update` time hasn't changed adds no `odds_snapsh
 **First deploy:** the backlog runs at once: research for ~130 matches (~1,100 requests over ~15 min) and ~130 AI
 analyses (~$1.60, a couple of hours one at a time).
 
+## Line-ups pitch card (built 2026-10-13)
+
+Match page → Research → **Line-ups**: both XIs on a pitch in formation (away top, home bottom), kit colours, shirt
+numbers, and a red marker on anyone in this match's injury list. Until line-ups are confirmed each side shows the XI
+it started its **previous match** with (labelled, with that result); the confirmed XI replaces it about an hour
+before kick-off. Ivo also wanted market values: there's no licensed source (API-Football and Sportmonks don't carry
+them; Transfermarkt has no API and forbids scraping), so each team links to its Transfermarkt page instead.
+
+* Data: `lineups` table (fixture id → API-Football line-ups with player ids, numbers, grid "row:col" with col 1 on the
+  team's right, formation, colours). Research fetches each team's previous-match XI once (a finished match never
+  changes); the existing line-ups job also saves the confirmed XI there. Served as `pitch` on `GET /matches/{id}`.
+* Transfermarkt ids: `backend/app/data/transfermarkt.json` (160 top-flight clubs, hand-checked; built from the CC0
+  transfermarkt-datasets clubs table). Other teams get a Transfermarkt search link. How to add one: see
+  `services/transfermarkt.py`.
+* Matches researched before this deploy show the card once research re-runs (24 h before kick-off) or after
+  **Refresh research**.
+
 ## Prices: every market from API-Football (built 2026-10-07)
 
 * API-Football's `/odds` (Pro) carries 100–150 markets per match: result, double chance, draw no bet, goals and

@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import AiPanel, { PublicAi } from '../components/AiPanel.jsx'
 import MarketBoard from '../components/MarketBoard.jsx'
 import PickForm from '../components/PickForm.jsx'
+import PitchCard from '../components/PitchCard.jsx'
 import RunStatus from '../components/RunStatus.jsx'
 import TipCard from '../components/TipCard.jsx'
 import { Empty, ErrorNote, FormStrip, Freshness, LeagueBadge, Loading, TeamName } from '../components/ui.jsx'
@@ -237,29 +238,6 @@ function TeamStats({ fx, home, away }) {
   )
 }
 
-function Lineups({ list }) {
-  if (!list?.length) return null
-  return (
-    <div className="panel p-4">
-      <h3 className="text-lg mb-2">Line-ups</h3>
-      <div className="grid gap-4 sm:grid-cols-2">
-        {list.map((t) => (
-          <div key={t.team_id}>
-            <p className="font-semibold">
-              {t.team} <span className="text-ink-soft font-normal">{t.formation}</span>
-            </p>
-            <ol className="text-sm list-decimal pl-5">
-              {t.start_xi.map((p) => (
-                <li key={p}>{p}</li>
-              ))}
-            </ol>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 export default function Match() {
   const { id } = useParams()
   const { user } = useAuth()
@@ -318,6 +296,9 @@ export default function Match() {
             <h2 className="text-2xl">Research</h2>
             <Freshness at={ctx.fetched_at} warnAfter={24} staleAfter={72} />
           </div>
+          {(data.pitch?.home.start_xi?.length > 0 || data.pitch?.away.start_xi?.length > 0) && (
+            <PitchCard pitch={data.pitch} fx={fx} injuries={ctx.injuries} />
+          )}
           {ctx.errors && (
             <ErrorNote>
               Some sections failed to load: {Object.entries(ctx.errors).map(([k, v]) => `${k} (${v})`).join('; ')}
@@ -329,7 +310,6 @@ export default function Match() {
             </Empty>
           ) : (
             <>
-              <Lineups list={ctx.lineups} />
               <Prediction p={ctx.prediction} fx={fx} />
               <TeamStats fx={fx} home={ctx.home_stats} away={ctx.away_stats} />
               <div className="panel p-4 space-y-5">
