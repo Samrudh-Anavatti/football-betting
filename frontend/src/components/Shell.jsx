@@ -24,7 +24,7 @@ export default function Shell({ children }) {
         <div className="mx-auto max-w-6xl px-4 h-14 flex items-center gap-2 sm:gap-5">
           <NavLink to="/" className="flex items-center gap-2.5 shrink-0 group">
             <span className="h-[22px] w-4 rounded-[3px] bg-amber rotate-[10deg] shadow-[1px_2px_0_rgba(0,0,0,0.35)] transition-transform duration-300 group-hover:rotate-[-4deg]" aria-hidden />
-            <span className="font-display wide text-[1.05rem] font-extrabold tracking-tight hidden sm:inline">Bet Predictions AI</span>
+            <span className="font-display wide text-[1.05rem] font-extrabold tracking-tight hidden sm:inline">Football Predictions AI</span>
           </NavLink>
           <nav className="flex items-stretch h-full min-w-0 overflow-x-auto" aria-label="Main">
             {NAV.map((n) => (
