@@ -9,6 +9,8 @@ import { pct } from '../lib/format.js'
 
 // The record in money rather than units: a unit is £1.
 const UNIT = 1
+// The return-on-stake stat reads better on a typical £10 bet.
+const EXAMPLE_STAKE = 10
 const pounds = (v, dp = 0) => `£${Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp })}`
 
 // Faint pitch markings behind the banner: halfway line, centre circle and spot.
@@ -31,7 +33,7 @@ function Ledger({ record }) {
   if (!record || record.tips === 0) return null
   const profit = record.profit_units * UNIT
   const items = [
-    [`Every £${UNIT} staked returned`, record.roi == null ? '–' : pounds(UNIT * (1 + record.roi), 2)],
+    [`Every £${EXAMPLE_STAKE} staked returned`, record.roi == null ? '–' : pounds(EXAMPLE_STAKE * (1 + record.roi), 2)],
     ['Won / lost', `${record.won}–${record.lost}`],
     ['Strike rate', pct(record.strike_rate, 0)],
     ['Average odds', record.avg_odds ?? '–'],
