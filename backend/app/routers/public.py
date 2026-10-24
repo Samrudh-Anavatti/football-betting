@@ -51,7 +51,7 @@ def fixtures(
     if tier != "all":
         q = q.where(League.supplementary.is_(tier == "more"))
     rows = list(db.scalars(q.limit(limit)))
-    odds = latest_snapshots(db, [f.id for f in rows]) if when == "upcoming" else {}
+    odds = latest_snapshots(db, [f.id for f in rows], market="1X2") if when == "upcoming" else {}
     return [fixture_dict(f, best_1x2(odds.get(f.id, []))) for f in rows]
 
 

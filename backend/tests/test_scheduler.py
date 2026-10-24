@@ -178,6 +178,12 @@ def test_only_one_process_runs_the_schedule(db):
     assert scheduler.hold_lease(db, now + timedelta(minutes=7), instance="new")  # old one gone quiet
     assert not scheduler.hold_lease(db, now + timedelta(minutes=8), instance="old")
 
+    # A lease left by the pre-Postgres code ("<holder>|<iso expiry>") keeps its expiry, then lapses.
+    db.merge(Setting(key="schedule_lease", value=f"web:1:abc|{(now + timedelta(minutes=5)).isoformat()}"))
+    db.commit()
+    assert not scheduler.hold_lease(db, now + timedelta(minutes=1), instance="new")
+    assert scheduler.hold_lease(db, now + timedelta(minutes=6), instance="new")
+
 
 class FakeContainer:
     def __init__(self):
@@ -187,6 +193,7 @@ class FakeContainer:
         self.blobs[name] = data.read()
 
 
+@pytest.mark.skipif(not str(SessionLocal.kw["bind"].url).startswith("sqlite"), reason="SQLite file backups only")
 def test_nightly_backup_is_a_working_database(client, auth, db, monkeypatch, tmp_path):
     import gzip
     import sqlite3

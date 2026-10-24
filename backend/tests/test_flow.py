@@ -146,3 +146,44 @@ def test_pitch_card_previous_then_confirmed_xi(client, auth, fake):
 
     client.post(f"{API}/admin/matches/1001/lineups", headers=auth)
     assert client.get(f"{API}/matches/1001").json()["pitch"]["home"]["source"] == "confirmed"
+
+
+def test_closing_price_is_stored_once_the_match_starts(client, auth):
+    import json
+    from datetime import datetime, timedelta
+
+    from sqlalchemy import select
+
+    from app.database import SessionLocal
+    from app.models import Fixture, MarketBook, Team, Tip, User
+    from app.services.settlement import settle_pending
+
+    now = datetime.utcnow()
+    db = SessionLocal()
+    db.merge(Team(id=901, name="Home FC"))
+    db.merge(Team(id=902, name="Away FC"))
+    db.add(Fixture(id=9001, league_id=39, season=2026, kickoff=now - timedelta(hours=1), status="1H",
+                   home_team_id=901, away_team_id=902))
+    db.flush()
+    book = [{"id": 8, "name": "Bet365", "bets": [{"id": 1, "name": "Match Winner", "values": [
+        {"value": "Home", "odd": "1.80"}, {"value": "Draw", "odd": "3.6"}, {"value": "Away", "odd": "4.5"}]}]}]
+    db.add(MarketBook(fixture_id=9001, pulled_at=now - timedelta(hours=2), bookmakers_json=json.dumps(book)))
+    ivo = db.scalar(select(User).where(User.username == "ivo"))
+    db.add(Tip(id=9001, fixture_id=9001, author_id=ivo.id, market_id=1, market="Match Winner", selection="Home",
+               odds=2.0, created_at=now - timedelta(hours=3)))
+    db.commit()
+
+    settle_pending(db)  # startup backfill: the match has kicked off, so its closing price is final
+    tip = db.get(Tip, 9001)
+    assert tip.closing_odds == 1.8 and tip.closing_checked_at is not None
+    db.get(MarketBook, 9001).bookmakers_json = "[]"  # the record no longer reads the book
+    db.commit()
+    try:
+        assert client.get(f"{API}/record").json()["clv_samples"] >= 1
+    finally:  # an in-play match would show up in the scheduler tests' live-scores job
+        for row in (db.get(Tip, 9001), db.get(MarketBook, 9001)):
+            db.delete(row)
+        db.flush()
+        db.delete(db.get(Fixture, 9001))
+        db.commit()
+        db.close()

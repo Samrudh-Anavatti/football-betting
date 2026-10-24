@@ -12,17 +12,22 @@ from ..models import MarketBook, OddsSnapshot
 from .markets import book_from_snapshots, build_board
 
 
-def latest_snapshots(db: Session, fixture_ids: list[int], before: datetime | None = None) -> dict[int, list[OddsSnapshot]]:
-    """Rows from each fixture's most recent pull (optionally the last pull before `before`)."""
+def latest_snapshots(db: Session, fixture_ids: list[int], before: datetime | None = None,
+                     market: str | None = None) -> dict[int, list[OddsSnapshot]]:
+    """Rows from each fixture's most recent pull (optionally the last pull before `before`,
+    and only one market, e.g. "1X2" for the fixture lists)."""
     if not fixture_ids:
         return {}
     q = select(OddsSnapshot.fixture_id, func.max(OddsSnapshot.pulled_at)).where(OddsSnapshot.fixture_id.in_(fixture_ids))
     if before is not None:
         q = q.where(OddsSnapshot.pulled_at <= before)
-    latest = dict(db.execute(q.group_by(OddsSnapshot.fixture_id)).all())
+    latest = q.group_by(OddsSnapshot.fixture_id).subquery()
+    rows = db.scalars(select(OddsSnapshot).join(latest, (OddsSnapshot.fixture_id == latest.c[0])
+                                                & (OddsSnapshot.pulled_at == latest.c[1]))
+                      .where(OddsSnapshot.market == market if market else True))
     out: dict[int, list[OddsSnapshot]] = defaultdict(list)
-    for fid, pulled in latest.items():
-        out[fid] = list(db.scalars(select(OddsSnapshot).where(OddsSnapshot.fixture_id == fid, OddsSnapshot.pulled_at == pulled)))
+    for r in rows:
+        out[r.fixture_id].append(r)
     return out
 
 

@@ -4,7 +4,9 @@ Provider data (leagues, teams, fixtures, odds, match context) is a *cache* of
 what the APIs returned, stamped with when we fetched it. Our own data (users,
 tips, bets) is the valuable part and never gets overwritten by a sync.
 
-All datetimes are naive UTC.
+All datetimes are naive UTC. Many-to-one relationships load with "selectin", so a
+list of fixtures or tips fetches its teams, leagues and authors in one query each
+(not one per row, which costs a network round trip each on Postgres).
 """
 from datetime import datetime
 
@@ -70,9 +72,9 @@ class Fixture(Base):
     odds_synced_at: Mapped[datetime | None] = mapped_column(DateTime)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
-    league: Mapped[League] = relationship()
-    home_team: Mapped[Team] = relationship(foreign_keys=[home_team_id])
-    away_team: Mapped[Team] = relationship(foreign_keys=[away_team_id])
+    league: Mapped[League] = relationship(lazy="selectin")
+    home_team: Mapped[Team] = relationship(foreign_keys=[home_team_id], lazy="selectin")
+    away_team: Mapped[Team] = relationship(foreign_keys=[away_team_id], lazy="selectin")
 
 
 class OddsSnapshot(Base):
@@ -242,11 +244,15 @@ class Tip(Base):
     published: Mapped[bool] = mapped_column(Boolean, default=True)
     status: Mapped[str] = mapped_column(String(8), default="pending")  # pending|won|lost|void
     profit_units: Mapped[float | None] = mapped_column(Float)
+    # Best price in the last pull before kick-off, recorded once the match has started (it can't
+    # change after that). closing_checked_at set with closing_odds null = no closing price exists.
+    closing_odds: Mapped[float | None] = mapped_column(Float)
+    closing_checked_at: Mapped[datetime | None] = mapped_column(DateTime)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     settled_at: Mapped[datetime | None] = mapped_column(DateTime)
 
-    fixture: Mapped[Fixture] = relationship()
-    author: Mapped[User] = relationship()
+    fixture: Mapped[Fixture] = relationship(lazy="selectin")
+    author: Mapped[User] = relationship(lazy="selectin")
 
 
 class Bet(Base):
@@ -270,8 +276,8 @@ class Bet(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     settled_at: Mapped[datetime | None] = mapped_column(DateTime)
 
-    fixture: Mapped[Fixture] = relationship()
-    user: Mapped[User] = relationship()
+    fixture: Mapped[Fixture] = relationship(lazy="selectin")
+    user: Mapped[User] = relationship(lazy="selectin")
 
 
 # ── AI analysis ──────────────────────────────────────────────────────────────

@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Bet, Fixture, Tip
+from .stats import record_closing_prices
 
 FINISHED = {"FT", "AET", "PEN"}
 VOIDED = {"PST", "CANC", "ABD", "AWD", "WO"}
@@ -271,7 +272,9 @@ def settle_fixture(db: Session, fx: Fixture) -> int:
     else:
         return 0
     n = 0
-    for tip in db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.status == "pending")):
+    tips = list(db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.status == "pending")))
+    record_closing_prices(db, tips)
+    for tip in tips:
         if (res := result_for(tip.market, tip.selection, tip.line)) is not None:
             apply_result(tip, res, tip.stake_units)
             n += 1
@@ -290,5 +293,7 @@ def settle_pending(db: Session) -> int:
     ids = set(db.scalars(select(Tip.fixture_id).where(Tip.status == "pending"))) | set(
         db.scalars(select(Bet.fixture_id).where(Bet.status == "pending")))
     n = sum(settle_fixture(db, db.get(Fixture, i)) for i in ids)
+    # Backfill closing prices for any match that has started (tips from before the column existed).
+    record_closing_prices(db, db.scalars(select(Tip).where(Tip.closing_checked_at.is_(None))))
     db.commit()
     return n

@@ -65,6 +65,7 @@ AI_RETRY_AFTER = timedelta(hours=1)
 KEEP_RUNS = timedelta(days=14)
 BACKUP_HOUR = 3  # UTC: no matches on
 LEASE = timedelta(minutes=5)
+LEASE_FMT = "%Y-%m-%dT%H:%M:%S"
 INSTANCE = f"{socket.gethostname()}:{os.getpid()}:{secrets.token_hex(3)}"
 
 
@@ -406,12 +407,20 @@ def hold_lease(db: Session, now: datetime | None = None, instance: str = INSTANC
     """Take or renew the schedule's lease; False while another process holds it.
     One UPDATE, so two processes can't both win."""
     now = now or datetime.utcnow()
-    value = f"{instance}|{(now + LEASE).isoformat()}"
-    db.execute(text("INSERT OR IGNORE INTO settings (key, value) VALUES ('schedule_lease', '|')"))
+    # "<expiry, fixed 19 chars>|<holder>", so plain substr() works on SQLite and Postgres alike.
+    value = f"{now + LEASE:{LEASE_FMT}}|{instance}"
+    db.execute(text("INSERT INTO settings (key, value) VALUES ('schedule_lease', '0000-00-00T00:00:00|') "
+                    "ON CONFLICT (key) DO NOTHING"))
+    # Pre-Postgres format "<holder>|<iso expiry>" (the SQLite file only): rewrite it, keeping its expiry.
+    old = db.get(Setting, "schedule_lease")
+    if old.value.find("|") not in (-1, 19):
+        holder, _, expiry = old.value.partition("|")
+        old.value = f"{expiry[:19]}|{holder}"
+        db.flush()
     won = db.execute(text(
         "UPDATE settings SET value = :value WHERE key = 'schedule_lease' "
-        "AND (substr(value, 1, instr(value, '|') - 1) = :me OR substr(value, instr(value, '|') + 1) < :now)"),
-        {"value": value, "me": instance, "now": now.isoformat()}).rowcount == 1
+        "AND (substr(value, 21) = :me OR substr(value, 1, 19) < :now)"),
+        {"value": value, "me": instance, "now": f"{now:{LEASE_FMT}}"}).rowcount == 1
     db.commit()
     return won
 

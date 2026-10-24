@@ -1,5 +1,6 @@
 """Track record (tips) and virtual bankrolls (bets)."""
 import json
+from datetime import datetime
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -10,6 +11,8 @@ from .markets import best_price
 
 def closing_price(db: Session, tip: Tip) -> float | None:
     """Best price in the last odds pull before kickoff — the market's final word."""
+    if tip.closing_checked_at is not None:
+        return tip.closing_odds
     fx: Fixture = tip.fixture
     if tip.market_id is not None:  # any board market: the frozen pre-kick-off book
         book = db.get(MarketBook, fx.id)
@@ -31,6 +34,17 @@ def closing_price(db: Session, tip: Tip) -> float | None:
         q = q.where(OddsSnapshot.line == tip.line)
     prices = list(db.scalars(q))
     return max(prices) if prices else None
+
+
+def record_closing_prices(db: Session, tips) -> int:
+    """Store the closing price on tips whose match has kicked off, so the record doesn't
+    re-read each match's market book (~100 KB) on every request. Caller commits."""
+    now, n = datetime.utcnow(), 0
+    for t in tips:
+        if t.closing_checked_at is None and t.fixture.kickoff <= now:
+            t.closing_odds, t.closing_checked_at = closing_price(db, t), now
+            n += 1
+    return n
 
 
 def tip_record(db: Session, tips: list[Tip]) -> dict:
