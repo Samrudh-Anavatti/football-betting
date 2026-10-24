@@ -3,14 +3,15 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-10-24 (**moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **Next: custom domain via Cloudflare**, then prompt v3, confidence 0–10, a simple past-picks list, pruning unused leagues)._
+_Last updated: 2026-10-24 (**moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. Next: prompt v3, confidence 0–10, a simple past-picks list, pruning unused leagues)._
 
 ## Live resources
 
 | Thing | Value |
 |---|---|
-| Frontend | https://samrudh-anavatti.github.io/football-betting/ (GitHub Pages, deploys on push to `main`). Branded **Bet Predictions AI** as a placeholder until the domain is chosen: change it in `frontend/src/components/Shell.jsx` and `frontend/index.html`. |
-| Backend | https://football-betting-api-sa.azurewebsites.net (API base `/api/v1`, docs at `/docs`) |
+| Frontend | **https://football-predictions.org** (GitHub Pages, deploys on push to `main`; `www` and the old github.io address redirect to it). Still branded **Bet Predictions AI**: change it in `frontend/src/components/Shell.jsx` and `frontend/index.html`. |
+| Backend | **https://api.football-predictions.org** (API base `/api/v1`, docs at `/docs`); also still at football-betting-api-sa.azurewebsites.net |
+| Domain | `football-predictions.org`, registered and DNS on **Cloudflare**. See "Domain and DNS" below. |
 | Resource group | `rg-football-betting` (UK South), **separate from PongPoints** |
 | App Service plan | `plan-football-betting`, Linux **B1**, Always On |
 | Web app | `football-betting-api-sa`, Python 3.11, startup `bash startup.sh` |
@@ -43,7 +44,7 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 | `USERS` | sam,ivo | Accounts. Each needs `PASSWORD_<NAME>`. |
 | `PASSWORD_SAM` / `PASSWORD_IVO` | — | Login passwords, reconciled on startup. Rotate = change + restart. |
 | `JWT_SECRET` | — | Signs login tokens. Changing it signs everyone out. |
-| `CORS_ORIGINS` | — | `https://samrudh-anavatti.github.io,http://localhost:5173` |
+| `CORS_ORIGINS` | — | `https://football-predictions.org,https://www.football-predictions.org,http://localhost:5173` |
 | `DATABASE_URL` | — (SQLite in `DATA_DIR`) | `postgresql+psycopg://fbadmin:<pw>@pg-football-betting-sa.postgres.database.azure.com:5432/football?sslmode=require`. The only place the DB password lives. |
 | `DATA_DIR` | /home/data | Where SQLite lives when `DATABASE_URL` is unset (local, tests; the production fallback until 2026-11-07). |
 | `ODDS_BOOKMAKERS` | 8,7,3,36,4 | API-Football bookmaker ids kept on the board: Bet365, William Hill, Betfair, BetVictor, Pinnacle. Ids from `/odds/bookmakers`. Swap when the affiliate deals are decided. |
@@ -59,7 +60,31 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 
 GitHub Actions (Settings → Secrets and variables → Actions):
 `AZURE_WEBAPP_NAME` (variable), `AZURE_WEBAPP_PUBLISH_PROFILE` (secret),
-`VITE_API_URL` (variable, `https://football-betting-api-sa.azurewebsites.net/api/v1`).
+`VITE_API_URL` (variable, `https://api.football-predictions.org/api/v1`), `VITE_BASE` (variable, `/` for the custom
+domain; unset = `/<repo>/` for a github.io project site). Setting `/` from Git Bash needs `MSYS_NO_PATHCONV=1`,
+or it becomes `C:/Program Files/Git/`.
+
+## Domain and DNS (set up 2026-10-24)
+
+`football-predictions.org` is on Cloudflare (zone `966d9a85977f278c829bcf12c42bd57d`). Every record is
+**DNS-only (grey cloud)**: GitHub and Azure both issue their certificates by reaching the origin directly, which
+Cloudflare's proxy would block.
+
+| Record | Points to | For |
+|---|---|---|
+| `A` / `AAAA` @ | 185.199.108–111.153 / 2606:50c0:8000–8003::153 | GitHub Pages (the site) |
+| `CNAME www` | samrudh-anavatti.github.io | GitHub Pages, redirects to the apex |
+| `CNAME api` | football-betting-api-sa.azurewebsites.net | the backend |
+| `TXT asuid.api` | the web app's `customDomainVerificationId` | proves to Azure we own `api.` |
+
+* **Site certificate:** GitHub's (Let's Encrypt), renews itself; HTTPS enforced in the repo's Pages settings, where
+  the custom domain is also set (no CNAME file: the site deploys from Actions).
+* **API certificate:** an App Service managed certificate for `api.football-predictions.org`, bound with SNI,
+  renews itself (first expiry 2027-04-24). It only renews while the `api` CNAME stays DNS-only.
+* **Moving the backend:** add the hostname to the new app (`az webapp config hostname add`), update `asuid.api` to
+  the new app's verification id and `api` to its hostname, then `az webapp config ssl create` + `ssl bind`.
+* The Cloudflare token used for the setup (DNS edit on this zone) expires in a few days; make a new one for any
+  later change.
 
 **Keep uvicorn to a single worker.** Syncs and the refresh schedule run in
 background threads inside the web process (two workers would mean two schedules),
@@ -133,7 +158,7 @@ the settings above.
 * [ ] **UI uplift** (started 2026-10-13): first cut is a "matchday form guide" look: Archivo (variable width) for type,
   the record as a scoreboard figure in the home banner, tips and the featured match as betting slips, light price cells
   that flip to amber-on-navy on hover, a scoreboard match header. Iterating with Sam's opinions next. To see the live
-  data locally: `API_PROXY=https://football-betting-api-sa.azurewebsites.net npx vite` in `frontend/` (public pages only;
+  data locally: `API_PROXY=https://api.football-predictions.org npx vite` in `frontend/` (public pages only;
   signing in through the proxy works too but acts on production).
 * [x] Postgres (2026-10-24), see [DATABASE.md](DATABASE.md). **On 2026-11-07:** delete storage account `stfootballbettingsa`,
   the `BACKUP_CONTAINER_URL` setting, the web app's managed-identity role on it, and `/home/data/football.db`.

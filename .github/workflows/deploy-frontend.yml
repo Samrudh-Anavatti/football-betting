@@ -38,7 +38,7 @@ jobs:
         env:
           # Path the site is served from: "/" for a custom domain, else /<repo>/.
           VITE_BASE: ${{ vars.VITE_BASE || format('/{0}/', github.event.repository.name) }}
-          # Backend base URL, e.g. https://football-betting-api-sa.azurewebsites.net/api/v1
+          # Backend base URL, e.g. https://api.football-predictions.org/api/v1
           VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: npm run build
 
