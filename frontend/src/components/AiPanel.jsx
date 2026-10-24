@@ -122,7 +122,7 @@ function Prediction({ pred, fx, board, tips, onPick }) {
                     {teamify(b.market, fx)}: {teamify(b.value, fx)}
                   </p>
                   <p className="ml-auto text-sm text-ink-soft whitespace-nowrap">
-                    take {odds(b.min_odds)}+ · {b.stake_units}u · confidence {b.confidence}/5
+                    take {odds(b.min_odds)}+ · {b.stake_units}u · confidence {b.confidence}/10
                   </p>
                 </div>
                 <p className="text-sm leading-relaxed text-ink/85">{b.reasoning}</p>

@@ -11,7 +11,7 @@ export default function PickForm({ pick, fx, onClose, onSaved }) {
     odds: pick.odds,
     bookmaker: pick.bookmaker,
     stake_units: pick.prefill?.stake_units ?? 1,
-    confidence: pick.prefill?.confidence ?? 3,
+    confidence: pick.prefill?.confidence ?? 5,
     reasoning: pick.prefill?.reasoning ?? '',
     stake: 10,
   })
@@ -83,8 +83,8 @@ export default function PickForm({ pick, fx, onClose, onSaved }) {
                 <input className="input num" type="number" step="0.5" min="0.5" max="10" value={form.stake_units} onChange={set('stake_units')} />
               </label>
               <label>
-                <span className="label">Confidence, 1 to 5</span>
-                <input className="input num" type="number" min="1" max="5" value={form.confidence} onChange={set('confidence')} />
+                <span className="label">Confidence, 0 to 10</span>
+                <input className="input num" type="number" min="0" max="10" value={form.confidence} onChange={set('confidence')} />
               </label>
             </div>
             <label className="block">

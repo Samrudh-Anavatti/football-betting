@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-10-24 (**moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. Next: prompt v3, confidence 0–10, a simple past-picks list, pruning unused leagues)._
+_Last updated: 2026-10-24 (**moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. Next: a simple past-picks list)._
 
 ## Live resources
 
@@ -152,7 +152,8 @@ the settings above.
 * [x] API-Football Pro for a one-month trial (from 2026-10-03). **Review with Ivo around 2026-11-03**: keep Pro only if he uses the Pro-only data (injuries, line-ups, team stats, extra markets), otherwise drop to football-data.org + our own stored history.
 * [x] Prices for every market from API-Football (2026-10-07). **This makes Pro load-bearing**: dropping it takes the board back to match result and totals from The Odds API.
 * [x] AI match analysis built (2026-10-07), see "AI analysis" below. Switched to GPT-5.6 Luna the same day (~10x cheaper, same verdicts in testing).
-* [ ] **Ivo's method in his own words** → `backend/app/ai/prompts/v3.md` (copy v2, fill the "Ivo's method" section, bump `PROMPT_VERSION` in `ai/service.py`).
+* [x] **Ivo's method** → prompt v3 (2026-10-24). Its record isn't split by prompt version yet; v2 and v3 tips are
+  mixed in Admin → AI. Split it if the comparison matters (`ai_predictions.prompt_version` via `tips.ai_prediction_id`).
 * [ ] Back-test: run the AI on ~30 settled matches played after its training cutoff and compare Brier scores with the market.
 * [x] Nightly database backups to Blob storage (2026-10-13), 30 days kept; restore steps in [DATABASE.md](DATABASE.md).
 * [ ] **UI uplift** (started 2026-10-13): first cut is a "matchday form guide" look: Archivo (variable width) for type,
@@ -292,6 +293,14 @@ fair probabilities, treats early-season splits as weak evidence, caps suggestion
 calls passing the normal outcome; on prompt v1 Luna suggested 4–5 correlated bets a match and moved 10+ points
 off the market on 2–3 game samples. Claude-era threads still display but are read-only.
 
+**Prompt v3** (2026-10-24, Ivo's method, Sam's calls on the thresholds) replaces v2's value hunting with
+**favourable bets**: selections priced 1.50–3.00 that the AI rates at least **45%** likely **and** at least as
+likely as the market's fair probability (so never a price the market itself thinks too short). Ranked by
+likelihood; a bargain is a tiebreaker. Still at most two uncorrelated bets, and it passes only when nothing
+qualifies. Confidence is **0–10**, the overall strength of the case (likelihood, evidence, price); picks and
+analyses before 2026-10-24 were rated 1–5 and were deliberately not rescaled.
+New analyses use v3; a follow-up on an older thread also runs on v3.
+
 **How it works.** On a match page (signed in), **Analyse with AI** builds the match bundle (the same data as the
 page: every market's best and fair price, form, H2H, injuries, season stats, API-Football's prediction, line-ups,
 table), starts a conversation, and asks for an analysis. The model records it through a strict `record_analysis` function
@@ -302,7 +311,7 @@ there is no memory framework to maintain. **Fresh analysis with latest data** st
 rebuilt bundle; old ones stay readable.
 
 * Code: `backend/app/ai/` (`client.py` is the only place the client is built, `bundle.py`, `service.py`,
-  `prompts/v2.md`), endpoints in `routers/ai.py`, UI in `AiPanel.jsx` and Admin → AI. AI runs are SyncRuns with
+  `prompts/v3.md`), endpoints in `routers/ai.py`, UI in `AiPanel.jsx` and Admin → AI. AI runs are SyncRuns with
   provider `claude` (historical name).
 * Tables: `ai_threads` (bundle as sent, its hash, model, prompt version), `ai_messages` (every API message as sent and
   received, with tokens and cost), `ai_predictions` (each recorded analysis plus the market's margin-free

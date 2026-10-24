@@ -43,9 +43,9 @@ export default function TipCard({ tip }) {
         {tip.reasoning && <p className="px-4 pb-3 text-[15px] leading-relaxed text-ink/80 max-w-prose">{tip.reasoning}</p>}
         <div className="mt-auto mx-4 pt-2.5 pb-5 border-t border-dashed border-ink/20 flex items-center gap-2 text-sm">
           <span className="text-ink-soft">Confidence</span>
-          <span className="flex gap-0.5" aria-label={`${tip.confidence} out of 5`}>
-            {[1, 2, 3, 4, 5].map((n) => (
-              <span key={n} className={`h-2 w-3.5 rounded-[2px] ${n <= tip.confidence ? 'bg-amber' : 'bg-ink/10'}`} />
+          <span className="flex gap-0.5" aria-label={`${tip.confidence} out of 10`}>
+            {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((n) => (
+              <span key={n} className={`h-2 w-2 rounded-[2px] ${n <= tip.confidence ? 'bg-amber' : 'bg-ink/10'}`} />
             ))}
           </span>
           {settled && fx.home_goals != null && (

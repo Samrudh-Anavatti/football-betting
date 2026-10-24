@@ -31,9 +31,9 @@ ANALYSIS = {
     "probabilities": {"home_win": 0.7, "draw": 0.18, "away_win": 0.12, "over_2_5_goals": 0.62, "both_teams_score": 0.5},
     "suggested_bets": [
         {"market_id": 5, "market": "Goals Over/Under", "value": "Over 2.5", "your_probability": 0.66,
-         "min_odds": 1.55, "stake_units": 1.5, "confidence": 3, "reasoning": "Both leaky."},
+         "min_odds": 1.55, "stake_units": 1.5, "confidence": 6, "reasoning": "Both leaky."},
         {"market_id": 12, "market": "Double Chance", "value": "Home/Draw", "your_probability": 0.95,
-         "min_odds": 1.5, "stake_units": 1, "confidence": 2, "reasoning": "Too short now."},
+         "min_odds": 1.5, "stake_units": 1, "confidence": 4, "reasoning": "Too short now."},
     ],
     "key_factors": ["Wolves' away defence"],
     "data_gaps": ["No line-ups"],
@@ -175,3 +175,4 @@ def test_public_sees_the_latest_analysis(client, auth, fake, monkeypatch):
     f = client.get(f"{API}/featured").json()
     assert f["fixture"]["id"] == 1001 and f["ai"]["id"] == ai["id"]
     assert client.get(f"{API}/tips").json() == []  # the AI's tracked tips stay private
+

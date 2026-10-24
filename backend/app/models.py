@@ -239,7 +239,7 @@ class Tip(Base):
     odds: Mapped[float] = mapped_column(Float)
     bookmaker: Mapped[str | None] = mapped_column(String(60))
     stake_units: Mapped[float] = mapped_column(Float, default=1.0)
-    confidence: Mapped[int] = mapped_column(Integer, default=3)  # 1–5
+    confidence: Mapped[int] = mapped_column(Integer, default=5)  # 0–10 (picks before 2026-10-24 were rated 1–5)
     reasoning: Mapped[str | None] = mapped_column(Text)
     published: Mapped[bool] = mapped_column(Boolean, default=True)
     status: Mapped[str] = mapped_column(String(8), default="pending")  # pending|won|lost|void

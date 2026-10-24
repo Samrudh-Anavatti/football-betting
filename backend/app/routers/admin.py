@@ -271,7 +271,7 @@ class Selection(BaseModel):
 class TipIn(Selection):
     fixture_id: int
     stake_units: float = Field(1.0, gt=0, le=10)
-    confidence: int = Field(3, ge=1, le=5)
+    confidence: int = Field(5, ge=0, le=10)
     reasoning: str | None = None
     published: bool = True
 
@@ -280,7 +280,7 @@ class TipUpdate(BaseModel):
     odds: float | None = Field(None, gt=1.0)
     bookmaker: str | None = None
     stake_units: float | None = Field(None, gt=0, le=10)
-    confidence: int | None = Field(None, ge=1, le=5)
+    confidence: int | None = Field(None, ge=0, le=10)
     reasoning: str | None = None
     published: bool | None = None
 

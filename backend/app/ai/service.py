@@ -35,7 +35,7 @@ from .client import cost_usd, make_client
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "v2"
+PROMPT_VERSION = "v3"
 SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md").read_text(encoding="utf-8")
 MAX_TOOL_ROUNDS = 3
 
@@ -79,9 +79,9 @@ RECORD_ANALYSIS = {
                         "market": {"type": "string", "description": "market name from the bundle"},
                         "value": {"type": "string", "description": "selection value exactly as in the bundle"},
                         "your_probability": _PROB,
-                        "min_odds": {"type": "number", "description": "lowest decimal price you'd still take"},
+                        "min_odds": {"type": "number", "description": "lowest decimal price at which the bet still qualifies"},
                         "stake_units": {"type": "number", "description": "0.5 to 3"},
-                        "confidence": {"type": "integer", "description": "1 to 5"},
+                        "confidence": {"type": "integer", "description": "0 to 10: how strong the case is overall"},
                         "reasoning": {"type": "string"},
                     },
                 },
@@ -89,7 +89,7 @@ RECORD_ANALYSIS = {
             "key_factors": {"type": "array", "items": {"type": "string"}},
             "data_gaps": {"type": "array", "items": {"type": "string"},
                           "description": "Missing information that limits this analysis"},
-            "no_bet": {"type": "boolean", "description": "true when nothing offers enough value"},
+            "no_bet": {"type": "boolean", "description": "true when no bet qualifies"},
         },
     },
 }
@@ -218,7 +218,7 @@ def _record(db: Session, thread: AiThread, fx: Fixture, user_id: int, raw: dict,
         db.add(Tip(fixture_id=fx.id, author_id=user_id, source="ai", ai_prediction_id=pred.id, published=False,
                    market_id=market_id, market=market, selection=selection, line=line, odds=sel["best"],
                    bookmaker=sel["at"], stake_units=min(max(b.stake_units, 0.5), 3),
-                   confidence=min(max(b.confidence, 1), 5), reasoning=b.reasoning))
+                   confidence=min(max(b.confidence, 0), 10), reasoning=b.reasoning))
         placed += 1
     db.commit()
     msg = f"Recorded as analysis #{pred.id}; {placed} bet{'s' * (placed != 1)} tracked at the best current price."

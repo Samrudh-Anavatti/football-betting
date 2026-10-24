@@ -93,11 +93,11 @@ def main():
     ivo = db.scalar(select(User).where(User.username == "ivo"))
     if not db.scalar(select(Tip)):
         db.add(Tip(fixture_id=fx.id, author_id=ivo.id, market="OU", selection="over", line=2.5, odds=1.95,
-                   bookmaker="Sky Bet", stake_units=2, confidence=4,
+                   bookmaker="Sky Bet", stake_units=2, confidence=8,
                    reasoning="Both sides have scored in four of their last five and the away defence is missing its first-choice centre-back."))
         played = db.scalar(select(Fixture).where(Fixture.status == "FT"))
         db.add(Tip(fixture_id=played.id, author_id=ivo.id, market="1X2", selection="home", odds=2.1, bookmaker="William Hill",
-                   stake_units=1, confidence=3, reasoning="Home side unbeaten in six.", created_at=played.kickoff - timedelta(days=1)))
+                   stake_units=1, confidence=6, reasoning="Home side unbeaten in six.", created_at=played.kickoff - timedelta(days=1)))
         db.flush()
         settle_fixture(db, played)
     db.commit()
