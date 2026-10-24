@@ -14,7 +14,7 @@ for live resources, config and operations.
 | Layer    | Choice |
 |----------|--------|
 | Frontend | React + Vite + Tailwind + React Router (HashRouter) on GitHub Pages |
-| Backend  | FastAPI + SQLAlchemy 2.0 + SQLite on Azure App Service (Linux, B1, UK South) |
+| Backend  | FastAPI + SQLAlchemy 2.0 on Azure App Service (Linux, B1, UK South); Azure Database for PostgreSQL (SQLite locally and in tests) |
 | Data     | [API-Football](https://www.api-football.com/) Pro (fixtures, results, tables, research, prices for every market); [The Odds API](https://the-odds-api.com/) as a backup price source |
 | AI       | GPT-5.6 Luna on Microsoft Foundry (`openai` SDK, Responses API) |
 | Auth     | Username + password per person (bcrypt) → signed token (JWT) |

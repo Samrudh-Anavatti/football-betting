@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-10-13 (**UI uplift** first cut; **refresh schedule** built: results, prices, research and AI analyses now refresh in the background; settlement now covers handicaps and team-to-score; **next: Ivo's method for the prompt**)._
+_Last updated: 2026-10-24 (**moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **Next: custom domain via Cloudflare**, then prompt v3, confidence 0–10, a simple past-picks list, pruning unused leagues)._
 
 ## Live resources
 
@@ -14,9 +14,9 @@ _Last updated: 2026-10-13 (**UI uplift** first cut; **refresh schedule** built: 
 | Resource group | `rg-football-betting` (UK South), **separate from PongPoints** |
 | App Service plan | `plan-football-betting`, Linux **B1**, Always On |
 | Web app | `football-betting-api-sa`, Python 3.11, startup `bash startup.sh` |
-| Database | SQLite at `/home/data/football.db` (persists across deploys) |
+| Database | Azure Database for PostgreSQL `pg-football-betting-sa` (Flexible, B1ms, PG 17, UK South), database `football`. See [DATABASE.md](DATABASE.md). The old SQLite file `/home/data/football.db` is kept until 2026-11-07 as a fallback. |
 | AI | Foundry resource `foundry-football-sa` (AIServices, **Sweden Central**). Deployment **`gpt-5.6-luna`** (version 2026-07-09, Global Standard, capacity 200 = 200k tokens/min), used by the app. The `claude-sonnet-5-5` deployment was deleted on 2026-10-07 (no Marketplace/SaaS resources were left behind). No fallback model: if Luna is down, analysis waits. |
-| Backups | Storage account `stfootballbettingsa` (UK South, LRS), container `db-backups`, 30-day auto-delete. See [DATABASE.md](DATABASE.md). |
+| Backups | Azure's own Postgres backups, point-in-time restore over 35 days. Storage account `stfootballbettingsa` (the old SQLite backups) **to delete on 2026-11-07**. |
 | Budget alert | `football-betting-monthly` on the resource group: 50 (billing currency) a month, emails at 80% actual and 100% forecast. |
 | Plans | API-Football **Pro** ($19/mo, 7,500 req/day, upgraded 2026-10-03 for a one-month trial). The Odds API **free** (500 credits/month), now only a backup. |
 | Repo | https://github.com/Samrudh-Anavatti/football-betting |
@@ -44,7 +44,8 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 | `PASSWORD_SAM` / `PASSWORD_IVO` | — | Login passwords, reconciled on startup. Rotate = change + restart. |
 | `JWT_SECRET` | — | Signs login tokens. Changing it signs everyone out. |
 | `CORS_ORIGINS` | — | `https://samrudh-anavatti.github.io,http://localhost:5173` |
-| `DATA_DIR` | /home/data | Where SQLite lives. |
+| `DATABASE_URL` | — (SQLite in `DATA_DIR`) | `postgresql+psycopg://fbadmin:<pw>@pg-football-betting-sa.postgres.database.azure.com:5432/football?sslmode=require`. The only place the DB password lives. |
+| `DATA_DIR` | /home/data | Where SQLite lives when `DATABASE_URL` is unset (local, tests; the production fallback until 2026-11-07). |
 | `ODDS_BOOKMAKERS` | 8,7,3,36,4 | API-Football bookmaker ids kept on the board: Bet365, William Hill, Betfair, BetVictor, Pinnacle. Ids from `/odds/bookmakers`. Swap when the affiliate deals are decided. |
 | `FOUNDRY_RESOURCE` / `FOUNDRY_API_KEY` | — | The Foundry resource the AI runs on. Key: `az cognitiveservices account keys list -g rg-football-betting -n foundry-football-sa`. |
 | `AI_MODEL` | gpt-5.6-luna | A Foundry deployment name that speaks the Responses API (e.g. `gpt-5.6-terra` after deploying it). Add its price to `AI_PRICES` in `config.py`. |
@@ -52,7 +53,7 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 | `AI_MONTHLY_BUDGET_USD` | 20 | The Analyse/chat buttons refuse once this month's AI spend reaches it. |
 | `AI_AUTO_BUDGET_SHARE` | 0.85 | Scheduled analyses stop at this share of the budget ($17 of $20), leaving the rest for the buttons. |
 | `SCHEDULER` | on | `off` stops the refresh schedule's threads entirely (the Schedule card then says "Not running"). Pausing from the card is the normal way. |
-| `BACKUP_CONTAINER_URL` | — | `https://stfootballbettingsa.blob.core.windows.net/db-backups`. Nightly database backups; unset = none. The app signs in with its managed identity. |
+| `BACKUP_CONTAINER_URL` | — | No longer read (SQLite backups retired 2026-10-24); remove with the storage account on 2026-11-07. |
 | `SCHEDULE_RESERVE` | 2000 | Default for the card's "stop for the day when this many are left". The card's value (stored in the DB) wins once saved. |
 | `SCM_DO_BUILD_DURING_DEPLOYMENT` | true | Azure pip-installs requirements on deploy. |
 
@@ -62,23 +63,19 @@ GitHub Actions (Settings → Secrets and variables → Actions):
 
 **Keep uvicorn to a single worker.** Syncs and the refresh schedule run in
 background threads inside the web process (two workers would mean two schedules),
-and SQLite prefers one writer.
+and only the lease holder runs it anyway.
 
 ## Moving the backend (new plan, region or host)
 
-All state is in one file, `/home/data/football.db`. Everything else is code plus
+All state is in the Postgres server, which the web app reaches over `DATABASE_URL`. Everything else is code plus
 the settings above.
 
-1. Create the new web app (Python 3.11, startup `bash startup.sh`, same settings).
-2. Copy the DB: Kudu (`https://<app>.scm.azurewebsites.net/DebugConsole`) →
-   download `/home/data/football.db`, then upload it to the new app's `/home/data/`.
-   Losing it only loses picks/bets/history; the provider cache can be re-synced.
+1. Create the new web app (Python 3.11, startup `bash startup.sh`, same settings, including `DATABASE_URL`).
+2. Add its outbound IPs to the Postgres firewall (see [DATABASE.md](DATABASE.md)). Moving region: restore the
+   server into the new region, or keep it where it is (cross-region latency slows every request).
 3. Point GitHub: update `AZURE_WEBAPP_NAME`, the publish-profile secret and
    `VITE_API_URL`, then re-run both workflows.
 4. Add the new frontend origin to `CORS_ORIGINS` if the domain changes.
-
-Moving to Postgres later: set `DATABASE_URL`. The models are plain SQLAlchemy;
-only `database.py`'s SQLite pragmas are SQLite-specific.
 
 ## Verified against the live APIs (2026-10-03)
 
@@ -103,7 +100,7 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
 
 ## Gotchas
 
-* **SQLite on `/home` (2026-10-12 outage).** `/home` is a network share. In WAL mode two processes (the old and new
+* **SQLite on `/home` (2026-10-12 outage, before the move to Postgres).** `/home` is a network share. In WAL mode two processes (the old and new
   app overlap for a minute or two on every deploy, each running the schedule) corrupted SQLite's shared-memory
   index and every query failed with "file is not a database". The files themselves were intact: stopped the app,
   downloaded `football.db` + `-wal` + `-shm` from Kudu, opened them locally (integrity_check ok, WAL folded in),
@@ -120,7 +117,7 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
 * Odds API team names differ from API-Football's. Unmatched events are listed in
   the sync history. Add an alias in `backend/app/services/matching.py`.
 * Odds snapshots are append-only and will grow by roughly 50–100k rows/month at
-  daily pulls of all leagues. That's fine for SQLite; prune old pulls if it ever
+  daily pulls of all leagues. That's fine for Postgres; prune old pulls if it ever
   matters.
 * Locally, `python -m app.demo` loads fake data. Never run it against production.
 
@@ -138,16 +135,17 @@ only `database.py`'s SQLite pragmas are SQLite-specific.
   that flip to amber-on-navy on hover, a scoreboard match header. Iterating with Sam's opinions next. To see the live
   data locally: `API_PROXY=https://football-betting-api-sa.azurewebsites.net npx vite` in `frontend/` (public pages only;
   signing in through the proxy works too but acts on production).
-* [ ] Postgres when there's a reason to (see [DATABASE.md](DATABASE.md)).
+* [x] Postgres (2026-10-24), see [DATABASE.md](DATABASE.md). **On 2026-11-07:** delete storage account `stfootballbettingsa`,
+  the `BACKUP_CONTAINER_URL` setting, the web app's managed-identity role on it, and `/home/data/football.db`.
 * [ ] Price-movement chart from odds history; closing-line value per pick. (The schedule now captures a closing
   book 5–10 min before every kick-off, so the data for this is there.)
 * [x] Refresh schedule (2026-10-12). **Check real usage on the Schedule card after a full weekend** against the
   estimates below, before adding leagues.
 
-## Database: backups and Postgres
+## Database
 
-See [DATABASE.md](DATABASE.md): current size and growth, the 2026-10-12 outage, the nightly Blob backup plan
-(next), and when and how to move to Postgres (~£13–14/month, 2–3 hours).
+See [DATABASE.md](DATABASE.md): the Postgres server, connecting to it, restoring, growth, and how the 2026-10-24
+move from SQLite was done.
 
 ## Running costs (estimate, Oct 2026)
 
@@ -157,10 +155,10 @@ See [DATABASE.md](DATABASE.md): current size and growth, the 2026-10-12 outage, 
 | API-Football Pro ($19) | ~14–15 |
 | The Odds API (free) | 0 |
 | GPT-5.6 Luna on Foundry (~$0.012 per analysis; the schedule runs 2 per match) | ~8–11 ($10–14), capped at $20 |
-| Postgres Flexible B1ms (future, see DATABASE.md) | ~13–14 |
-| Blob storage for nightly DB backups (`stfootballbettingsa`) | ~0.01 |
+| Postgres Flexible B1ms (since 2026-10-24, backups included) | ~13–14 |
 
-About £33–36/month including scheduled AI analysis. The resource group's budget alert is set at 50.
+About £46–50/month including scheduled AI analysis, close to the 50 budget alert (Sam to decide
+whether to raise it). The resource group's budget alert is set at 50.
 
 ## Leagues (2026-10-12)
 
@@ -313,9 +311,10 @@ At that price the $20 monthly budget is about 1,500 analyses.
 
 ## Running the analysis locally
 
-Copy the prod DB from Kudu (`/api/vfs/data/football.db` plus `-wal`/`-shm`, bearer token from
-`az account get-access-token`) into a scratch folder, set `DATA_DIR` to it, the API keys, and
-`FOUNDRY_RESOURCE`/`FOUNDRY_API_KEY`, then run uvicorn. Never point local code at `/home/data`.
+Copy production into a local Postgres (`docker run -d -p 55432:5432 -e POSTGRES_PASSWORD=local -e POSTGRES_DB=football postgres:17`)
+with `pg_dump`/`pg_restore` through a temporary firewall rule, or run against SQLite. Set `DATABASE_URL` to the local
+copy, the API keys, `FOUNDRY_RESOURCE`/`FOUNDRY_API_KEY` and `SCHEDULER=off`, then run uvicorn. Never point local
+code at the production `DATABASE_URL` with the schedule on: it would compete for the lease.
 
 ## AI predictions: original plan (2026-10-04, kept for reference)
 

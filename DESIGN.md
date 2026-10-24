@@ -15,10 +15,10 @@
 
 ```
  Admin buttons ──► SyncRun (background thread) ──┐
- Schedule (1-min ticks) ──► SyncRun (inline) ────┴──► provider client ──► SQLite cache
+ Schedule (1-min ticks) ──► SyncRun (inline) ────┴──► provider client ──► Postgres
                                                         │
                                        quota headers ───┘──► ProviderQuota
- Public site ◄── FastAPI read endpoints ◄── SQLite cache (never calls providers)
+ Public site ◄── FastAPI read endpoints ◄── Postgres (never calls providers)
 ```
 
 * **The refresh schedule** (`services/scheduler.py`) keeps scores, prices, research and AI
