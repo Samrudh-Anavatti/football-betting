@@ -22,9 +22,9 @@ function Records({ records }) {
   return (
     <section className="panel overflow-hidden">
       <header className="px-5 py-3 border-b border-ink/10">
-        <h3 className="text-2xl">AI vs Ivo</h3>
+        <h3 className="text-2xl">AI vs our team</h3>
         <p className="text-sm text-ink-soft">
-          The AI's suggestions are tracked at the best price when it made them, and settle like Ivo's picks. Beating the
+          The AI's suggestions are tracked at the best price when it made them, and settle like our team's picks. Beating the
           closing price is the best early sign of a real edge.
         </p>
       </header>
@@ -33,7 +33,7 @@ function Records({ records }) {
           <tr>
             <th />
             <th className="font-medium text-right px-5 py-2">AI</th>
-            <th className="font-medium text-right px-5 py-2">Ivo</th>
+            <th className="font-medium text-right px-5 py-2">Our team</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-ink/5">

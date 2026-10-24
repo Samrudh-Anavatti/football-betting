@@ -239,7 +239,7 @@ export function PublicAi({ ai, fx, board }) {
         <h2 className="text-2xl">AI analysis</h2>
         <p className="text-sm text-ink-soft max-w-2xl">
           The AI reads everything on this page (prices, form, injuries, stats, the table) and gives its own view. It's
-          separate from Ivo's picks, which are his own judgement.
+          separate from our team's picks, which are our own judgement.
         </p>
       </header>
       <div className="px-5 py-4">
@@ -282,8 +282,8 @@ export default function AiPanel({ fx, board, onPick }) {
           <div className="space-y-3">
             <p className="text-ink-soft">
               The AI reads everything on this page (prices across all markets, form, head-to-head, injuries, season stats,
-              API-Football's prediction, line-ups if out) and says where it sees value, or that there's none. Its calls
-              stay private and are tracked against the market and Ivo. Refresh prices and research first.
+              API-Football's prediction, line-ups if out) and suggests favourable bets, or says there are none. Its calls
+              stay private and are tracked against the market and our team. Refresh prices and research first.
             </p>
             <button type="button" className="btn-primary" disabled={!canRun} onClick={() => r.start(() => api.analyse(fx.id))}>
               {r.busy ? 'Analysing…' : `Analyse with AI (about ${usd(data.estimate_usd)})`}

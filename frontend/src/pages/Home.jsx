@@ -72,7 +72,7 @@ export default function Home() {
         <div className={`grid grid-cols-1 gap-10 ${featured.data?.ai ? 'lg:grid-cols-[minmax(0,1fr)_23rem] lg:items-center lg:gap-14' : ''}`}>
           <div className="min-w-0">
             <h1 className="text-[2.1rem] sm:text-5xl font-extrabold leading-[1.02] max-w-2xl">
-              Expert football picks from Ivo, every one of them on the record.
+              Expert football picks from our team, every one of them on the record.
             </h1>
             <p className="mt-4 max-w-xl text-white/70 text-[17px] leading-relaxed">
               Single bets, no long-odds accumulators. Each pick goes up before kick-off with the price taken and the

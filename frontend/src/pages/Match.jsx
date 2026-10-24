@@ -262,7 +262,7 @@ export default function Match() {
 
       {data.tips.length > 0 && (
         <section>
-          <h2 className="text-2xl mb-3">Ivo's pick{data.tips.length > 1 ? 's' : ''}</h2>
+          <h2 className="text-2xl mb-3">Our team's pick{data.tips.length > 1 ? 's' : ''}</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             {data.tips.map((t) => (
               <TipCard key={t.id} tip={{ ...t, fixture: fx }} />
