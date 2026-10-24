@@ -59,7 +59,7 @@ export const api = {
   leagues: () => request('/leagues'),
   fixtures: (params = {}) => request(`/fixtures${qs(params)}`),
   match: (id) => request(`/matches/${id}`),
-  tips: (status = 'open') => request(`/tips${qs({ status })}`),
+  tips: (status = 'open', limit) => request(`/tips${qs({ status, limit })}`),
   record: () => request('/record'),
   featured: () => request('/featured'),
 

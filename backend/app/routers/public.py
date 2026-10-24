@@ -167,7 +167,8 @@ def context_dict(ctx: MatchContext | None) -> dict:
 
 
 @router.get("/tips")
-def tips(status: str = Query("open", pattern="^(open|settled|all)$"), limit: int = 50, db: Session = Depends(get_db)):
+def tips(status: str = Query("open", pattern="^(open|settled|all)$"), limit: int = Query(50, ge=1, le=1000),
+         db: Session = Depends(get_db)):
     q = select(Tip).join(Fixture).where(Tip.published.is_(True), Tip.source == "ivo")
     if status == "open":
         q = q.where(Tip.status == "pending").order_by(Fixture.kickoff)

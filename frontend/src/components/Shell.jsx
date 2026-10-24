@@ -5,13 +5,14 @@ const NAV = [
   { to: '/', label: 'Picks', end: true },
   { to: '/fixtures', label: 'Fixtures' },
   { to: '/results', label: 'Results' },
+  { to: '/history', label: 'History' },
 ]
 
 export default function Shell({ children }) {
   const { user } = useAuth()
   // The current page gets an amber bar along the bottom of the header.
   const link = ({ isActive }) =>
-    `relative h-full inline-flex items-center px-3 text-sm font-semibold transition-colors after:absolute after:inset-x-3 after:bottom-0 after:h-[3px] after:rounded-t-sm after:transition-colors ${
+    `relative h-full inline-flex items-center whitespace-nowrap px-2 sm:px-3 text-sm font-semibold transition-colors after:absolute after:inset-x-2 sm:after:inset-x-3 after:bottom-0 after:h-[3px] after:rounded-t-sm after:transition-colors ${
       isActive ? 'text-white after:bg-amber' : 'text-white/65 hover:text-white after:bg-transparent hover:after:bg-white/25'
     }`
 

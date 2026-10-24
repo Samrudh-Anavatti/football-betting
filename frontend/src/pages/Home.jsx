@@ -101,7 +101,11 @@ export default function Home() {
 
       {settled.data?.length > 0 && (
         <section>
-          <SectionHead title="Recently settled" />
+          <SectionHead title="Recently settled">
+            <Link to="/history" className="link">
+              All past picks
+            </Link>
+          </SectionHead>
           <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
             {settled.data.slice(0, 6).map((t) => (
               <TipCard key={t.id} tip={t} />

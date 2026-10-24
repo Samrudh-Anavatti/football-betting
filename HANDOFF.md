@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-10-24 (**moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. Next: a simple past-picks list)._
+_Last updated: 2026-10-24 (**moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
 
 ## Live resources
 
