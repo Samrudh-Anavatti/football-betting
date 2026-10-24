@@ -7,8 +7,8 @@ import { useApi } from '../hooks/useApi.js'
 import { api } from '../lib/api.js'
 import { pct } from '../lib/format.js'
 
-// The record in money rather than units: a unit is £10, Ivo's standard stake.
-const UNIT = 10
+// The record in money rather than units: a unit is £1.
+const UNIT = 1
 const pounds = (v, dp = 0) => `£${Math.abs(v).toLocaleString('en-GB', { minimumFractionDigits: dp, maximumFractionDigits: dp })}`
 
 // Faint pitch markings behind the banner: halfway line, centre circle and spot.
@@ -40,7 +40,7 @@ function Ledger({ record }) {
     <div className="mt-8">
       <p className={`num wide font-black leading-[0.85] tracking-[-0.04em] text-[clamp(2.75rem,8vw,4.75rem)] ${profit >= 0 ? 'text-pitch-bright' : 'text-red'}`}>
         {profit < 0 ? '−' : '+'}
-        {pounds(profit)}
+        {pounds(profit, 2)}
       </p>
       <p className="mt-2 text-sm text-white/60">Profit so far at £{UNIT} a unit. It moves with every result.</p>
       <dl className="mt-6 grid grid-cols-2 sm:grid-cols-4 gap-y-4 border-t border-white/15 pt-4">
