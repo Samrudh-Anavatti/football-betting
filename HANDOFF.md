@@ -12,6 +12,7 @@ _Last updated: 2026-10-24 (**moved to Postgres**: fixture lists 15 s → under 1
 | Frontend | **https://football-predictions.org** (GitHub Pages, deploys on push to `main`; `www` and the old github.io address redirect to it). Branded **Football Predictions AI** (in `frontend/src/components/Shell.jsx` and `frontend/index.html`). |
 | Backend | **https://api.football-predictions.org** (API base `/api/v1`, docs at `/docs`); also still at football-betting-api-sa.azurewebsites.net |
 | Domain | `football-predictions.org`, registered and DNS on **Cloudflare**. See "Domain and DNS" below. |
+| Traffic | **Cloudflare Web Analytics** (dashboard → Analytics & Logs → Web Analytics), cookieless beacon in `frontend/index.html` (site token there, not secret), SPA mode on. Added 2026-10-24. |
 | Resource group | `rg-football-betting` (UK South), **separate from PongPoints** |
 | App Service plan | `plan-football-betting`, Linux **B1**, Always On |
 | Web app | `football-betting-api-sa`, Python 3.11, startup `bash startup.sh` |
