@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom'
+import { Link, NavLink } from 'react-router-dom'
+import { openCookieSettings } from '../lib/analytics.js'
 import { useAuth } from '../lib/auth.jsx'
 
 const NAV = [
@@ -49,6 +50,12 @@ export default function Shell({ children }) {
             Bet with money you can afford to lose. Free support at BeGambleAware.org.
           </span>
           <span className="sm:ml-auto">Fixtures, research and prices by API-Football</span>
+          <span className="flex gap-4">
+            <Link to="/privacy" className="hover:text-white underline underline-offset-4">Privacy</Link>
+            <button type="button" className="hover:text-white underline underline-offset-4" onClick={openCookieSettings}>
+              Cookie settings
+            </button>
+          </span>
         </div>
       </footer>
     </div>

@@ -4,6 +4,8 @@ import Home from './pages/Home.jsx'
 import Fixtures from './pages/Fixtures.jsx'
 import Match from './pages/Match.jsx'
 import History from './pages/History.jsx'
+import Privacy from './pages/Privacy.jsx'
+import ConsentBanner from './components/ConsentBanner.jsx'
 import Admin from './pages/Admin.jsx'
 
 export default function App() {
@@ -14,10 +16,12 @@ export default function App() {
         <Route path="/fixtures" element={<Fixtures />} />
         <Route path="/results" element={<Fixtures results />} />
         <Route path="/history" element={<History />} />
+        <Route path="/privacy" element={<Privacy />} />
         <Route path="/match/:id" element={<Match />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <ConsentBanner />
     </Shell>
   )
 }
