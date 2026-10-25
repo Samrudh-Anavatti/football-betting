@@ -36,6 +36,15 @@ export default function Privacy() {
         when you sign out.
       </p>
 
+      <H>Contact</H>
+      <p>
+        Questions about your data, or a request to see or delete it: email{' '}
+        <a href="mailto:samrudh.anavatti@gmail.com" className="link">
+          samrudh.anavatti@gmail.com
+        </a>
+        .
+      </p>
+
       <H>Betting</H>
       <p>
         Our picks are opinions, not financial advice. You must be 18 or over to bet. Bet only with money you can
