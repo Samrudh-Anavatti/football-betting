@@ -240,7 +240,9 @@ def run_turn(db: Session, thread: AiThread, user_id: int) -> dict:
                 input=_history(db, thread),
                 tools=[RECORD_ANALYSIS],
                 reasoning={"effort": thread.effort},
-                max_output_tokens=32000,
+                # Azure counts prompt + this cap against the deployment's tokens/min (100k), so keep it
+                # near real use: replies peak around 9k tokens, reasoning included.
+                max_output_tokens=16000,
                 store=False,
                 include=["reasoning.encrypted_content"],
             )
