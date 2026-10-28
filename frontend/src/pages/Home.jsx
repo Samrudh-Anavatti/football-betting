@@ -93,7 +93,7 @@ export default function Home() {
         ) : tips.data.length === 0 ? (
           <Empty title="No open picks right now">New picks go up a day or two before kick-off.</Empty>
         ) : (
-          <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-x-5 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
             {tips.data.map((t) => (
               <TipCard key={t.id} tip={t} />
             ))}
@@ -108,7 +108,7 @@ export default function Home() {
               All past picks
             </Link>
           </SectionHead>
-          <div className="grid gap-x-5 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-x-5 gap-y-6 sm:grid-cols-2 lg:grid-cols-3">
             {settled.data.slice(0, 6).map((t) => (
               <TipCard key={t.id} tip={t} />
             ))}

@@ -162,7 +162,7 @@ function Prediction({ pred, fx, board, tips, onPick }) {
         </div>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 text-sm">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 text-sm">
         {a.key_factors.length > 0 && (
           <div>
             <h4 className="font-semibold mb-1">Key factors</h4>

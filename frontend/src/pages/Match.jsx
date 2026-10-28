@@ -75,7 +75,7 @@ function ResearchBar({ fx, data, reload }) {
   const prices = useRun(() => reload())
   const lineups = useRun(() => reload())
   return (
-    <section className="panel px-5 py-4 grid gap-4 sm:grid-cols-3 bg-amber-light/60 shadow-none ring-1 ring-inset ring-amber/50">
+    <section className="panel px-5 py-4 grid grid-cols-1 gap-4 sm:grid-cols-3 bg-amber-light/60 shadow-none ring-1 ring-inset ring-amber/50">
       <div className="space-y-2">
         <div className="flex flex-wrap items-center gap-3">
           <button type="button" className="btn-primary" disabled={ctx.busy} onClick={() => ctx.start(() => api.refreshContext(fx.id))}>
@@ -161,7 +161,7 @@ function Injuries({ list, fx }) {
   if (!list) return null
   const byTeam = (id) => list.filter((i) => i.team_id === id)
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
       {[fx.home, fx.away].map((t) => (
         <div key={t.id}>
           <p className="font-semibold mb-1">{t.name}</p>
@@ -263,7 +263,7 @@ export default function Match() {
       {data.tips.length > 0 && (
         <section>
           <h2 className="text-2xl mb-3">Our team's pick{data.tips.length > 1 ? 's' : ''}</h2>
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {data.tips.map((t) => (
               <TipCard key={t.id} tip={{ ...t, fixture: fx }} />
             ))}
