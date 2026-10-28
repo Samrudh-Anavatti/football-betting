@@ -14,6 +14,7 @@ _Last updated: 2026-10-24 (**moved to Postgres**: fixture lists 15 s → under 1
 | Domain | `football-predictions.org`, registered and DNS on **Cloudflare**. See "Domain and DNS" below. |
 | Traffic | **Cloudflare Web Analytics** (dashboard → Analytics & Logs → Web Analytics), cookieless beacon in `frontend/index.html` (site token there, not secret), SPA mode on. Added 2026-10-24. |
 | Google Analytics | GA4 property "Football Predictions AI", measurement id `G-MDK0G2HH7M` (`frontend/src/lib/analytics.js`). Consent Mode v2: cookieless until the visitor accepts the banner (`ConsentBanner.jsx`); page views sent per route with the real path (`/history`, `/match/123`), admin pages skipped, live site only. Disclosed on `/privacy`. Enhanced measurement's "page changes based on browser history events" should stay **off** (it would double-count). |
+| Football Friends | `/#/friends`, linked from the footer: reciprocal links Ivo arranges (first: matips.net, owned by a friend of his, which links to us from matips.net/friends). Add one with an entry in `frontend/src/pages/Friends.jsx`. Added 2026-10-28. |
 | Resource group | `rg-football-betting` (UK South), **separate from PongPoints** |
 | App Service plan | `plan-football-betting`, Linux **B1**, Always On |
 | Web app | `football-betting-api-sa`, Python 3.11, startup `bash startup.sh` |
