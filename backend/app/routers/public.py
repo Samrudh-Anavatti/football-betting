@@ -142,6 +142,16 @@ def ai_dict(pred: AiPrediction | None) -> dict | None:
 FEATURED_LEAGUES = [39, 2, 140, 135, 78, 61, 3]
 
 
+@router.get("/sitemap")
+def sitemap(db: Session = Depends(get_db)):
+    """Every match from the last 30 days and the next 14, just enough for the frontend's sitemap.xml to build
+    each one's address (/match/<teams>-<id>)."""
+    now = datetime.utcnow()
+    q = select(Fixture).where(Fixture.kickoff >= now - timedelta(days=30), Fixture.kickoff <= now + timedelta(days=14))
+    return [{"id": f.id, "home": {"name": f.home_team.name}, "away": {"name": f.away_team.name}}
+            for f in db.scalars(q.order_by(Fixture.kickoff))]
+
+
 @router.get("/featured")
 def featured(db: Session = Depends(get_db)):
     """One upcoming match with an AI analysis, for the home page's preview card."""

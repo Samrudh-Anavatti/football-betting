@@ -48,6 +48,7 @@ def test_full_flow(client, auth, fake):
     assert meta["fixture"]["home"]["name"] == "Manchester City" and meta["has_ai"] is False
     assert meta["tips"] == [{"market": "OU", "selection": "over", "line": 2.5, "odds": 1.6}]
     assert client.get(f"{API}/matches/999999/meta").status_code == 404
+    assert {"id": 1001, "home": {"name": "Manchester City"}, "away": {"name": "Wolves"}} in client.get(f"{API}/sitemap").json()
 
     # Match finishes 3-1 → next fixtures sync settles everything.
     fake.af_fixtures = [af_fixture(1001, (50, "Manchester City"), (39, "Wolves"), KICKOFF, "FT", 3, 1)]
