@@ -13,7 +13,7 @@ for live resources, config and operations.
 
 | Layer    | Choice |
 |----------|--------|
-| Frontend | React + Vite + Tailwind + React Router (HashRouter) on GitHub Pages |
+| Frontend | React + Vite + Tailwind + React Router on Cloudflare Pages (plus one Pages Function for match-page titles) |
 | Backend  | FastAPI + SQLAlchemy 2.0 on Azure App Service (Linux, B1, UK South); Azure Database for PostgreSQL (SQLite locally and in tests) |
 | Data     | [API-Football](https://www.api-football.com/) Pro (fixtures, results, tables, research, prices for every market); [The Odds API](https://the-odds-api.com/) as a backup price source |
 | AI       | GPT-5.6 Luna on Microsoft Foundry (`openai` SDK, Responses API) |
@@ -32,7 +32,7 @@ backend/
 frontend/
   src/pages      Home, Fixtures/Results, Match, Admin
   src/components OddsBoard, PickForm, TipCard, admin/DataTab etc.
-.github/workflows  Pages deploy + Azure backend deploy (tests gate both)
+.github/workflows  Cloudflare Pages deploy + Azure backend deploy (tests gate both)
 ```
 
 ## Run locally

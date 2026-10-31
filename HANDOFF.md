@@ -3,13 +3,13 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-10-24 (**moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
+_Last updated: 2026-10-31 (**frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
 
 ## Live resources
 
 | Thing | Value |
 |---|---|
-| Frontend | **https://football-predictions.org** (GitHub Pages, deploys on push to `main`; `www` and the old github.io address redirect to it). Branded **Football Predictions AI** (in `frontend/src/components/Shell.jsx` and `frontend/index.html`). |
+| Frontend | **https://football-predictions.org** (**Cloudflare Pages** project `football-predictions`, test address football-predictions-9hg.pages.dev; deploys on push to `main`). See "Frontend on Cloudflare Pages". Branded **Football Predictions AI** (in `frontend/src/components/Shell.jsx` and `frontend/index.html`). |
 | Backend | **https://api.football-predictions.org** (API base `/api/v1`, docs at `/docs`); also still at football-betting-api-sa.azurewebsites.net |
 | Domain | `football-predictions.org`, registered and DNS on **Cloudflare**. See "Domain and DNS" below. |
 | Traffic | **Cloudflare Web Analytics** (dashboard → Analytics & Logs → Web Analytics), cookieless beacon in `frontend/index.html` (site token there, not secret), SPA mode on. Added 2026-10-24. |
@@ -63,35 +63,51 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 
 GitHub Actions (Settings → Secrets and variables → Actions):
 `AZURE_WEBAPP_NAME` (variable), `AZURE_WEBAPP_PUBLISH_PROFILE` (secret),
-`VITE_API_URL` (variable, `https://api.football-predictions.org/api/v1`), `VITE_BASE` (variable, `/` for the custom
-domain; unset = `/<repo>/` for a github.io project site). Setting `/` from Git Bash needs `MSYS_NO_PATHCONV=1`,
-or it becomes `C:/Program Files/Git/`.
+`VITE_API_URL` (variable, `https://api.football-predictions.org/api/v1`), `CLOUDFLARE_ACCOUNT_ID` (variable),
+`CLOUDFLARE_API_TOKEN` (secret: an account token with **Cloudflare Pages: Edit** only, no expiry, used by wrangler).
 
 ## Domain and DNS (set up 2026-10-24)
 
-`football-predictions.org` is on Cloudflare (zone `966d9a85977f278c829bcf12c42bd57d`). Every record is
-**DNS-only (grey cloud)**: GitHub and Azure both issue their certificates by reaching the origin directly, which
-Cloudflare's proxy would block.
+`football-predictions.org` is on Cloudflare (zone `966d9a85977f278c829bcf12c42bd57d`, account
+`1eff171ce3876fd35f8af567dabf3e9b`). The site records are **proxied** (Cloudflare Pages needs it); `api` stays
+**DNS-only (grey cloud)**, because Azure issues its certificate by reaching the origin directly. MX/SPF/DKIM
+(Google Workspace email) and two `google-site-verification` TXT records (Search Console) also live here.
 
 | Record | Points to | For |
 |---|---|---|
-| `A` / `AAAA` @ | 185.199.108–111.153 / 2606:50c0:8000–8003::153 | GitHub Pages (the site) |
-| `CNAME www` | samrudh-anavatti.github.io | GitHub Pages, redirects to the apex |
+| `CNAME` @ (proxied) | football-predictions-9hg.pages.dev | Cloudflare Pages (the site), since 2026-10-31 |
+| `CNAME www` | samrudh-anavatti.github.io | **To move:** still GitHub Pages, which redirects it to the apex. Point it at football-predictions-9hg.pages.dev (proxied) and add a redirect rule www → `https://football-predictions.org` + path (301); then switch GitHub Pages off in the repo settings. |
 | `CNAME api` | football-betting-api-sa.azurewebsites.net | the backend |
 | `TXT asuid.api` | the web app's `customDomainVerificationId` | proves to Azure we own `api.` |
 
-* **Site certificate:** GitHub's (Let's Encrypt), renews itself; HTTPS enforced in the repo's Pages settings, where
-  the custom domain is also set (no CNAME file: the site deploys from Actions).
+* **Site certificate:** Cloudflare's own edge certificate for the zone, renews itself.
 * **API certificate:** an App Service managed certificate for `api.football-predictions.org`, bound with SNI,
   renews itself (first expiry 2027-04-24). It only renews while the `api` CNAME stays DNS-only.
 * **Moving the backend:** add the hostname to the new app (`az webapp config hostname add`), update `asuid.api` to
   the new app's verification id and `api` to its hostname, then `az webapp config ssl create` + `ssl bind`.
-* The Cloudflare token used for the setup (DNS edit on this zone) expires in a few days; make a new one for any
-  later change.
+* No standing Cloudflare token can edit DNS (the setup tokens were deleted); make a short-lived one for any later change.
 
 **Keep uvicorn to a single worker.** Syncs and the refresh schedule run in
 background threads inside the web process (two workers would mean two schedules),
 and only the lease holder runs it anyway.
+
+## Frontend on Cloudflare Pages (2026-10-31)
+
+Moved from GitHub Pages so search engines can see every page: GitHub Pages can't serve `/match/123` as a real page,
+so the app used hash URLs (`/#/match/123`), and Google ignores everything after `#`, so it saw one page.
+
+* **Real URLs** (React Router's BrowserRouter). Old `#/…` links redirect to the real path in `main.jsx`.
+* **Fixed pages** (`/`, `/fixtures`, `/results`, `/history`, `/friends`, `/privacy`, `/admin`): `npm run build` runs
+  `scripts/page-meta.mjs`, which writes `dist/<page>.html` with that page's title, description and canonical link
+  (text in `src/lib/seo.js`). `/admin` is `noindex`.
+* **Match pages:** the Pages Function `functions/match/[id].js` serves the app with the match's title and description
+  written in, from `GET /matches/{id}/meta` (a light endpoint; the full match is ~400 KB). Cached at Cloudflare for
+  10 minutes, 2 s timeout (the page just keeps the default title if the API is slow). A match the API doesn't know
+  returns 404 + `noindex`. Free plan: 100k function requests/day.
+* Any other path gets the app (200), which sends it home; its canonical link points at `/`.
+* Deploy: `.github/workflows/deploy-frontend.yml` builds and runs `wrangler pages deploy` (Node 22). By hand:
+  `CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… npx wrangler@4.151.3 pages deploy dist --project-name football-predictions --branch main`
+  from `frontend/`.
 
 ## Moving the backend (new plan, region or host)
 
