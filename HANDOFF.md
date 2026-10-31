@@ -14,7 +14,7 @@ _Last updated: 2026-10-31 (**frontend moved to Cloudflare Pages** with real URLs
 | Domain | `football-predictions.org`, registered and DNS on **Cloudflare**. See "Domain and DNS" below. |
 | Traffic | **Cloudflare Web Analytics** (dashboard → Analytics & Logs → Web Analytics), cookieless beacon in `frontend/index.html` (site token there, not secret), SPA mode on. Added 2026-10-24. |
 | Google Analytics | GA4 property "Football Predictions AI", measurement id `G-MDK0G2HH7M` (`frontend/src/lib/analytics.js`). Consent Mode v2: cookieless until the visitor accepts the banner (`ConsentBanner.jsx`); page views sent per route with the real path (`/history`, `/match/123`), admin pages skipped, live site only. Disclosed on `/privacy`. Enhanced measurement's "page changes based on browser history events" should stay **off** (it would double-count). |
-| Football Friends | `/#/friends`, linked from the footer: reciprocal links Ivo arranges (first: matips.net, owned by a friend of his, which links to us from matips.net/friends). Add one with an entry in `frontend/src/pages/Friends.jsx`. Added 2026-10-28. |
+| Football Friends | `/friends`, linked from the footer: reciprocal links Ivo arranges (first: matips.net, owned by a friend of his, which links to us from matips.net/friends). Add one with an entry in `frontend/src/pages/Friends.jsx`. Added 2026-10-28. |
 | Resource group | `rg-football-betting` (UK South), **separate from PongPoints** |
 | App Service plan | `plan-football-betting`, Linux **B1**, Always On |
 | Web app | `football-betting-api-sa`, Python 3.11, startup `bash startup.sh` |
@@ -107,6 +107,9 @@ so the app used hash URLs (`/#/match/123`), and Google ignores everything after 
   written in, from `GET /matches/{id}/meta` (a light endpoint; the full match is ~400 KB). Cached at Cloudflare for
   10 minutes, 2 s timeout (the page just keeps the default title if the API is slow). A match the API doesn't know
   returns 404 + `noindex`. Free plan: 100k function requests/day.
+* **Sitemap:** `functions/sitemap.xml.js` serves `/sitemap.xml`: the fixed pages (not `/admin`) plus every match from
+  the last 30 days and the next 14 (~2,500 addresses), from the light `GET /sitemap` endpoint, cached for an hour.
+  `public/robots.txt` points at it. Submitted in Google Search Console (Sitemaps).
 * Any other path gets the app (200), which sends it home; its canonical link points at `/`.
 * `www`: `functions/_middleware.js` redirects it to the bare domain. `public/_routes.json` keeps `/assets/*` from
   invoking functions at all (they're static and only ever loaded from the bare domain).
