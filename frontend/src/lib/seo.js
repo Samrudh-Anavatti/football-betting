@@ -67,3 +67,26 @@ export function matchMeta(fixture, tips = []) {
 }
 
 export const canonical = (path) => SITE_URL + (path === '/' ? '/' : path)
+
+// Letters that don't decompose into a plain one plus an accent.
+const LETTERS = { ı: 'i', ø: 'o', æ: 'ae', œ: 'oe', ß: 'ss', ł: 'l', đ: 'd', þ: 'th' }
+
+// "Atlético Madrid" -> "atletico-madrid", "Kasımpaşa" -> "kasimpasa"
+const slug = (name) =>
+  name
+    .toLowerCase()
+    .replace(/[ıøæœßłđþ]/g, (c) => LETTERS[c])
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+
+// A match's address: the teams for search engines and people, the id at the end for us
+// (/match/udinese-vs-as-roma-1550186). Any other spelling of it redirects here.
+export function matchPath(fixture) {
+  const teams = fixture.home?.name && fixture.away?.name ? `${slug(fixture.home.name)}-vs-${slug(fixture.away.name)}-` : ''
+  return `/match/${teams}${fixture.id}`
+}
+
+// The id from the last part of a match address; also takes the old plain-id form (/match/1550186).
+export const matchIdFrom = (param) => param.match(/(?:^|-)(\d+)$/)?.[1] ?? null

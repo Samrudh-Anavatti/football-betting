@@ -4,6 +4,7 @@ import { api } from '../../lib/api.js'
 import { ago, pct, shortDate, signed } from '../../lib/format.js'
 import { runSummary } from '../RunStatus.jsx'
 import { Empty, ErrorNote, Loading } from '../ui.jsx'
+import { matchPath } from '../../lib/seo.js'
 
 const usd = (x) => (x == null ? '–' : `$${x.toFixed(2)}`)
 
@@ -133,7 +134,7 @@ export default function AiTab() {
           <ul className="divide-y divide-ink/5 text-sm">
             {data.recent.map((t) => (
               <li key={t.thread_id} className="px-5 py-2.5 grid grid-cols-[1fr_auto] sm:grid-cols-[1fr_8rem_6rem_5rem] gap-x-3 items-center">
-                <Link to={`/match/${t.fixture.id}`} className="font-medium hover:underline truncate">
+                <Link to={matchPath(t.fixture)} className="font-medium hover:underline truncate">
                   {t.fixture.home.name} v {t.fixture.away.name}
                   <span className="text-ink-faint font-normal"> · {shortDate(t.fixture.kickoff)}</span>
                 </Link>

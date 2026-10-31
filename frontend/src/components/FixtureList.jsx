@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { dayLabel, groupBy, kickoffTime, odds } from '../lib/format.js'
 import { LeagueBadge, TeamName } from './ui.jsx'
+import { matchPath } from '../lib/seo.js'
 
 const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT'])
 
@@ -9,7 +10,7 @@ function Row({ fx, results }) {
   const showScore = results || live
   return (
     <Link
-      to={`/match/${fx.id}`}
+      to={matchPath(fx)}
       className="group grid grid-cols-[3rem_minmax(0,1fr)_auto] sm:grid-cols-[3.75rem_minmax(0,1fr)_auto] items-center gap-3 px-4 py-2.5 transition-colors hover:bg-amber-light/50"
     >
       <span className={`num text-[15px] inline-flex items-center gap-1.5 ${live ? 'text-red font-bold' : 'text-ink-soft'}`}>

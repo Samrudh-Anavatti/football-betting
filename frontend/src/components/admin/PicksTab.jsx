@@ -3,6 +3,7 @@ import { useApi } from '../../hooks/useApi.js'
 import { api } from '../../lib/api.js'
 import { odds, pct, pickLabel, shortDate, signed } from '../../lib/format.js'
 import { Empty, ErrorNote, Loading } from '../ui.jsx'
+import { matchPath } from '../../lib/seo.js'
 
 const STATUS_STYLE = { won: 'text-pitch', lost: 'text-red', void: 'text-ink-soft', pending: 'text-ink-soft' }
 
@@ -67,7 +68,7 @@ export default function PicksTab() {
               {tips.map((t) => (
                 <tr key={t.id}>
                   <td className="px-4 py-2">
-                    <Link to={`/match/${t.fixture.id}`} className="font-medium hover:underline">
+                    <Link to={matchPath(t.fixture)} className="font-medium hover:underline">
                       {t.fixture.home.name} v {t.fixture.away.name}
                     </Link>
                     <div className="text-ink-faint">

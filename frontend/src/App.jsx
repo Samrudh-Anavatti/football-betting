@@ -28,7 +28,7 @@ export default function App() {
         <Route path="/history" element={<History />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/friends" element={<Friends />} />
-        <Route path="/match/:id" element={<Match />} />
+        <Route path="/match/:slug" element={<Match />} />
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

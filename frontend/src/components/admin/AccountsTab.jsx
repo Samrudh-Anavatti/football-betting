@@ -5,6 +5,7 @@ import { api } from '../../lib/api.js'
 import { useAuth } from '../../lib/auth.jsx'
 import { money, odds, pct, pickLabel, shortDate } from '../../lib/format.js'
 import { Empty, ErrorNote, Loading } from '../ui.jsx'
+import { matchPath } from '../../lib/seo.js'
 
 function AccountCard({ a, mine, onSaved }) {
   const [editing, setEditing] = useState(false)
@@ -103,7 +104,7 @@ export default function AccountsTab() {
                 <tr key={b.id}>
                   <td className="px-4 py-2 font-medium">{b.user}</td>
                   <td className="py-2 pr-3">
-                    <Link to={`/match/${b.fixture.id}`} className="hover:underline">
+                    <Link to={matchPath(b.fixture)} className="hover:underline">
                       {b.fixture.home.name} v {b.fixture.away.name}
                     </Link>
                     <div className="text-ink-faint">{shortDate(b.fixture.kickoff)}</div>

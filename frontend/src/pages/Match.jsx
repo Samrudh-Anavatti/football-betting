@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import AiPanel, { PublicAi } from '../components/AiPanel.jsx'
 import MarketBoard from '../components/MarketBoard.jsx'
 import PickForm from '../components/PickForm.jsx'
@@ -13,7 +13,7 @@ import { useRun } from '../hooks/useRun.js'
 import { api } from '../lib/api.js'
 import { dayLabel, kickoffTime, shortDate } from '../lib/format.js'
 import { useAuth } from '../lib/auth.jsx'
-import { matchMeta } from '../lib/seo.js'
+import { matchIdFrom, matchMeta, matchPath } from '../lib/seo.js'
 
 const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT'])
 
@@ -241,12 +241,20 @@ function TeamStats({ fx, home, away }) {
 }
 
 export default function Match() {
-  const { id } = useParams()
+  const id = matchIdFrom(useParams().slug)
   const { user } = useAuth()
   const { data, loading, error, reload } = useApi(() => api.match(id), [id])
   const [pick, setPick] = useState(null)
   const [saved, setSaved] = useState(null)
-  usePageMeta(data && matchMeta(data.fixture, data.tips), `/match/${id}`)
+  // Only once this address's match has loaded (moving between matches, the last one's data lingers a moment).
+  const path = data && String(data.fixture.id) === id ? matchPath(data.fixture) : null
+  usePageMeta(data && matchMeta(data.fixture, data.tips), path)
+  // An old or misspelt address (/match/1550186) settles on the match's own one.
+  const { pathname } = useLocation()
+  const navigate = useNavigate()
+  useEffect(() => {
+    if (path && pathname !== path) navigate(path, { replace: true })
+  }, [path, pathname, navigate])
 
   if (loading && !data) return <Loading />
   if (error) return <ErrorNote error={error} />

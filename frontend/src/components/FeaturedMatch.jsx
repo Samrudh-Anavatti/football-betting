@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom'
 import { dayLabel, kickoffTime } from '../lib/format.js'
 import ProbabilityStrip from './ProbabilityStrip.jsx'
 import { LeagueBadge, Price, TeamName } from './ui.jsx'
+import { matchPath } from '../lib/seo.js'
 
 // The home banner's preview of what a match page holds: a real upcoming match
 // with its best prices and the AI's read, printed as a betting slip. The whole slip opens the match.
@@ -12,7 +13,7 @@ export default function FeaturedMatch({ data }) {
   const best = fx.best_1x2
   return (
     <Link
-      to={`/match/${fx.id}`}
+      to={matchPath(fx)}
       className="group block min-w-0 rounded-lg lg:rotate-[2deg] transition-transform duration-300 ease-out hover:rotate-0 hover:-translate-y-1 focus-visible:rotate-0 focus-visible:ring-offset-ink [filter:drop-shadow(0_18px_28px_rgba(2,8,20,0.55))]"
     >
       <div className="perforated rounded-t-lg bg-paper text-ink">

@@ -1,6 +1,7 @@
 import { Link } from 'react-router-dom'
 import { dayLabel, kickoffTime, pickLabel, signed } from '../lib/format.js'
 import { LeagueBadge, Price } from './ui.jsx'
+import { matchPath } from '../lib/seo.js'
 
 // Settled tips get a rubber stamp, slightly askew.
 const STAMP = {
@@ -17,7 +18,7 @@ export default function TipCard({ tip }) {
     <div className="slip-shadow h-full transition-transform duration-200 hover:-translate-y-0.5">
       <article className="perforated h-full rounded-t-xl bg-paper flex flex-col">
         <Link
-          to={`/match/${fx.id}`}
+          to={matchPath(fx)}
           className="px-4 pt-3.5 pb-2 text-sm text-ink-soft hover:text-ink flex items-center gap-2 transition-colors"
         >
           <LeagueBadge league={fx.league} />

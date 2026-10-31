@@ -3,6 +3,7 @@ import { Empty, ErrorNote, Loading, SectionHead } from '../components/ui.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { api } from '../lib/api.js'
 import { odds, pickLabel, shortDate, signed } from '../lib/format.js'
+import { matchPath } from '../lib/seo.js'
 
 const RESULT = {
   won: ['W', 'bg-pitch text-white'],
@@ -32,7 +33,7 @@ export default function History() {
               <li key={t.id} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 text-sm">
                 <span className="hidden sm:block w-16 shrink-0 text-ink-soft num">{shortDate(fx.kickoff)}</span>
                 <div className="min-w-0 flex-1">
-                  <Link to={`/match/${fx.id}`} className="block truncate font-semibold hover:underline underline-offset-4">
+                  <Link to={matchPath(fx)} className="block truncate font-semibold hover:underline underline-offset-4">
                     {pickLabel(t, fx)}
                   </Link>
                   <span className="block truncate text-ink-soft">

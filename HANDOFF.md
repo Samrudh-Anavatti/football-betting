@@ -97,10 +97,13 @@ Moved from GitHub Pages so search engines can see every page: GitHub Pages can't
 so the app used hash URLs (`/#/match/123`), and Google ignores everything after `#`, so it saw one page.
 
 * **Real URLs** (React Router's BrowserRouter). Old `#/…` links redirect to the real path in `main.jsx`.
+* **Match addresses carry the teams:** `/match/udinese-vs-as-roma-1550186` (`matchPath` in `src/lib/seo.js`; only the
+  trailing id is used to look the match up). Any other form, including the old `/match/1550186`, gets a 301 to it from
+  the function (and the app corrects it in the browser too).
 * **Fixed pages** (`/`, `/fixtures`, `/results`, `/history`, `/friends`, `/privacy`, `/admin`): `npm run build` runs
   `scripts/page-meta.mjs`, which writes `dist/<page>.html` with that page's title, description and canonical link
   (text in `src/lib/seo.js`). `/admin` is `noindex`.
-* **Match pages:** the Pages Function `functions/match/[id].js` serves the app with the match's title and description
+* **Match pages:** the Pages Function `functions/match/[id].js` (the `[id]` is the whole `<teams>-<id>` part) serves the app with the match's title and description
   written in, from `GET /matches/{id}/meta` (a light endpoint; the full match is ~400 KB). Cached at Cloudflare for
   10 minutes, 2 s timeout (the page just keeps the default title if the API is slow). A match the API doesn't know
   returns 404 + `noindex`. Free plan: 100k function requests/day.
