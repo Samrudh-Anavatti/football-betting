@@ -76,7 +76,7 @@ GitHub Actions (Settings → Secrets and variables → Actions):
 | Record | Points to | For |
 |---|---|---|
 | `CNAME` @ (proxied) | football-predictions-9hg.pages.dev | Cloudflare Pages (the site), since 2026-10-31 |
-| `CNAME www` | samrudh-anavatti.github.io | **To move:** still GitHub Pages, which redirects it to the apex. Point it at football-predictions-9hg.pages.dev (proxied) and add a redirect rule www → `https://football-predictions.org` + path (301); then switch GitHub Pages off in the repo settings. |
+| `CNAME www` (proxied) | football-predictions-9hg.pages.dev | A custom domain on the Pages project; `functions/_middleware.js` 301s every `www` request to the bare domain (path and query kept). |
 | `CNAME api` | football-betting-api-sa.azurewebsites.net | the backend |
 | `TXT asuid.api` | the web app's `customDomainVerificationId` | proves to Azure we own `api.` |
 
@@ -108,6 +108,10 @@ so the app used hash URLs (`/#/match/123`), and Google ignores everything after 
   10 minutes, 2 s timeout (the page just keeps the default title if the API is slow). A match the API doesn't know
   returns 404 + `noindex`. Free plan: 100k function requests/day.
 * Any other path gets the app (200), which sends it home; its canonical link points at `/`.
+* `www`: `functions/_middleware.js` redirects it to the bare domain. `public/_routes.json` keeps `/assets/*` from
+  invoking functions at all (they're static and only ever loaded from the bare domain).
+* GitHub Pages was switched off on 2026-10-31 (and its `github-pages` environment removed). Nothing else about the
+  repo changed: pushes to `main` still deploy, now to Cloudflare.
 * Deploy: `.github/workflows/deploy-frontend.yml` builds and runs `wrangler pages deploy` (Node 22). By hand:
   `CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… npx wrangler@4.151.3 pages deploy dist --project-name football-predictions --branch main`
   from `frontend/`.
