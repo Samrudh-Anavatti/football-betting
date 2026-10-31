@@ -1,4 +1,4 @@
-import { Navigate, Route, Routes } from 'react-router-dom'
+import { Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import Shell from './components/Shell.jsx'
 import Home from './pages/Home.jsx'
 import Fixtures from './pages/Fixtures.jsx'
@@ -8,6 +8,15 @@ import Privacy from './pages/Privacy.jsx'
 import Friends from './pages/Friends.jsx'
 import ConsentBanner from './components/ConsentBanner.jsx'
 import Admin from './pages/Admin.jsx'
+import usePageMeta from './hooks/usePageMeta.js'
+import { PAGES } from './lib/seo.js'
+
+// Fixed pages' titles; a match page sets its own once the match has loaded.
+function StaticMeta() {
+  const { pathname } = useLocation()
+  usePageMeta(PAGES[pathname], pathname)
+  return null
+}
 
 export default function App() {
   return (
@@ -23,6 +32,7 @@ export default function App() {
         <Route path="/admin" element={<Admin />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <StaticMeta />
       <ConsentBanner />
     </Shell>
   )

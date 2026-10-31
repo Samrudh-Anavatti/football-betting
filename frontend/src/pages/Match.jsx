@@ -8,10 +8,12 @@ import RunStatus from '../components/RunStatus.jsx'
 import TipCard from '../components/TipCard.jsx'
 import { Empty, ErrorNote, FormStrip, Freshness, LeagueBadge, Loading, TeamName } from '../components/ui.jsx'
 import { useApi } from '../hooks/useApi.js'
+import usePageMeta from '../hooks/usePageMeta.js'
 import { useRun } from '../hooks/useRun.js'
 import { api } from '../lib/api.js'
 import { dayLabel, kickoffTime, shortDate } from '../lib/format.js'
 import { useAuth } from '../lib/auth.jsx'
+import { matchMeta } from '../lib/seo.js'
 
 const LIVE = new Set(['1H', 'HT', '2H', 'ET', 'BT', 'P', 'LIVE', 'INT'])
 
@@ -244,6 +246,7 @@ export default function Match() {
   const { data, loading, error, reload } = useApi(() => api.match(id), [id])
   const [pick, setPick] = useState(null)
   const [saved, setSaved] = useState(null)
+  usePageMeta(data && matchMeta(data.fixture, data.tips), `/match/${id}`)
 
   if (loading && !data) return <Loading />
   if (error) return <ErrorNote error={error} />

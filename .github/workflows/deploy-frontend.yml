@@ -1,4 +1,4 @@
-name: Deploy frontend to GitHub Pages
+name: Deploy frontend to Cloudflare Pages
 
 on:
   push:
@@ -10,15 +10,13 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: pages
   cancel-in-progress: true
 
 jobs:
-  build:
+  deploy:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -36,22 +34,13 @@ jobs:
 
       - name: Build
         env:
-          # Path the site is served from: "/" for a custom domain, else /<repo>/.
-          VITE_BASE: ${{ vars.VITE_BASE || format('/{0}/', github.event.repository.name) }}
           # Backend base URL, e.g. https://api.football-predictions.org/api/v1
           VITE_API_URL: ${{ vars.VITE_API_URL }}
         run: npm run build
 
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: frontend/dist
-
-  deploy:
-    needs: build
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - id: deployment
-        uses: actions/deploy-pages@v4
+      # Uploads dist/ plus functions/ (the match-page titles) to the football-predictions project.
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: npx --yes wrangler@4.151.3 pages deploy dist --project-name football-predictions --branch main --commit-hash ${{ github.sha }}

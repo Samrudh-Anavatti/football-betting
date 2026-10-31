@@ -62,7 +62,7 @@ function clearGaCookies() {
   }
 }
 
-// HashRouter pages live after "#", which analytics tools drop; report them as real paths.
+// Sent by hand on every route change: GA's own page view only fires on full page loads.
 export function trackPage(path) {
   if (!enabled) return
   gtag('event', 'page_view', { page_location: location.origin + path, page_title: document.title })
