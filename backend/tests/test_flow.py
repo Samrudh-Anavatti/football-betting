@@ -44,6 +44,10 @@ def test_full_flow(client, auth, fake):
         "fixture_id": 1001, "market": "OU", "selection": "over", "line": 2.5, "odds": 1.6, "stake": 50,
     })
     assert len(client.get(f"{API}/tips").json()) == 1
+    meta = client.get(f"{API}/matches/1001/meta").json()
+    assert meta["fixture"]["home"]["name"] == "Manchester City" and meta["has_ai"] is False
+    assert meta["tips"] == [{"market": "OU", "selection": "over", "line": 2.5, "odds": 1.6}]
+    assert client.get(f"{API}/matches/999999/meta").status_code == 404
 
     # Match finishes 3-1 → next fixtures sync settles everything.
     fake.af_fixtures = [af_fixture(1001, (50, "Manchester City"), (39, "Wolves"), KICKOFF, "FT", 3, 1)]

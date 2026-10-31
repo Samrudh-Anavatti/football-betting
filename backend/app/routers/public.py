@@ -82,6 +82,20 @@ def match(fixture_id: int, db: Session = Depends(get_db)):
     }
 
 
+@router.get("/matches/{fixture_id}/meta")
+def match_meta(fixture_id: int, db: Session = Depends(get_db)):
+    """Just enough to title a match page for search engines and link previews (the full match is ~400 KB)."""
+    fx = db.get(Fixture, fixture_id)
+    if fx is None:
+        raise HTTPException(404, "Match not found")
+    tips = db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.published.is_(True)))
+    return {
+        "fixture": fixture_dict(fx),
+        "tips": [{"market": t.market, "selection": t.selection, "line": t.line, "odds": t.odds} for t in tips],
+        "has_ai": latest_prediction(db, fx) is not None,
+    }
+
+
 def pitch_dict(db: Session, fx: Fixture) -> dict:
     """Each team's XI for the pitch card: the confirmed one once it's out, otherwise the
     one it started its previous match with (from the research's last-five list)."""
