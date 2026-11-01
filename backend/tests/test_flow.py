@@ -43,7 +43,8 @@ def test_full_flow(client, auth, fake):
     client.post(f"{API}/admin/bets", headers=auth, json={
         "fixture_id": 1001, "market": "OU", "selection": "over", "line": 2.5, "odds": 1.6, "stake": 50,
     })
-    assert len(client.get(f"{API}/tips").json()) == 1
+    public_tips = client.get(f"{API}/tips").json()
+    assert len(public_tips) == 1 and "author" not in public_tips[0]  # no names on public pages
     meta = client.get(f"{API}/matches/1001/meta").json()
     assert meta["fixture"]["home"]["name"] == "Manchester City" and meta["has_ai"] is False
     assert meta["tips"] == [{"market": "OU", "selection": "over", "line": 2.5, "odds": 1.6}]

@@ -183,6 +183,9 @@ the settings above.
 
 ## Gotchas
 
+* **No names on public pages.** Ivo (or anyone) must not appear on the public site or in public API responses:
+  public copy says "we"/"our picks", and `public_tip()` in `routers/public.py` drops a pick's `author`. Admin pages can name people.
+
 * **SQLite on `/home` (2026-10-12 outage, before the move to Postgres).** `/home` is a network share. In WAL mode two processes (the old and new
   app overlap for a minute or two on every deploy, each running the schedule) corrupted SQLite's shared-memory
   index and every query failed with "file is not a database". The files themselves were intact: stopped the app,

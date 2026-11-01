@@ -147,7 +147,7 @@ function PlanView({ data, hitRate }) {
             <div className="panel px-5 py-8 text-center">
               <p className="font-display text-xl font-bold">Next bundle coming soon</p>
               <p className="mt-1 text-ink-soft max-w-prose mx-auto">
-                Ivo bundles his picks once the day's are in. Run {run.number}, bet {run.step}: the stake will be about{' '}
+                We bundle the picks once the day's are in. Run {run.number}, bet {run.step}: the stake will be about{' '}
                 <span className="num font-semibold text-ink">{money(run.next_stake * scale)}</span>
                 {run.losses > 0 && <> to win back {money(run.losses * scale)} and make the profit</>}.
               </p>
@@ -191,7 +191,7 @@ function PlanView({ data, hitRate }) {
         <div className="grid gap-6 lg:grid-cols-2 items-start">
           <div className="space-y-3 text-[15px] leading-relaxed max-w-prose">
             <p>
-              Ivo combines his picks into one bet at odds of about {odds(plan.target_odds)}. A win makes{' '}
+              We combine our picks into one bet at odds of about {odds(plan.target_odds)}. A win makes{' '}
               {money(plan.target_profit * scale)} and starts a new run at {money(plan.base_stake * scale)}.
             </p>
             <p>
@@ -201,7 +201,7 @@ function PlanView({ data, hitRate }) {
             </p>
             {winChance != null && (
               <p>
-                Ivo's picks have landed {pct(hitRate, 0)} of the time. At that rate a {Math.round(legs)}-pick bundle
+                Our picks have landed {pct(hitRate, 0)} of the time. At that rate a {Math.round(legs)}-pick bundle
                 wins about {pct(winChance, 0)} of the time, and {plan.survivable_losses + 1} losses in a row, enough to
                 empty the bank, happens in about {pct(wipeout, 1)} of runs.
               </p>
@@ -275,9 +275,9 @@ function Preview() {
             </svg>
           </span>
           <p className="mt-3 text-sm font-semibold uppercase tracking-wider text-amber-dark">Members only, coming soon</p>
-          <h2 className="mt-1 text-2xl">Ivo's staking plan</h2>
+          <h2 className="mt-1 text-2xl">Our staking plan</h2>
           <p className="mt-2 text-ink-soft">
-            His picks combined into bets at around 6.00, with stakes that win back every loss. Follow each bundle live,
+            Our picks combined into bets at around 6.00, with stakes that win back every loss. Follow each bundle live,
             scaled to your own stake, with every result on the record.
           </p>
         </div>

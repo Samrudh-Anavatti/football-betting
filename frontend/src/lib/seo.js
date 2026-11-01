@@ -29,9 +29,9 @@ export const PAGES = {
     description: 'Every pick we have made, won or lost, with the price taken and the profit or loss. Nothing deleted.',
   },
   '/staking': {
-    title: `Staking plan: Ivo's picks in bundles at about 6.00 | ${SITE}`,
+    title: `Staking plan: our picks in bundles at about 6.00 | ${SITE}`,
     description:
-      "Ivo's picks combined into bets at around 6.00, with stakes that win back every loss. Every bundle and result on the record.",
+      "Our picks combined into bets at around 6.00, with stakes that win back every loss. Every bundle and result on the record.",
   },
   '/friends': {
     title: `Football Friends | ${SITE}`,

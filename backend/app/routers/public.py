@@ -17,6 +17,13 @@ from ..services.transfermarkt import team_url
 router = APIRouter(tags=["public"])
 
 
+def public_tip(t: Tip, with_fixture: bool = True) -> dict:
+    """A pick as the public sees it: no names of who made it."""
+    d = tip_dict(t, with_fixture)
+    del d["author"]
+    return d
+
+
 # Main leagues first (UEFA competitions after the countries), then supplementary by country.
 LEAGUE_ORDER = (League.supplementary, League.id.in_([2, 3, 848]), League.country, League.id)
 
@@ -75,7 +82,7 @@ def match(fixture_id: int, db: Session = Depends(get_db)):
         "odds": {**board, "pulled_at": iso(board["pulled_at"])},
         "context": context_dict(db.get(MatchContext, fixture_id)),
         "standings": {"synced_at": iso(fx.league.standings_synced_at), "rows": _standing_rows(fx)},
-        "tips": [tip_dict(t, with_fixture=False) for t in
+        "tips": [public_tip(t, with_fixture=False) for t in
                  db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.published.is_(True)))],
         "ai": ai_dict(latest_prediction(db, fx)),
         "pitch": pitch_dict(db, fx),
@@ -200,7 +207,7 @@ def tips(status: str = Query("open", pattern="^(open|settled|all)$"), limit: int
         q = q.where(Tip.status != "pending").order_by(Fixture.kickoff.desc())
     else:
         q = q.order_by(Fixture.kickoff.desc())
-    return [tip_dict(t) for t in db.scalars(q.limit(limit))]
+    return [public_tip(t) for t in db.scalars(q.limit(limit))]
 
 
 @router.get("/record")
