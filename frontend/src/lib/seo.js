@@ -28,6 +28,11 @@ export const PAGES = {
     title: `Our record: every settled pick | ${SITE}`,
     description: 'Every pick we have made, won or lost, with the price taken and the profit or loss. Nothing deleted.',
   },
+  '/staking': {
+    title: `Staking plan: Ivo's picks in bundles at about 6.00 | ${SITE}`,
+    description:
+      "Ivo's picks combined into bets at around 6.00, with stakes that win back every loss. Every bundle and result on the record.",
+  },
   '/friends': {
     title: `Football Friends | ${SITE}`,
     description: 'Football sites run by people we know and rate.',

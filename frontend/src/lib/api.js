@@ -97,4 +97,10 @@ export const api = {
   createBet: (body) => request('/admin/bets', { method: 'POST', body }),
   deleteBet: (id) => request(`/admin/bets/${id}`, { method: 'DELETE' }),
   setBankroll: (starting_bankroll) => request('/admin/accounts/me', { method: 'PUT', body: { starting_bankroll } }),
+
+  // staking plan
+  staking: () => request('/staking'),
+  updateStakingPlan: (body) => request('/staking/plan', { method: 'PUT', body }),
+  createBundle: (body) => request('/staking/bundles', { method: 'POST', body }),
+  deleteBundle: (id) => request(`/staking/bundles/${id}`, { method: 'DELETE' }),
 }

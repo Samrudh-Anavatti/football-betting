@@ -9,13 +9,14 @@ from sqlalchemy.orm import Session
 from .. import config
 from ..database import get_db
 from ..deps import current_user
-from ..models import Bet, Fixture, League, ProviderQuota, SyncRun, Tip, User
+from ..models import Bet, Bundle, BundleLeg, Fixture, League, ProviderQuota, SyncRun, Tip, User
 from ..security import make_token, verify_password
 from ..serialize import bet_dict, iso, league_dict, run_dict, tip_dict
 from ..services import scheduler, sync
 from .public import LEAGUE_ORDER
 from ..services.markets import parse_value, to_code
 from ..services.settlement import MARKETS, apply_result, settle_pending
+from ..services.staking import settle_bundles
 from ..services.stats import account_summary, tip_record
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
@@ -329,6 +330,8 @@ def delete_tip(tip_id: int, db: Session = Depends(get_db)):
     if tip is None:
         raise HTTPException(404, "Tip not found")
     _not_started(tip.fixture)
+    if db.scalars(select(BundleLeg).where(BundleLeg.tip_id == tip.id)).first():
+        raise HTTPException(409, "This pick is in a staking bundle; delete the bundle first")
     db.delete(tip)
     db.commit()
 
@@ -343,6 +346,12 @@ def settle_tip(tip_id: int, body: SettleIn, db: Session = Depends(get_db)):
         tip.status, tip.profit_units, tip.settled_at = "pending", None, None
     else:
         apply_result(tip, body.status, tip.stake_units)
+    # A bundle settled on this pick is decided again from its legs as they now stand.
+    if leg := db.scalars(select(BundleLeg).where(BundleLeg.tip_id == tip.id)).first():
+        bundle = db.get(Bundle, leg.bundle_id)
+        bundle.status, bundle.profit, bundle.settled_at = "pending", None, None
+        db.flush()
+        settle_bundles(db)
     db.commit()
     return tip_dict(tip)
 

@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-10-31 (**frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
+_Last updated: 2026-11-01 (**staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
 
 ## Live resources
 
@@ -119,6 +119,35 @@ so the app used hash URLs (`/#/match/123`), and Google ignores everything after 
   `CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… npx wrangler@4.151.3 pages deploy dist --project-name football-predictions --branch main`
   from `frontend/`.
 
+## Staking plan (built 2026-11-01)
+
+Ivo's method: his picks combined into one bet ("bundle") at about 6.00, and after a loss the next stake is raised so
+that a win recovers the whole run plus the target profit, base stake × (target odds − 1) (£30 at £6 and 6.00). A win
+starts a new run at the base stake.
+
+* **Exact stakes**, not a fixed ×1.2: stake = (the run's losses so far + target profit) ÷ (bundle odds − 1), so a
+  bundle at 5.6 or 6.4 still recovers the run. At the target odds that is ×odds÷(odds−1) per loss (×1.2 at 6.00).
+  Ivo can enter the stake he actually placed if he rounded it; later stakes then use that.
+* **Data:** `staking_plans` (one row: base stake, target odds, bank), `bundles` (run, step, odds, stake, status,
+  profit) and `bundle_legs` (one per pick; a pick can be in one bundle only). Code in
+  `backend/app/services/staking.py` and `backend/app/routers/staking.py` (`/api/v1/staking`, signed-in only).
+* **Settling:** bundles settle from their picks whenever picks settle (`settle_bundles` from `settle_fixture`,
+  `settle_pending` and a manual pick settle). A lost pick loses the bundle straight away; void picks count at 1.00; all
+  void = void bundle (same step again). Any win ends the run, even one cut short by a void pick.
+* **One bundle at a time:** the next stake depends on the last result, so a new bundle can't be made until the live
+  one settles. Picks in a bundle can't be deleted (delete the bundle first; only live bundles can be deleted).
+* **Admin → Bundles:** tick open picks (two from one match aren't allowed), see the combined odds and exact stake,
+  create. Plan settings below it.
+* **`/staking` page** (nav "Staking"): the live bundle as a slip (or "Next bundle coming soon"), stats, a "your
+  starting stake" box that scales every amount (stored in the browser), the loss ladder up to where the bank runs out,
+  and every settled bundle. The chance of emptying the bank is shown once Ivo has 20+ settled picks to estimate from.
+* **Paywall: not built yet.** Signed-out visitors get the page blurred over made-up data (`lib/stakingSample.js`) with
+  a "Members only, coming soon" card; the real plan is never sent to them (a blur only hides what the browser has).
+  Next piece: member accounts + payments (Stripe looked best: no monthly fee; check its restricted-business list for
+  betting tips first). The router's `current_user` dependency is where a membership check goes. UK ad rules (CAP) don't
+  allow "guaranteed" claims for gambling, so keep the copy factual.
+* Phones: the header now shows a person icon instead of "Sign in"/"Admin" so the five sections fit at 360 px.
+
 ## Moving the backend (new plan, region or host)
 
 All state is in the Postgres server, which the web app reaches over `DATABASE_URL`. Everything else is code plus
@@ -194,6 +223,7 @@ the settings above.
   the `BACKUP_CONTAINER_URL` setting, the web app's managed-identity role on it, and `/home/data/football.db`.
 * [ ] Price-movement chart from odds history; closing-line value per pick. (The schedule now captures a closing
   book 5–10 min before every kick-off, so the data for this is there.)
+* [x] Staking plan (2026-11-01), see "Staking plan". **Next: the paywall** (member accounts + payments).
 * [x] Refresh schedule (2026-10-12). **Check real usage on the Schedule card after a full weekend** against the
   estimates below, before adding leagues.
 

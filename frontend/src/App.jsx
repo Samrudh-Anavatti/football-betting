@@ -6,6 +6,7 @@ import Match from './pages/Match.jsx'
 import History from './pages/History.jsx'
 import Privacy from './pages/Privacy.jsx'
 import Friends from './pages/Friends.jsx'
+import Staking from './pages/Staking.jsx'
 import ConsentBanner from './components/ConsentBanner.jsx'
 import Admin from './pages/Admin.jsx'
 import usePageMeta from './hooks/usePageMeta.js'
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/fixtures" element={<Fixtures />} />
         <Route path="/results" element={<Fixtures results />} />
         <Route path="/history" element={<History />} />
+        <Route path="/staking" element={<Staking />} />
         <Route path="/privacy" element={<Privacy />} />
         <Route path="/friends" element={<Friends />} />
         <Route path="/match/:slug" element={<Match />} />

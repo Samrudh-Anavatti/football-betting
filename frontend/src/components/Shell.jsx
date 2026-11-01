@@ -7,13 +7,14 @@ const NAV = [
   { to: '/fixtures', label: 'Fixtures' },
   { to: '/results', label: 'Results' },
   { to: '/history', label: 'History' },
+  { to: '/staking', label: 'Staking' },
 ]
 
 export default function Shell({ children }) {
   const { user } = useAuth()
   // The current page gets an amber bar along the bottom of the header.
   const link = ({ isActive }) =>
-    `relative h-full inline-flex items-center whitespace-nowrap px-2 sm:px-3 text-sm font-semibold transition-colors after:absolute after:inset-x-2 sm:after:inset-x-3 after:bottom-0 after:h-[3px] after:rounded-t-sm after:transition-colors ${
+    `relative h-full inline-flex items-center whitespace-nowrap px-[5px] sm:px-3 text-[13px] sm:text-sm font-semibold transition-colors after:absolute after:inset-x-[5px] sm:after:inset-x-3 after:bottom-0 after:h-[3px] after:rounded-t-sm after:transition-colors ${
       isActive ? 'text-white after:bg-amber' : 'text-white/65 hover:text-white after:bg-transparent hover:after:bg-white/25'
     }`
 
@@ -23,7 +24,7 @@ export default function Shell({ children }) {
         Skip to content
       </a>
       <header className="bg-ink text-white">
-        <div className="mx-auto max-w-6xl px-4 h-14 flex items-center gap-2 sm:gap-5">
+        <div className="mx-auto max-w-6xl px-4 h-14 flex items-center gap-1.5 sm:gap-5">
           <NavLink to="/" className="flex items-center gap-2.5 shrink-0 group">
             <span className="h-[22px] w-4 rounded-[3px] bg-amber rotate-[10deg] shadow-[1px_2px_0_rgba(0,0,0,0.35)] transition-transform duration-300 group-hover:rotate-[-4deg]" aria-hidden />
             <span className="font-display wide text-[1.05rem] font-extrabold tracking-tight hidden sm:inline">Football Predictions AI</span>
@@ -35,8 +36,13 @@ export default function Shell({ children }) {
               </NavLink>
             ))}
           </nav>
-          <NavLink to="/admin" className={(s) => `ml-auto h-full ${link(s)}`}>
-            {user ? 'Admin' : 'Sign in'}
+          <NavLink to="/admin" className={(s) => `ml-auto h-full ${link(s)}`} aria-label={user ? 'Admin' : 'Sign in'}>
+            {/* An icon on phones, where the five sections need the room. */}
+            <svg viewBox="0 0 24 24" className="h-5 w-5 sm:hidden" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
+              <circle cx="12" cy="8" r="4" />
+              <path d="M4 21a8 8 0 0 1 16 0" />
+            </svg>
+            <span className="hidden sm:inline">{user ? 'Admin' : 'Sign in'}</span>
           </NavLink>
         </div>
       </header>

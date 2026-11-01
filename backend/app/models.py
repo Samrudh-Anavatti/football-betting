@@ -280,6 +280,55 @@ class Bet(Base):
     user: Mapped[User] = relationship(lazy="selectin")
 
 
+# ── Staking plan ─────────────────────────────────────────────────────────────
+
+
+class StakingPlan(Base):
+    """Ivo's staking method: his picks combined into bundles of about `target_odds`, the stake raised after each
+    loss so the next win recovers the run's losses plus base_stake × (target_odds − 1). A win starts a new run.
+    One plan for now; `bank` is only for the survival maths shown on the page."""
+
+    __tablename__ = "staking_plans"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    base_stake: Mapped[float] = mapped_column(Float, default=6.0)
+    target_odds: Mapped[float] = mapped_column(Float, default=6.0)
+    bank: Mapped[float] = mapped_column(Float, default=150.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class Bundle(Base):
+    """A multi of Ivo's picks in the staking plan. Settles from its legs: any leg lost loses it, void legs count
+    at 1.00. `run` and `step` place it in the plan (run 3, step 2 = the second bet since the last win)."""
+
+    __tablename__ = "bundles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    plan_id: Mapped[int] = mapped_column(ForeignKey("staking_plans.id"), index=True)
+    run: Mapped[int] = mapped_column(Integer)
+    step: Mapped[int] = mapped_column(Integer)
+    odds: Mapped[float] = mapped_column(Float)  # combined, when placed
+    stake: Mapped[float] = mapped_column(Float)
+    status: Mapped[str] = mapped_column(String(8), default="pending")  # pending|won|lost|void
+    profit: Mapped[float | None] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    legs: Mapped[list["BundleLeg"]] = relationship(lazy="selectin", cascade="all, delete-orphan",
+                                                   order_by="BundleLeg.id")
+
+
+class BundleLeg(Base):
+    __tablename__ = "bundle_legs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    bundle_id: Mapped[int] = mapped_column(ForeignKey("bundles.id"), index=True)
+    tip_id: Mapped[int] = mapped_column(ForeignKey("tips.id"), unique=True)  # a pick goes in one bundle at most
+    odds: Mapped[float] = mapped_column(Float)  # the pick's odds when bundled
+
+    tip: Mapped[Tip] = relationship(lazy="selectin")
+
+
 # ── AI analysis ──────────────────────────────────────────────────────────────
 
 
