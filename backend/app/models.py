@@ -213,6 +213,7 @@ class User(Base):
     username: Mapped[str] = mapped_column(String(40), unique=True)
     display_name: Mapped[str] = mapped_column(String(60))
     password_hash: Mapped[str] = mapped_column(String(100))
+    is_admin: Mapped[bool] = mapped_column(Boolean, default=False)  # Sam and Ivo (seed.py); everyone else is a member
     starting_bankroll: Mapped[float] = mapped_column(Float, default=1000.0)
 
 

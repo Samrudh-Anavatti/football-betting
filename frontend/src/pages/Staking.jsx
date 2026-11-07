@@ -291,7 +291,7 @@ export default function Staking() {
   return (
     <section className="space-y-6">
       <SectionHead title="Staking plan" />
-      {checking ? <Loading rows={4} /> : user ? <Members /> : <Preview />}
+      {checking ? <Loading rows={4} /> : user?.is_admin ? <Members /> : <Preview />}
     </section>
   )
 }

@@ -1,4 +1,4 @@
-"""The staking plan and Ivo's bundle builder. Signed-in only for now; members get to read it once there's a paywall."""
+"""The staking plan and Ivo's bundle builder. Admins only for now; members get to read it once there's a paywall."""
 import math
 from datetime import datetime
 
@@ -8,11 +8,11 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import current_user
+from ..deps import admin_user
 from ..models import Bundle, BundleLeg, Tip
 from ..services.staking import bundle_dict, get_plan, plan_bundles, plan_state, run_state, stake_for
 
-router = APIRouter(prefix="/staking", tags=["staking"], dependencies=[Depends(current_user)])
+router = APIRouter(prefix="/staking", tags=["staking"], dependencies=[Depends(admin_user)])
 
 
 @router.get("")

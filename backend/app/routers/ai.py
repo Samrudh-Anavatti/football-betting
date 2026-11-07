@@ -12,14 +12,14 @@ from ..ai import client as ai_client
 from ..ai import service
 from ..ai.bundle import build_bundle, serialise
 from ..database import get_db
-from ..deps import current_user
+from ..deps import admin_user
 from ..models import AiPrediction, AiThread, Fixture, SyncRun, Tip, User
 from ..serialize import fixture_dict, iso, run_dict, tip_dict
 from ..services import sync
 from ..services.settlement import FINISHED
 from ..services.stats import tip_record
 
-router = APIRouter(prefix="/admin", tags=["ai"], dependencies=[Depends(current_user)])
+router = APIRouter(prefix="/admin", tags=["ai"], dependencies=[Depends(admin_user)])
 
 
 def _budget(db: Session) -> dict:
@@ -73,7 +73,7 @@ def match_ai(fixture_id: int, db: Session = Depends(get_db)):
 
 
 @router.post("/matches/{fixture_id}/ai")
-def analyse(fixture_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def analyse(fixture_id: int, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     """Start a new thread with a freshly built bundle and ask for an analysis."""
     fx = _fixture(db, fixture_id)
     if fx.status != "NS":
@@ -90,7 +90,7 @@ class ChatIn(BaseModel):
 
 
 @router.post("/ai/threads/{thread_id}/messages")
-def chat(thread_id: int, body: ChatIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def chat(thread_id: int, body: ChatIn, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     thread = db.get(AiThread, thread_id)
     if thread is None:
         raise HTTPException(404, "Conversation not found")

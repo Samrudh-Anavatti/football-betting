@@ -60,6 +60,15 @@ export default function Admin() {
   const [params, setParams] = useSearchParams()
   if (checking) return <Loading />
   if (!user) return <SignIn />
+  if (!user.is_admin)
+    return (
+      <div className="space-y-4">
+        <h1 className="text-4xl sm:text-5xl leading-none">Admins only</h1>
+        <button type="button" className="btn-ghost" onClick={logout}>
+          Sign out {user.display_name}
+        </button>
+      </div>
+    )
 
   const active = TABS.find((t) => t.key === params.get('tab')) || TABS[0]
   const Tab = active.el

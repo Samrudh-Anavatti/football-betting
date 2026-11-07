@@ -242,7 +242,7 @@ function TeamStats({ fx, home, away }) {
 
 export default function Match() {
   const id = matchIdFrom(useParams().slug)
-  const { user } = useAuth()
+  const admin = useAuth().user?.is_admin
   const { data, loading, error, reload } = useApi(() => api.match(id), [id])
   const [pick, setPick] = useState(null)
   const [saved, setSaved] = useState(null)
@@ -260,7 +260,7 @@ export default function Match() {
   if (error) return <ErrorNote error={error} />
   const fx = data.fixture
   const ctx = data.context
-  const canPick = user && fx.status === 'NS'
+  const canPick = admin && fx.status === 'NS'
 
   return (
     <div className="space-y-6">
@@ -268,8 +268,8 @@ export default function Match() {
         <span aria-hidden>‹</span> Back to fixtures
       </Link>
       <Header fx={fx} />
-      {user && <ResearchBar fx={fx} data={data} reload={reload} />}
-      {user && <AiPanel fx={fx} board={data.odds} onPick={canPick ? setPick : null} />}
+      {admin && <ResearchBar fx={fx} data={data} reload={reload} />}
+      {admin && <AiPanel fx={fx} board={data.odds} onPick={canPick ? setPick : null} />}
 
       {data.tips.length > 0 && (
         <section>
@@ -281,7 +281,7 @@ export default function Match() {
           </div>
         </section>
       )}
-      {!user && <PublicAi ai={data.ai} fx={fx} board={data.odds} />}
+      {!admin && <PublicAi ai={data.ai} fx={fx} board={data.odds} />}
 
       <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
         <section className="space-y-3 min-w-0">
@@ -297,7 +297,7 @@ export default function Match() {
             <MarketBoard board={data.odds} fx={fx} onPick={canPick ? setPick : null} />
           ) : (
             <Empty title="No prices yet">
-              {user ? 'Use Refresh prices above, or pull a whole league from the admin page.' : 'Prices appear closer to kick-off.'}
+              {admin ? 'Use Refresh prices above, or pull a whole league from the admin page.' : 'Prices appear closer to kick-off.'}
             </Empty>
           )}
         </section>
@@ -317,7 +317,7 @@ export default function Match() {
           )}
           {!ctx.fetched_at ? (
             <Empty title="No research fetched yet">
-              {user ? 'Use Refresh research above to pull head-to-head, form and injuries.' : 'Check back closer to kick-off.'}
+              {admin ? 'Use Refresh research above to pull head-to-head, form and injuries.' : 'Check back closer to kick-off.'}
             </Empty>
           ) : (
             <>

@@ -14,3 +14,9 @@ def current_user(authorization: str | None = Header(default=None), db: Session =
     if user is None:
         raise HTTPException(status_code=401, detail="Sign in to continue")
     return user
+
+
+def admin_user(user: User = Depends(current_user)) -> User:
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admins only")
+    return user

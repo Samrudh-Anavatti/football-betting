@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from .. import config
 from ..database import get_db
-from ..deps import current_user
+from ..deps import admin_user, current_user
 from ..models import Bet, Bundle, BundleLeg, Fixture, League, ProviderQuota, SyncRun, Tip, User
 from ..security import make_token, verify_password
 from ..serialize import bet_dict, iso, league_dict, run_dict, tip_dict
@@ -20,7 +20,7 @@ from ..services.staking import settle_bundles
 from ..services.stats import account_summary, tip_record
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
-router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(current_user)])
+router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(admin_user)])
 
 
 # ── Auth ─────────────────────────────────────────────────────────────────────
@@ -32,7 +32,7 @@ class LoginIn(BaseModel):
 
 
 def _me(u: User) -> dict:
-    return {"id": u.id, "username": u.username, "display_name": u.display_name}
+    return {"id": u.id, "username": u.username, "display_name": u.display_name, "is_admin": u.is_admin}
 
 
 @auth_router.post("/login")
@@ -142,7 +142,7 @@ class FixturesSyncIn(BaseModel):
 
 
 @router.post("/sync/fixtures")
-def sync_fixtures(body: FixturesSyncIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def sync_fixtures(body: FixturesSyncIn, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     _guard(db, "api_football")
     lgs = _leagues(db, body.league_ids)
     scope = f"{len(lgs)} league{'s' * (len(lgs) != 1)}" + (" + standings" if body.include_standings else "")
@@ -166,7 +166,7 @@ class OddsSyncIn(BaseModel):
 
 
 @router.post("/sync/odds")
-def sync_odds(body: OddsSyncIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def sync_odds(body: OddsSyncIn, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     _guard(db, "odds_api")
     lgs = _leagues(db, body.league_ids)
     scope = f"{len(lgs)} league{'s' * (len(lgs) != 1)} · {'+'.join(body.markets)} · {'+'.join(body.regions)}"
@@ -187,7 +187,7 @@ class MarketsSyncIn(BaseModel):
 
 
 @router.post("/sync/markets")
-def sync_markets(body: MarketsSyncIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def sync_markets(body: MarketsSyncIn, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     """Every market for every upcoming match in the leagues (API-Football /odds)."""
     _guard(db, "api_football")
     lgs = _leagues(db, body.league_ids)
@@ -198,7 +198,7 @@ def sync_markets(body: MarketsSyncIn, db: Session = Depends(get_db), user: User 
 
 
 @router.post("/matches/{fixture_id}/context")
-def refresh_context(fixture_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def refresh_context(fixture_id: int, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     fx = _fixture(db, fixture_id)
     _guard(db, "api_football")
     run = sync.start_run(db, "api_football", "context", f"{fx.home_team.name} v {fx.away_team.name}",
@@ -207,7 +207,7 @@ def refresh_context(fixture_id: int, db: Session = Depends(get_db), user: User =
 
 
 @router.post("/matches/{fixture_id}/markets")
-def refresh_match_markets(fixture_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def refresh_match_markets(fixture_id: int, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     fx = _fixture(db, fixture_id)
     _guard(db, "api_football")
     run = sync.start_run(db, "api_football", "match_markets", f"{fx.home_team.name} v {fx.away_team.name}", 1,
@@ -216,7 +216,7 @@ def refresh_match_markets(fixture_id: int, db: Session = Depends(get_db), user: 
 
 
 @router.post("/matches/{fixture_id}/lineups")
-def refresh_lineups(fixture_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def refresh_lineups(fixture_id: int, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     fx = _fixture(db, fixture_id)
     _guard(db, "api_football")
     run = sync.start_run(db, "api_football", "lineups", f"{fx.home_team.name} v {fx.away_team.name}", 1,
@@ -226,7 +226,7 @@ def refresh_lineups(fixture_id: int, db: Session = Depends(get_db), user: User =
 
 @router.post("/matches/{fixture_id}/odds")
 def refresh_match_odds(fixture_id: int, body: OddsSyncIn | None = None, db: Session = Depends(get_db),
-                       user: User = Depends(current_user)):
+                       user: User = Depends(admin_user)):
     fx = _fixture(db, fixture_id)
     _guard(db, "odds_api")
     body = body or OddsSyncIn(league_ids=[fx.league_id], markets=["h2h", "totals"])
@@ -302,7 +302,7 @@ def admin_tips(source: str = "ivo", db: Session = Depends(get_db)):
 
 
 @router.post("/tips", status_code=201)
-def create_tip(body: TipIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def create_tip(body: TipIn, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     fx = _fixture(db, body.fixture_id)
     _not_started(fx)
     tip = Tip(author_id=user.id, **body.model_dump())
@@ -373,7 +373,7 @@ def accounts(db: Session = Depends(get_db)):
 
 
 @router.post("/bets", status_code=201)
-def create_bet(body: BetIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def create_bet(body: BetIn, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     fx = _fixture(db, body.fixture_id)
     _not_started(fx)
     bet = Bet(user_id=user.id, **body.model_dump())
@@ -384,7 +384,7 @@ def create_bet(body: BetIn, db: Session = Depends(get_db), user: User = Depends(
 
 
 @router.delete("/bets/{bet_id}", status_code=204)
-def delete_bet(bet_id: int, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def delete_bet(bet_id: int, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     bet = db.get(Bet, bet_id)
     if bet is None or bet.user_id != user.id:
         raise HTTPException(404, "Bet not found")
@@ -398,7 +398,7 @@ class BankrollIn(BaseModel):
 
 
 @router.put("/accounts/me")
-def set_bankroll(body: BankrollIn, db: Session = Depends(get_db), user: User = Depends(current_user)):
+def set_bankroll(body: BankrollIn, db: Session = Depends(get_db), user: User = Depends(admin_user)):
     user = db.get(User, user.id)
     user.starting_bankroll = body.starting_bankroll
     db.commit()

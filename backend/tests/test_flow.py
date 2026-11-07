@@ -8,6 +8,21 @@ def test_admin_requires_login(client):
     assert client.get(f"{API}/admin/integrations").status_code == 401
 
 
+def test_members_cant_use_admin_routes(client):
+    from app.database import SessionLocal
+    from app.models import User
+    from app.security import hash_password, make_token
+
+    with SessionLocal() as db:
+        u = User(username="member1", display_name="Member", password_hash=hash_password("pw"))
+        db.add(u)
+        db.commit()
+        h = {"Authorization": f"Bearer {make_token(u.id)}"}
+    assert client.get(f"{API}/auth/me", headers=h).json()["is_admin"] is False
+    for path in ("/admin/integrations", "/admin/tips", "/staking"):
+        assert client.get(f"{API}{path}", headers=h).status_code == 403
+
+
 def test_full_flow(client, auth, fake):
     # Quota check uses the free status endpoints.
     q = client.post(f"{API}/admin/integrations/api_football/check", headers=auth).json()
