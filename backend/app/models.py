@@ -214,6 +214,14 @@ class User(Base):
     display_name: Mapped[str] = mapped_column(String(60))
     password_hash: Mapped[str] = mapped_column(String(100))
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)  # Sam and Ivo (seed.py); everyone else is a member
+    # Members sign in with their email (admins with their username); lower-cased, unique.
+    email: Mapped[str | None] = mapped_column(String(254), unique=True)
+    created_at: Mapped[datetime | None] = mapped_column(DateTime, default=utcnow)
+    # Goes up on every password change; sign-in tokens carry it, so older ones stop working everywhere.
+    token_version: Mapped[int] = mapped_column(Integer, default=0)
+    # Password reset: only the SHA-256 of the emailed token is kept, single use.
+    reset_token_hash: Mapped[str | None] = mapped_column(String(64))
+    reset_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
     starting_bankroll: Mapped[float] = mapped_column(Float, default=1000.0)
 
 

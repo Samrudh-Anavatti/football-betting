@@ -8,9 +8,8 @@ from sqlalchemy.orm import Session
 
 from .. import config
 from ..database import get_db
-from ..deps import admin_user, current_user
+from ..deps import admin_user
 from ..models import Bet, Bundle, BundleLeg, Fixture, League, ProviderQuota, SyncRun, Tip, User
-from ..security import make_token, verify_password
 from ..serialize import bet_dict, iso, league_dict, run_dict, tip_dict
 from ..services import scheduler, sync
 from .public import LEAGUE_ORDER
@@ -19,33 +18,7 @@ from ..services.settlement import MARKETS, apply_result, settle_pending
 from ..services.staking import settle_bundles
 from ..services.stats import account_summary, tip_record
 
-auth_router = APIRouter(prefix="/auth", tags=["auth"])
 router = APIRouter(prefix="/admin", tags=["admin"], dependencies=[Depends(admin_user)])
-
-
-# ── Auth ─────────────────────────────────────────────────────────────────────
-
-
-class LoginIn(BaseModel):
-    username: str
-    password: str
-
-
-def _me(u: User) -> dict:
-    return {"id": u.id, "username": u.username, "display_name": u.display_name, "is_admin": u.is_admin}
-
-
-@auth_router.post("/login")
-def login(body: LoginIn, db: Session = Depends(get_db)):
-    user = db.scalar(select(User).where(User.username == body.username.strip().lower()))
-    if user is None or not verify_password(body.password, user.password_hash):
-        raise HTTPException(401, "Wrong username or password")
-    return {"token": make_token(user.id), "user": _me(user)}
-
-
-@auth_router.get("/me")
-def me(user: User = Depends(current_user)):
-    return _me(user)
 
 
 # ── Integrations ─────────────────────────────────────────────────────────────
@@ -367,7 +340,7 @@ class BetIn(Selection):
 
 @router.get("/accounts")
 def accounts(db: Session = Depends(get_db)):
-    users = list(db.scalars(select(User).where(User.username != "auto").order_by(User.id)))
+    users = list(db.scalars(select(User).where(User.is_admin).order_by(User.id)))
     bets = list(db.scalars(select(Bet).join(Fixture).order_by(Fixture.kickoff.desc()).limit(200)))
     return {"accounts": [account_summary(db, u) for u in users], "bets": [bet_dict(b) for b in bets]}
 

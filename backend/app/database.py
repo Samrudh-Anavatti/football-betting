@@ -53,7 +53,7 @@ class Base(DeclarativeBase):
 def add_missing_columns() -> None:
     """Tiny forward-only migration: create_all() makes new tables but never alters
     existing ones, so add any model column the live table lacks. Enough for
-    nullable/defaulted additions; anything harder needs Alembic (see HANDOFF.md)."""
+    nullable/defaulted additions (plus a unique index for a new unique column); anything harder needs Alembic (see HANDOFF.md)."""
     from sqlalchemy import inspect, text
 
     insp = inspect(engine)
@@ -70,6 +70,8 @@ def add_missing_columns() -> None:
                 if default is not None:
                     ddl += f" DEFAULT {default!r}" if isinstance(default, str) else f" DEFAULT {default}"
                 conn.execute(text(ddl))
+                if col.unique:
+                    conn.execute(text(f'CREATE UNIQUE INDEX "uq_{table.name}_{col.name}" ON {table.name} ("{col.name}")'))
 
 
 def get_db():

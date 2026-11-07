@@ -15,7 +15,7 @@ import httpx  # noqa: E402
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 
-from app import config  # noqa: E402
+from app import config, ratelimit  # noqa: E402
 from app.main import app  # noqa: E402
 from app.providers.api_football import ApiFootball  # noqa: E402
 from app.providers.odds_api import OddsApi  # noqa: E402
@@ -158,6 +158,7 @@ def fake(monkeypatch):
 
 @pytest.fixture()
 def client():
+    ratelimit.reset()
     with TestClient(app) as c:
         yield c
 

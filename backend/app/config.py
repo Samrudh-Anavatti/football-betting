@@ -25,6 +25,13 @@ SCHEDULE_RESERVE = int(os.getenv("SCHEDULE_RESERVE", "2000"))
 JWT_SECRET = os.getenv("JWT_SECRET", "dev-only-secret")
 TOKEN_DAYS = int(os.getenv("TOKEN_DAYS", "14"))
 
+# Password-reset emails go through Azure Communication Services Email (email-football-sa).
+# EMAIL_CONNECTION_STRING is the Communication Service's "endpoint=...;accesskey=..." string.
+EMAIL_CONNECTION_STRING = os.getenv("EMAIL_CONNECTION_STRING", "").strip()
+EMAIL_SENDER = os.getenv("EMAIL_SENDER", "no-reply@football-predictions.org")
+SITE_URL = os.getenv("SITE_URL", "https://football-predictions.org").rstrip("/")
+RESET_MINUTES = int(os.getenv("RESET_MINUTES", "60"))
+
 # The Odds API (backup price source: match result and totals only).
 ODDS_REGIONS = ["uk", "eu"]
 ODDS_MARKETS = ["h2h", "totals"]
