@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-11-08 (**AI Lab** (`/ai-lab`, admins only): Ivo's staking plan run on the AI's own short-priced legs (prompt v4), and an arbitrage scanner over our prices; see "AI Lab". Also: **member accounts**: sign-up by email (page live, not linked until the paywall), password reset by email through Azure Communication Services, admins vs members; see "Member accounts". Paywall decision: Stripe directly, not Buy Me a Coffee. 2026-11-01: **staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
+_Last updated: 2026-11-08 (**Nations League** added as a main league. **AI Lab** (`/ai-lab`, admins only): Ivo's staking plan run on the AI's own short-priced legs (prompt v4), and an arbitrage scanner over our prices; see "AI Lab". Also: **member accounts**: sign-up by email (page live, not linked until the paywall), password reset by email through Azure Communication Services, admins vs members; see "Member accounts". Paywall decision: Stripe directly, not Buy Me a Coffee. 2026-11-01: **staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
 
 ## Live resources
 
@@ -316,8 +316,11 @@ whether to raise it). The resource group's budget alert is set at 50.
 
 ## Leagues (2026-10-12)
 
-**13 main leagues**: top flights of England, Spain, Italy, Germany, France, Portugal, Netherlands, Turkey, Belgium,
-USA (MLS), plus the Champions, Europa and Conference Leagues. Everything runs for these.
+**14 main leagues**: top flights of England, Spain, Italy, Germany, France, Portugal, Netherlands, Turkey, Belgium,
+USA (MLS), plus the Champions, Europa and Conference Leagues, and (since 2026-11-08) the **UEFA Nations League**
+(API-Football 5, The Odds API `soccer_uefa_nations_league`) so international breaks have matches for the AI and the
+AI Lab. Everything runs for these. International friendlies were left out (youth and minor-nation games, loose
+prices); World Cup qualifiers can be added the same way when they start.
 
 **28 supplementary leagues** (`supplementary=True` in `config.LEAGUES`): the 2nd and 3rd tiers of those ten
 countries (Spain's Primera RFEF and Italy's Serie C are regional groups, so 2 and 3 entries), Brazil Série A/B,
