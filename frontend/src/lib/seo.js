@@ -46,6 +46,7 @@ export const PAGES = {
   '/signup': { title: `Create an account | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
   '/forgot': { title: `Reset your password | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
   '/reset': { title: `Choose a new password | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
+  '/ai-lab': { title: `AI Lab | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
   '/account': { title: `Your account | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
 }
 

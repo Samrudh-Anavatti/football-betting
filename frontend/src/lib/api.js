@@ -108,4 +108,11 @@ export const api = {
   updateStakingPlan: (body) => request('/staking/plan', { method: 'PUT', body }),
   createBundle: (body) => request('/staking/bundles', { method: 'POST', body }),
   deleteBundle: (id) => request(`/staking/bundles/${id}`, { method: 'DELETE' }),
+
+  // AI Lab (admins)
+  aiLabStaking: () => request('/admin/ai-lab/staking'),
+  aiLabUpdatePlan: (body) => request('/admin/ai-lab/staking/plan', { method: 'PUT', body }),
+  aiLabBuild: () => request('/admin/ai-lab/staking/build', { method: 'POST' }),
+  aiLabDeleteBundle: (id) => request(`/admin/ai-lab/staking/bundles/${id}`, { method: 'DELETE' }),
+  aiLabArbs: () => request('/admin/ai-lab/arbs'),
 }

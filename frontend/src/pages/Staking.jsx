@@ -18,7 +18,7 @@ const RESULT = {
   pending: ['·', 'bg-ink/[0.06] text-ink-soft'],
 }
 
-function ResultMark({ status }) {
+export function ResultMark({ status }) {
   const [letter, tone] = RESULT[status] || RESULT.pending
   return (
     <span className={`h-6 w-6 shrink-0 grid place-items-center rounded text-xs font-bold ${tone}`} aria-label={status}>
@@ -28,7 +28,7 @@ function ResultMark({ status }) {
 }
 
 // The live bundle, printed as a slip: each pick with its price, then the combined odds, stake and return.
-function BundleSlip({ bundle, scale, losses }) {
+export function BundleSlip({ bundle, scale = 1, losses }) {
   return (
     <div className="slip-shadow">
       <article className="perforated rounded-t-xl bg-paper">
@@ -80,7 +80,7 @@ function BundleSlip({ bundle, scale, losses }) {
   )
 }
 
-function Stat({ label, value, tone = '' }) {
+export function Stat({ label, value, tone = '' }) {
   return (
     <div className="panel px-4 py-3">
       <p className="text-sm text-ink-soft">{label}</p>
@@ -90,7 +90,7 @@ function Stat({ label, value, tone = '' }) {
 }
 
 // The bets of a run that keeps losing, at the target odds, until the bank runs out.
-function Ladder({ plan, scale, step }) {
+export function Ladder({ plan, scale = 1, step }) {
   const rows = ladder({ ...plan, base_stake: plan.base_stake * scale, bank: plan.bank * scale })
   return (
     <ol className="panel divide-y divide-ink/5 text-sm">
@@ -109,6 +109,32 @@ function Ladder({ plan, scale, step }) {
           <span className="flex-1 text-right">{money(r.stake)}</span>
           <span className="flex-1 text-right">{money(r.lostBefore)}</span>
           <span className="flex-1 text-right">{r.affordable ? money(r.stake * plan.target_odds) : 'bank out'}</span>
+        </li>
+      ))}
+    </ol>
+  )
+}
+
+// Settled bundles, newest first.
+export function BundleHistory({ history, scale = 1 }) {
+  return (
+    <ol className="panel divide-y divide-ink/5">
+      {history.map((b) => (
+        <li key={b.id} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 text-sm">
+          <span className="hidden sm:block w-16 shrink-0 text-ink-soft num">{shortDate(b.created_at)}</span>
+          <div className="min-w-0 flex-1">
+            <p className="font-semibold">
+              Run {b.run}, bet {b.step}
+            </p>
+            <p className="truncate text-ink-soft">{b.legs.map((l) => pickLabel(l.tip, l.tip.fixture)).join(' · ')}</p>
+          </div>
+          <span className="w-10 shrink-0 text-right num">{odds(b.odds)}</span>
+          <span className="w-16 shrink-0 text-right num">{money(b.stake * scale)}</span>
+          <ResultMark status={b.status} />
+          <span className={`w-20 shrink-0 text-right num font-semibold ${b.profit > 0 ? 'text-pitch' : b.profit < 0 ? 'text-red' : 'text-ink-soft'}`}>
+            {b.profit > 0 ? '+' : ''}
+            {money(b.profit * scale)}
+          </span>
         </li>
       ))}
     </ol>
@@ -220,26 +246,7 @@ function PlanView({ data, hitRate }) {
         {history.length === 0 ? (
           <p className="text-ink-soft">Settled bundles appear here.</p>
         ) : (
-          <ol className="panel divide-y divide-ink/5">
-            {history.map((b) => (
-              <li key={b.id} className="flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2.5 text-sm">
-                <span className="hidden sm:block w-16 shrink-0 text-ink-soft num">{shortDate(b.created_at)}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="font-semibold">
-                    Run {b.run}, bet {b.step}
-                  </p>
-                  <p className="truncate text-ink-soft">{b.legs.map((l) => pickLabel(l.tip, l.tip.fixture)).join(' · ')}</p>
-                </div>
-                <span className="w-10 shrink-0 text-right num">{odds(b.odds)}</span>
-                <span className="w-16 shrink-0 text-right num">{money(b.stake * scale)}</span>
-                <ResultMark status={b.status} />
-                <span className={`w-20 shrink-0 text-right num font-semibold ${b.profit > 0 ? 'text-pitch' : b.profit < 0 ? 'text-red' : 'text-ink-soft'}`}>
-                  {b.profit > 0 ? '+' : ''}
-                  {money(b.profit * scale)}
-                </span>
-              </li>
-            ))}
-          </ol>
+          <BundleHistory history={history} scale={scale} />
         )}
       </section>
     </div>

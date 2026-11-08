@@ -32,7 +32,7 @@ export default function Shell({ children }) {
             <span className="font-display wide text-[1.05rem] font-extrabold tracking-tight hidden sm:inline">Football Predictions AI</span>
           </NavLink>
           <nav className="flex items-stretch h-full min-w-0 overflow-x-auto" aria-label="Main">
-            {NAV.map((n) => (
+            {(user?.is_admin ? [...NAV, { to: '/ai-lab', label: 'AI Lab' }] : NAV).map((n) => (
               <NavLink key={n.to} to={n.to} end={n.end} className={link}>
                 {n.label}
               </NavLink>
