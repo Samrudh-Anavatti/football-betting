@@ -101,3 +101,5 @@ def test_delete_account(client, auth):
     assert client.post(f"{API}/auth/delete-account", headers=h, json={"password": "password1"}).status_code == 204
     assert client.get(f"{API}/auth/me", headers=h).status_code == 401
     assert client.post(f"{API}/auth/delete-account", headers=auth, json={"password": "pw"}).status_code == 409
+    r = client.put(f"{API}/auth/password", headers=auth, json={"current_password": "pw", "new_password": "newpass99"})
+    assert r.status_code == 409

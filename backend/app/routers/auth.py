@@ -108,6 +108,8 @@ class PasswordIn(BaseModel):
 @router.put("/password")
 def change_password(body: PasswordIn, request: Request, db: Session = Depends(get_db),
                     user: User = Depends(current_user)):
+    if user.is_admin:  # seed.py puts it back from PASSWORD_<NAME> on every start
+        raise HTTPException(409, "Admin passwords are changed in the App Service settings")
     ip = client_ip(request)
     check("login", ip, *LOGIN_LIMIT)
     user = db.get(User, user.id)
