@@ -140,8 +140,10 @@ def ai_dict(pred: AiPrediction | None) -> dict | None:
     nobody outside can start one, and the AI's tracked tips stay private."""
     if pred is None:
         return None
+    analysis = json.loads(pred.analysis_json)
+    analysis.pop("bundle_legs", None)  # the AI staking test's legs are admin-only
     return {"id": pred.id, "created_at": iso(pred.created_at), "model": pred.model,
-            "analysis": json.loads(pred.analysis_json),
+            "analysis": analysis,
             "market_probs": json.loads(pred.market_probs_json) if pred.market_probs_json else None, "tips": []}
 
 

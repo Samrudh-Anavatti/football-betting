@@ -3,6 +3,8 @@ prediction + private AI tips -> chat -> settlement and scoring."""
 import json
 from types import SimpleNamespace as NS
 
+from sqlalchemy import select
+
 from app import config
 from app.ai import client as ai_client
 from app.ai import service
@@ -34,6 +36,12 @@ ANALYSIS = {
          "min_odds": 1.55, "stake_units": 1.5, "confidence": 6, "reasoning": "Both leaky."},
         {"market_id": 12, "market": "Double Chance", "value": "Home/Draw", "your_probability": 0.95,
          "min_odds": 1.5, "stake_units": 1, "confidence": 4, "reasoning": "Too short now."},
+    ],
+    "bundle_legs": [
+        {"market_id": 1, "market": "Match Winner", "value": "Home", "your_probability": 0.74, "min_odds": 1.36,
+         "reasoning": "City at home."},
+        {"market_id": 12, "market": "Double Chance", "value": "Home/Draw", "your_probability": 0.95, "min_odds": 1.06,
+         "reasoning": "Below the leg band."},
     ],
     "key_factors": ["Wolves' away defence"],
     "data_gaps": ["No line-ups"],
@@ -99,6 +107,14 @@ def test_analysis_chat_and_record(client, auth, fake, monkeypatch):
     assert len(info["tips"]) == 1
     tip = info["tips"][0]
     assert tip["source"] == "ai" and not tip["published"] and tip["market"] == "OU" and tip["odds"] == 1.62
+
+    # One bundle leg tracked (home win at 1.45); Double Chance at 1.10 is under the 1.15 leg band.
+    from app.database import SessionLocal
+    from app.models import Tip
+    with SessionLocal() as db:
+        legs = list(db.scalars(select(Tip).where(Tip.source == "ai_leg")))
+    assert [(t.market, t.selection, t.odds, t.ai_probability) for t in legs] == [("1X2", "home", 1.45, 0.74)]
+    assert not legs[0].published
 
     # AI tips never appear publicly.
     assert client.get(f"{API}/tips").json() == []
@@ -171,6 +187,7 @@ def test_public_sees_the_latest_analysis(client, auth, fake, monkeypatch):
 
     ai = client.get(f"{API}/matches/1001").json()["ai"]  # no login
     assert ai["analysis"]["probabilities"]["home_win"] == 0.7 and ai["analysis"]["suggested_bets"]
+    assert "bundle_legs" not in ai["analysis"]  # the staking test's legs are admin-only
     assert ai["market_probs"]["result"]["home"] > 0.5
     f = client.get(f"{API}/featured").json()
     assert f["fixture"]["id"] == 1001 and f["ai"]["id"] == ai["id"]

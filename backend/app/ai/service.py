@@ -27,7 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import config
-from ..models import AiMessage, AiPrediction, AiThread, Fixture, Tip, User
+from ..models import AiMessage, AiPrediction, AiThread, BundleLeg, Fixture, Tip, User
 from ..services.markets import market_probs, parse_value, to_code
 from ..services.board import match_board
 from .bundle import build_bundle, find_selection, serialise
@@ -35,9 +35,11 @@ from .client import cost_usd, make_client
 
 log = logging.getLogger(__name__)
 
-PROMPT_VERSION = "v3"
+PROMPT_VERSION = "v4"
 SYSTEM_PROMPT = (Path(__file__).parent / "prompts" / f"{PROMPT_VERSION}.md").read_text(encoding="utf-8")
 MAX_TOOL_ROUNDS = 3
+# Bundle legs (prompt v4): short-priced, very likely picks for the AI staking test. Enforced here as well as asked for.
+LEG_MIN_ODDS, LEG_MAX_ODDS, LEG_MIN_PROB = 1.15, 1.60, 0.70
 
 FIRST_TURN = (
     "Analyse this match. Work out your probabilities, compare them with the prices across all the markets, "
@@ -57,7 +59,8 @@ RECORD_ANALYSIS = {
     "parameters": {
         "type": "object",
         "additionalProperties": False,
-        "required": ["summary", "probabilities", "suggested_bets", "key_factors", "data_gaps", "no_bet"],
+        "required": ["summary", "probabilities", "suggested_bets", "bundle_legs", "key_factors", "data_gaps",
+                     "no_bet"],
         "properties": {
             "summary": {"type": "string", "description": "Two to four sentences: your overall read of the match."},
             "probabilities": {
@@ -86,6 +89,23 @@ RECORD_ANALYSIS = {
                     },
                 },
             },
+            "bundle_legs": {
+                "type": "array",
+                "description": "Up to two private legs for the staking test: priced 1.15-1.60, at least 70% likely",
+                "items": {
+                    "type": "object",
+                    "additionalProperties": False,
+                    "required": ["market_id", "market", "value", "your_probability", "min_odds", "reasoning"],
+                    "properties": {
+                        "market_id": {"type": "integer", "description": "market_id from the bundle"},
+                        "market": {"type": "string", "description": "market name from the bundle"},
+                        "value": {"type": "string", "description": "selection value exactly as in the bundle"},
+                        "your_probability": _PROB,
+                        "min_odds": {"type": "number", "description": "lowest decimal price at which the leg still qualifies"},
+                        "reasoning": {"type": "string"},
+                    },
+                },
+            },
             "key_factors": {"type": "array", "items": {"type": "string"}},
             "data_gaps": {"type": "array", "items": {"type": "string"},
                           "description": "Missing information that limits this analysis"},
@@ -106,10 +126,20 @@ class SuggestedBet(BaseModel):
     reasoning: str
 
 
+class LegPick(BaseModel):
+    market_id: int
+    market: str
+    value: str
+    your_probability: float = Field(ge=0, le=1)
+    min_odds: float = Field(gt=1)
+    reasoning: str
+
+
 class Analysis(BaseModel):
     summary: str
     probabilities: dict[str, float]
     suggested_bets: list[SuggestedBet]
+    bundle_legs: list[LegPick] = []  # prompt v4 on
     key_factors: list[str]
     data_gaps: list[str]
     no_bet: bool
@@ -196,32 +226,44 @@ def _record(db: Session, thread: AiThread, fx: Fixture, user_id: int, raw: dict,
     db.add(pred)
     db.flush()
 
-    # The latest analysis replaces earlier AI tips on this match (still private and pre-kick-off).
-    for old in db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.source == "ai", Tip.status == "pending")):
+    # The latest analysis replaces earlier AI tips and legs on this match (still private and pre-kick-off), except
+    # legs already in a bundle, which have to stay as they were bet.
+    for old in db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.source.in_(["ai", "ai_leg"]),
+                                            Tip.status == "pending", Tip.id.not_in(select(BundleLeg.tip_id)))):
         db.delete(old)
 
-    notes, placed = [], 0
-    for b in a.suggested_bets:
+    notes = []
+
+    def track(b, source: str, **extra) -> bool:
         sel = find_selection(bundle, b.market_id, b.value)
         if sel is None:
             notes.append(f"'{b.market} / {b.value}' isn't in the bundle's prices, so it wasn't tracked")
-            continue
+            return False
         if sel["best"] < b.min_odds:
             notes.append(f"'{b.market} / {b.value}' is {sel['best']} now, below your minimum {b.min_odds}: not tracked")
-            continue
+            return False
+        if source == "ai_leg" and not (LEG_MIN_ODDS <= sel["best"] <= LEG_MAX_ODDS
+                                       and b.your_probability >= LEG_MIN_PROB):
+            notes.append(f"leg '{b.market} / {b.value}' at {sel['best']} ({b.your_probability:.0%}) isn't priced "
+                         f"{LEG_MIN_ODDS}-{LEG_MAX_ODDS} at {LEG_MIN_PROB:.0%}+: not tracked")
+            return False
         market, selection, line, market_id = b.market, b.value, None, b.market_id
         if code := to_code(b.market_id, b.value):
             market, selection, line = code
             market_id = None
         else:
             line = parse_value(b.value)[1]
-        db.add(Tip(fixture_id=fx.id, author_id=user_id, source="ai", ai_prediction_id=pred.id, published=False,
+        db.add(Tip(fixture_id=fx.id, author_id=user_id, source=source, ai_prediction_id=pred.id, published=False,
                    market_id=market_id, market=market, selection=selection, line=line, odds=sel["best"],
-                   bookmaker=sel["at"], stake_units=min(max(b.stake_units, 0.5), 3),
-                   confidence=min(max(b.confidence, 0), 10), reasoning=b.reasoning))
-        placed += 1
+                   bookmaker=sel["at"], ai_probability=b.your_probability, reasoning=b.reasoning, **extra))
+        return True
+
+    placed = sum(track(b, "ai", stake_units=min(max(b.stake_units, 0.5), 3), confidence=min(max(b.confidence, 0), 10))
+                 for b in a.suggested_bets)
+    legs = sum(track(b, "ai_leg", stake_units=1, confidence=round(b.your_probability * 10)) for b in a.bundle_legs[:2])
     db.commit()
-    msg = f"Recorded as analysis #{pred.id}; {placed} bet{'s' * (placed != 1)} tracked at the best current price."
+    msg = f"Recorded as analysis #{pred.id}; {placed} bet{'s' * (placed != 1)} tracked at the best current price"
+    msg += f", plus {legs} bundle leg{'s' * (legs != 1)}." if a.bundle_legs else "."
     if notes:
         msg += " " + "; ".join(notes) + "."
     return pred, msg
@@ -341,7 +383,7 @@ def _texts_and_calls(blocks: list[dict]) -> tuple[list[str], list[str]]:
 def thread_view(db: Session, thread: AiThread) -> dict:
     """The thread as the UI shows it: typed messages, the model's text, analyses."""
     preds = {p.id: p for p in db.scalars(select(AiPrediction).where(AiPrediction.thread_id == thread.id))}
-    tips = list(db.scalars(select(Tip).where(Tip.ai_prediction_id.in_(preds.keys())))) if preds else []
+    tips = list(db.scalars(select(Tip).where(Tip.ai_prediction_id.in_(preds.keys()), Tip.source == "ai"))) if preds else []
     by_tool_use = {p.tool_use_id: p.id for p in preds.values()}
     msgs, spent = [], 0.0
     for m in db.scalars(select(AiMessage).where(AiMessage.thread_id == thread.id).order_by(AiMessage.id)):

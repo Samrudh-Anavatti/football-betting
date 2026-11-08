@@ -239,7 +239,7 @@ class Tip(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     fixture_id: Mapped[int] = mapped_column(ForeignKey("fixtures.id"), index=True)
     author_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
-    source: Mapped[str] = mapped_column(String(8), default="ivo")  # ivo | ai
+    source: Mapped[str] = mapped_column(String(8), default="ivo")  # ivo | ai | ai_leg (the AI staking test)
     ai_prediction_id: Mapped[int | None] = mapped_column(Integer)
     market_id: Mapped[int | None] = mapped_column(Integer)
     market: Mapped[str] = mapped_column(String(80))
@@ -250,6 +250,7 @@ class Tip(Base):
     stake_units: Mapped[float] = mapped_column(Float, default=1.0)
     confidence: Mapped[int] = mapped_column(Integer, default=5)  # 0–10 (picks before 2026-10-24 were rated 1–5)
     reasoning: Mapped[str | None] = mapped_column(Text)
+    ai_probability: Mapped[float | None] = mapped_column(Float)  # the AI's estimate (source ai / ai_leg)
     published: Mapped[bool] = mapped_column(Boolean, default=True)
     status: Mapped[str] = mapped_column(String(8), default="pending")  # pending|won|lost|void
     profit_units: Mapped[float | None] = mapped_column(Float)
