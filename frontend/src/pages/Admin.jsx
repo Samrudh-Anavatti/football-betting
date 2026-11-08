@@ -1,11 +1,10 @@
-import { useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Navigate, useSearchParams } from 'react-router-dom'
 import AccountsTab from '../components/admin/AccountsTab.jsx'
 import AiTab from '../components/admin/AiTab.jsx'
 import BundlesTab from '../components/admin/BundlesTab.jsx'
 import DataTab from '../components/admin/DataTab.jsx'
 import PicksTab from '../components/admin/PicksTab.jsx'
-import { ErrorNote, Loading } from '../components/ui.jsx'
+import { Loading } from '../components/ui.jsx'
 import { useAuth } from '../lib/auth.jsx'
 
 const TABS = [
@@ -16,59 +15,12 @@ const TABS = [
   { key: 'accounts', label: 'Accounts', el: AccountsTab },
 ]
 
-function SignIn() {
-  const { login } = useAuth()
-  const [username, setUsername] = useState('')
-  const [password, setPassword] = useState('')
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState(null)
-
-  const submit = async (e) => {
-    e.preventDefault()
-    setBusy(true)
-    setError(null)
-    try {
-      await login(username, password)
-    } catch (err) {
-      setError(err)
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  return (
-    <form onSubmit={submit} className="panel max-w-sm mx-auto mt-10 p-6 space-y-4">
-      <h1 className="text-3xl">Sign in</h1>
-      <label className="block">
-        <span className="label">Username</span>
-        <input className="input" autoComplete="username" value={username} onChange={(e) => setUsername(e.target.value)} required />
-      </label>
-      <label className="block">
-        <span className="label">Password</span>
-        <input className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} required />
-      </label>
-      <ErrorNote error={error} />
-      <button className="btn-primary w-full" disabled={busy}>
-        {busy ? 'Signing in…' : 'Sign in'}
-      </button>
-    </form>
-  )
-}
-
 export default function Admin() {
   const { user, checking, logout } = useAuth()
   const [params, setParams] = useSearchParams()
   if (checking) return <Loading />
-  if (!user) return <SignIn />
-  if (!user.is_admin)
-    return (
-      <div className="space-y-4">
-        <h1 className="text-4xl sm:text-5xl leading-none">Admins only</h1>
-        <button type="button" className="btn-ghost" onClick={logout}>
-          Sign out {user.display_name}
-        </button>
-      </div>
-    )
+  if (!user) return <Navigate to="/login?next=/admin" replace />
+  if (!user.is_admin) return <Navigate to="/account" replace />
 
   const active = TABS.find((t) => t.key === params.get('tab')) || TABS[0]
   const Tab = active.el

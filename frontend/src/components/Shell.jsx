@@ -12,6 +12,7 @@ const NAV = [
 
 export default function Shell({ children }) {
   const { user } = useAuth()
+  const me = !user ? { to: '/login', label: 'Sign in' } : user.is_admin ? { to: '/admin', label: 'Admin' } : { to: '/account', label: 'Account' }
   // The current page gets an amber bar along the bottom of the header.
   const link = ({ isActive }) =>
     `relative h-full inline-flex items-center whitespace-nowrap px-[5px] sm:px-3 text-[13px] sm:text-sm font-semibold transition-colors after:absolute after:inset-x-[5px] sm:after:inset-x-3 after:bottom-0 after:h-[3px] after:rounded-t-sm after:transition-colors ${
@@ -36,13 +37,13 @@ export default function Shell({ children }) {
               </NavLink>
             ))}
           </nav>
-          <NavLink to="/admin" className={(s) => `ml-auto h-full ${link(s)}`} aria-label={user ? 'Admin' : 'Sign in'}>
+          <NavLink to={me.to} className={(s) => `ml-auto h-full ${link(s)}`} aria-label={me.label}>
             {/* An icon on phones, where the five sections need the room. */}
             <svg viewBox="0 0 24 24" className="h-5 w-5 sm:hidden" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
               <circle cx="12" cy="8" r="4" />
               <path d="M4 21a8 8 0 0 1 16 0" />
             </svg>
-            <span className="hidden sm:inline">{user ? 'Admin' : 'Sign in'}</span>
+            <span className="hidden sm:inline">{me.label}</span>
           </NavLink>
         </div>
       </header>

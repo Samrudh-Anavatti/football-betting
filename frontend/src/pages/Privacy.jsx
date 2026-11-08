@@ -7,8 +7,9 @@ export default function Privacy() {
     <article className="max-w-prose text-[15px] leading-relaxed text-ink/85">
       <h1 className="text-3xl sm:text-4xl leading-tight text-ink">Privacy</h1>
       <p className="mt-3">
-        Football Predictions AI publishes football picks and match data. You don't need an account to use it, and we
-        don't ask for your name, email or payment details. This page explains the little we do collect.
+        Football Predictions AI publishes football picks and match data. You don't need an account to use it. If you
+        make one, we keep your email address and password; we don't ask for your name or payment details. This page
+        explains what we collect and why.
       </p>
 
       <H>Analytics</H>
@@ -30,10 +31,17 @@ export default function Privacy() {
         </button>
       </p>
 
-      <H>Signing in</H>
+      <H>Accounts</H>
       <p>
-        Only our team signs in. Signing in stores a login token in your browser so you stay signed in; it's removed
-        when you sign out.
+        An account holds your email address, a scrambled copy of your password (we can't read it), and when the
+        account was made. We use your email only to sign you in and to send a password-reset link when you ask for
+        one; we don't send marketing or share it with anyone. Reset emails are sent through Microsoft Azure.
+      </p>
+      <p className="mt-3">
+        Signing in stores a login token in your browser so you stay signed in; it's removed when you sign out. You can
+        delete your account at any time from the account page, which removes your email address straight away. To stop
+        password guessing, our server briefly remembers the IP address of sign-in and reset attempts, in memory only,
+        for up to an hour.
       </p>
 
       <H>Contact</H>

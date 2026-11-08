@@ -66,6 +66,11 @@ export const api = {
   // auth
   login: (username, password) => request('/auth/login', { method: 'POST', body: { username, password } }),
   me: () => request('/auth/me'),
+  signup: (body) => request('/auth/signup', { method: 'POST', body }),
+  forgot: (email) => request('/auth/forgot', { method: 'POST', body: { email } }),
+  resetPassword: (token, password) => request('/auth/reset', { method: 'POST', body: { token, password } }),
+  changePassword: (body) => request('/auth/password', { method: 'PUT', body }),
+  deleteAccount: (password) => request('/auth/delete-account', { method: 'POST', body: { password } }),
 
   // integrations
   integrations: () => request('/admin/integrations'),

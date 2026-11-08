@@ -9,6 +9,8 @@ import Friends from './pages/Friends.jsx'
 import Staking from './pages/Staking.jsx'
 import ConsentBanner from './components/ConsentBanner.jsx'
 import Admin from './pages/Admin.jsx'
+import Account from './pages/Account.jsx'
+import { Forgot, Login, Reset, Signup } from './pages/Auth.jsx'
 import usePageMeta from './hooks/usePageMeta.js'
 import { PAGES } from './lib/seo.js'
 
@@ -32,6 +34,11 @@ export default function App() {
         <Route path="/friends" element={<Friends />} />
         <Route path="/match/:slug" element={<Match />} />
         <Route path="/admin" element={<Admin />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/signup" element={<Signup />} />
+        <Route path="/forgot" element={<Forgot />} />
+        <Route path="/reset" element={<Reset />} />
+        <Route path="/account" element={<Account />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <StaticMeta />

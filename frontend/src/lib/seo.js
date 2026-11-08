@@ -41,7 +41,12 @@ export const PAGES = {
     title: `Privacy | ${SITE}`,
     description: 'What Football Predictions AI collects (very little), the cookies it uses and how to contact us.',
   },
-  '/admin': { title: `Sign in | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
+  '/admin': { title: `Admin | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
+  '/login': { title: `Sign in | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
+  '/signup': { title: `Create an account | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
+  '/forgot': { title: `Reset your password | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
+  '/reset': { title: `Choose a new password | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
+  '/account': { title: `Your account | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
 }
 
 const FINISHED = ['FT', 'AET', 'PEN']

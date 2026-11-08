@@ -16,18 +16,21 @@ export function AuthProvider({ children }) {
       .finally(() => setChecking(false))
   }, [])
 
-  const login = useCallback(async (username, password) => {
-    const res = await api.login(username, password)
+  // Every sign-in route (login, sign-up, reset, password change) answers with { token, user }.
+  const signIn = useCallback((res) => {
     setToken(res.token)
     setUser(res.user)
+    return res.user
   }, [])
+
+  const login = useCallback(async (username, password) => signIn(await api.login(username, password)), [signIn])
 
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
   }, [])
 
-  return <AuthContext.Provider value={{ user, checking, login, logout }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, checking, login, signIn, logout }}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => useContext(AuthContext)
