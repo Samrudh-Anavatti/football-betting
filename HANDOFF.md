@@ -21,7 +21,7 @@ _Last updated: 2026-11-08 (**member accounts**: sign-up by email (page live, not
 | Database | Azure Database for PostgreSQL `pg-football-betting-sa` (Flexible, B1ms, PG 17, UK South), database `football`. See [DATABASE.md](DATABASE.md). The old SQLite file `/home/data/football.db` is kept until 2026-11-07 as a fallback. |
 | AI | Foundry resource `foundry-football-sa` (AIServices, **Sweden Central**). Deployment **`gpt-5.6-luna`** (version 2026-07-09, Global Standard, capacity 100 = 100k tokens/min, lowered from 200 on 2026-10-27 to free quota for another app), used by the app. Azure counts each call as prompt (up to ~40k) + `max_output_tokens` (16k), so about two calls a minute fit; the OpenAI SDK retries a 429 twice (`max_retries=2`). The `claude-sonnet-5-5` deployment was deleted on 2026-10-07 (no Marketplace/SaaS resources were left behind). No fallback model: if Luna is down, analysis waits. |
 | Backups | Azure's own Postgres backups, point-in-time restore over 35 days. Storage account `stfootballbettingsa` (the old SQLite backups) **to delete on 2026-11-07**. |
-| Email | Azure Communication Services: Email service `email-football-sa` (data in UK) with domain `football-predictions.org` (customer-managed) and sender `no-reply@`; Communication Service `comm-football-sa`, whose connection string the app uses. Pay per email (~$0.00025). **Not sending yet (2026-11-08):** needs the domain TXT, SPF merged into the Google one (`v=spf1 include:_spf.google.com include:spf.protection.outlook.com ~all`) and 2 DKIM CNAMEs on Cloudflare, then domain verify + link to `comm-football-sa` + `EMAIL_CONNECTION_STRING`. |
+| Email | Azure Communication Services: Email service `email-football-sa` (data in UK) with domain `football-predictions.org` (customer-managed) and sender `no-reply@`; Communication Service `comm-football-sa`, whose connection string the app uses. Pay per email (~$0.00025). Live since 2026-11-08: domain, SPF and both DKIM verified, linked to `comm-football-sa`. |
 | Budget alert | `football-betting-monthly` on the resource group: 50 (billing currency) a month, emails at 80% actual and 100% forecast. |
 | Plans | API-Football **Pro** ($19/mo, 7,500 req/day, upgraded 2026-10-03 for a one-month trial). The Odds API **free** (500 credits/month), now only a backup. |
 | Repo | https://github.com/Samrudh-Anavatti/football-betting |
@@ -76,6 +76,10 @@ GitHub Actions (Settings → Secrets and variables → Actions):
 `1eff171ce3876fd35f8af567dabf3e9b`). The site records are **proxied** (Cloudflare Pages needs it); `api` stays
 **DNS-only (grey cloud)**, because Azure issues its certificate by reaching the origin directly. MX/SPF/DKIM
 (Google Workspace email) and two `google-site-verification` TXT records (Search Console) also live here.
+Azure email (2026-11-08) added an `ms-domain-verification` TXT and two DKIM CNAMEs
+(`selector1/2-azurecomm-prod-net._domainkey` → `…azurecomm.net`, DNS-only), and the SPF is now
+`v=spf1 include:_spf.google.com include:spf.protection.outlook.com -all`. **Keep `-all`**: Azure won't verify SPF with
+`~all`. Anything new that sends as @football-predictions.org must be added to the SPF, or its mail bounces.
 
 | Record | Points to | For |
 |---|---|---|
