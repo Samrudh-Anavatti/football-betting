@@ -3,6 +3,7 @@ import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { ErrorNote, Loading } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
+import { WHATSAPP_URL } from '../lib/support.js'
 
 // Where to go once signed in: ?next= if it's one of our pages, else Admin or Account.
 function useDone() {
@@ -120,7 +121,10 @@ export function Forgot() {
       <div className="panel max-w-sm mx-auto mt-10 p-6 space-y-3">
         <h1 className="text-3xl">Check your email</h1>
         <p>{sent}</p>
-        <p className="text-sm text-ink-soft">The link expires in an hour. Nothing arrived? Check your spam folder.</p>
+        <p className="text-sm text-ink-soft">
+          The link expires in an hour. Nothing arrived? Check your spam folder, or{' '}
+          <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className={linkCls}>message us on WhatsApp</a>.
+        </p>
       </div>
     )
   return (
@@ -130,9 +134,15 @@ export function Forgot() {
       busyLabel="Sending…"
       onSubmit={async () => setSent((await api.forgot(email)).detail)}
       footer={
-        <p>
-          Remembered it? <Link to="/login" className={linkCls}>Sign in</Link>
-        </p>
+        <>
+          <p>
+            Remembered it? <Link to="/login" className={linkCls}>Sign in</Link>
+          </p>
+          <p>
+            Can't get into that email any more?{' '}
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className={linkCls}>Message us on WhatsApp</a>
+          </p>
+        </>
       }
     >
       <Field label="Email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />

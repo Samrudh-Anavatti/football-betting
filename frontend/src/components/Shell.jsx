@@ -1,6 +1,7 @@
 import { Link, NavLink } from 'react-router-dom'
 import { openCookieSettings } from '../lib/analytics.js'
 import { useAuth } from '../lib/auth.jsx'
+import { WHATSAPP_URL } from '../lib/support.js'
 
 const NAV = [
   { to: '/', label: 'Picks', end: true },
@@ -58,6 +59,7 @@ export default function Shell({ children }) {
           </span>
           <span className="sm:ml-auto">Fixtures, research and prices by API-Football</span>
           <span className="flex gap-4">
+            <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="hover:text-white underline underline-offset-4">Help on WhatsApp</a>
             <Link to="/friends" className="hover:text-white underline underline-offset-4">Football Friends</Link>
             <Link to="/privacy" className="hover:text-white underline underline-offset-4">Privacy</Link>
             <button type="button" className="hover:text-white underline underline-offset-4" onClick={openCookieSettings}>

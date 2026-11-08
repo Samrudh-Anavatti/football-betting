@@ -3,6 +3,7 @@ import { Link, Navigate } from 'react-router-dom'
 import { ErrorNote, Loading } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
+import { WHATSAPP_URL } from '../lib/support.js'
 import { Field } from './Auth.jsx'
 
 function useSubmit(fn) {
@@ -92,6 +93,7 @@ export default function Account() {
       <ChangePassword />
       <p className="text-sm text-ink-soft">
         Forgotten your password? Sign out and use <Link to="/forgot" className="underline underline-offset-4">reset password</Link>.
+        Anything else, <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="underline underline-offset-4">message us on WhatsApp</a>.
       </p>
       <DeleteAccount />
     </div>
