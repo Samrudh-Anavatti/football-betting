@@ -44,7 +44,7 @@ from ..database import SessionLocal
 from ..models import AiThread, Fixture, League, MarketBook, MatchContext, ProviderQuota, Setting, SyncRun, User
 from ..providers.base import ProviderError
 from ..serialize import run_dict
-from . import ai_staking, sync
+from . import ai_staking, arbitrage, sync
 from .settlement import FINISHED, VOIDED
 
 log = logging.getLogger(__name__)
@@ -339,7 +339,9 @@ def ai_tick(db: Session, now: datetime | None = None) -> None:
 
     now = now or datetime.utcnow()
     db.expire_all()
-    ai_staking.build_bundle(db, now)  # plain code, no model call
+    # Plain code, no model or API calls: the AI Lab's bundles and the arbitrage scan.
+    ai_staking.build_bundle(db, now)
+    arbitrage.scan(db, now)
     if not ai_client.configured():
         return
     if service.month_spend(db) >= config.AI_MONTHLY_BUDGET_USD * config.AI_AUTO_BUDGET_SHARE:

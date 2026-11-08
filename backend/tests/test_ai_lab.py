@@ -1,4 +1,5 @@
 """AI Lab: the AI's bundle legs built into bundles on its own staking plan, separate from Ivo's."""
+import json
 from datetime import timedelta
 from types import SimpleNamespace as NS
 
@@ -6,8 +7,8 @@ import pytest
 from sqlalchemy import delete, select
 
 from app.database import SessionLocal
-from app.models import Bundle, BundleLeg, Fixture, Tip
-from app.services import ai_staking
+from app.models import ArbSighting, Bundle, BundleLeg, Fixture, MarketBook, Tip
+from app.services import ai_staking, arbitrage
 
 from .conftest import KICKOFF, af_fixture
 
@@ -91,3 +92,56 @@ def test_ai_staking_plan(client, auth, fake, monkeypatch, lab_fixtures):
 
 def test_ai_lab_is_admin_only(client):
     assert client.get(f"{API}/admin/ai-lab/staking").status_code == 401
+
+
+def book(bid, name, over, under, over3=None, under3=None, dc=None):
+    bets = [{"id": 5, "name": "Goals Over/Under", "values": [
+        {"value": "Over 2.5", "odd": str(over)}, {"value": "Under 2.5", "odd": str(under)}]
+        + ([{"value": "Over 3.0", "odd": str(over3)}, {"value": "Under 3.0", "odd": str(under3)}] if over3 else [])}]
+    if dc:
+        bets.append({"id": 12, "name": "Double Chance", "values": [
+            {"value": "Home/Draw", "odd": str(dc[0])}, {"value": "Home/Away", "odd": str(dc[1])},
+            {"value": "Draw/Away", "odd": str(dc[2])}]})
+    return {"id": bid, "name": name, "bets": bets}
+
+
+ARB_BOOKS = [book(8, "Bet365", 2.10, 1.75, 2.6, 1.6, (1.2, 1.3, 1.9)),
+             book(4, "Pinnacle", 1.80, 2.05, 2.2, 1.75, (1.25, 1.35, 2.0))]
+
+
+def test_find_arbs():
+    arbs = arbitrage.find_arbs(ARB_BOOKS)
+    # Over 2.5 at 2.10 (Bet365) + Under 2.5 at 2.05 (Pinnacle): 1/2.10 + 1/2.05 = 0.964, so 3.7% locked in.
+    # Over/Under 3.0 is a whole line (pushes), and double chance outcomes overlap, so neither counts.
+    assert len(arbs) == 1
+    a = arbs[0]
+    assert a["key"] == "5|2.5" and a["profit"] == round(1 / (1 / 2.10 + 1 / 2.05) - 1, 4) and not a["suspect"]
+    assert [(leg["value"], leg["bookmaker"], leg["price"]) for leg in a["legs"]] == [
+        ("Over 2.5", "Bet365", 2.10), ("Under 2.5", "Pinnacle", 2.05)]
+    assert abs(a["legs"][0]["share"] * 2.10 - a["legs"][1]["share"] * 2.05) < 0.001  # same return either way
+    assert arbitrage.find_arbs([book(8, "Bet365", 2.10, 1.75), book(4, "Pinnacle", 1.80, 1.85)]) == []  # 1.017
+
+
+def test_arb_sightings(client, auth, fake):
+    client.post(f"{API}/admin/sync/fixtures", json={"league_ids": [39], "include_standings": False}, headers=auth)
+    t0 = KICKOFF - timedelta(days=1)
+    with SessionLocal() as db:
+        db.merge(MarketBook(fixture_id=1001, pulled_at=t0 - timedelta(minutes=1), provider_updated_at=t0,
+                            bookmakers_json=json.dumps(ARB_BOOKS)))
+        db.commit()
+        arbitrage.scan(db, t0)
+    live = client.get(f"{API}/admin/ai-lab/arbs", headers=auth).json()["live"]
+    assert [(a["fixture"]["id"], a["market"], a["line"]) for a in live] == [(1001, "Goals Over/Under", 2.5)]
+
+    # The next pull no longer shows it: closed at that pull.
+    with SessionLocal() as db:
+        db.merge(MarketBook(fixture_id=1001, pulled_at=t0 + timedelta(minutes=59), provider_updated_at=t0,
+                            bookmakers_json=json.dumps([book(8, "Bet365", 1.9, 1.9), book(4, "Pinnacle", 1.9, 1.9)])))
+        db.commit()
+        arbitrage.scan(db, t0 + timedelta(hours=1))
+    r = client.get(f"{API}/admin/ai-lab/arbs", headers=auth).json()
+    assert r["live"] == [] and r["recent"][0]["gone_at"] is not None
+    with SessionLocal() as db:
+        db.execute(delete(ArbSighting))
+        db.delete(db.get(MarketBook, 1001))
+        db.commit()

@@ -1,4 +1,4 @@
-"""AI Lab (admins only): the AI staking test, and later the arbitrage scanner."""
+"""AI Lab (admins only): the AI staking test and the arbitrage scanner."""
 from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -8,7 +8,7 @@ from ..database import get_db
 from ..deps import admin_user
 from ..models import Bundle
 from ..serialize import tip_dict
-from ..services import ai_staking
+from ..services import ai_staking, arbitrage
 from ..services.staking import get_plan, plan_state
 from .staking import PlanIn
 
@@ -55,3 +55,8 @@ def delete_bundle(bundle_id: int, db: Session = Depends(get_db)):
         raise HTTPException(409, "Only a live bundle can be deleted")
     db.delete(b)
     db.commit()
+
+
+@router.get("/arbs")
+def arbs(db: Session = Depends(get_db)):
+    return arbitrage.overview(db)
