@@ -70,7 +70,8 @@ class LeagueDef:
     supplementary: bool = False
 
 
-# Main leagues: top flight of ten countries plus the three UEFA club competitions.
+# Main leagues: top flight of ten countries, the three UEFA club competitions, and the Nations League (so the
+# international breaks have matches to analyse; no fixtures, so no cost, outside its windows).
 LEAGUES: list[LeagueDef] = [
     LeagueDef(39, "Premier League", "England", "soccer_epl", "🏴󠁧󠁢󠁥󠁮󠁧󠁿"),
     LeagueDef(140, "La Liga", "Spain", "soccer_spain_la_liga", "🇪🇸"),
@@ -85,6 +86,7 @@ LEAGUES: list[LeagueDef] = [
     LeagueDef(2, "Champions League", "Europe", "soccer_uefa_champs_league", "🇪🇺"),
     LeagueDef(3, "Europa League", "Europe", "soccer_uefa_europa_league", "🇪🇺"),
     LeagueDef(848, "Conference League", "Europe", "soccer_uefa_europa_conference_league", "🇪🇺"),
+    LeagueDef(5, "Nations League", "Europe", "soccer_uefa_nations_league", "🇪🇺"),
 ] + [
     LeagueDef(i, name, country, key, flag, supplementary=True) for i, name, country, key, flag in [
         # Second and third tiers of the ten countries above (Spain's and Italy's third tiers are regional groups).

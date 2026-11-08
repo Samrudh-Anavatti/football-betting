@@ -25,7 +25,7 @@ def public_tip(t: Tip, with_fixture: bool = True) -> dict:
 
 
 # Main leagues first (UEFA competitions after the countries), then supplementary by country.
-LEAGUE_ORDER = (League.supplementary, League.id.in_([2, 3, 848]), League.country, League.id)
+LEAGUE_ORDER = (League.supplementary, League.id.in_([2, 3, 848, 5]), League.country, League.id)
 
 
 @router.get("/leagues")
