@@ -70,6 +70,14 @@ def build_bundle(db: Session, now: datetime | None = None) -> Bundle | None:
     return bundle
 
 
+def waiting_legs(db: Session, now: datetime) -> tuple[int, datetime | None]:
+    """Legs for matches beyond the window: how many, and when the earliest comes into range (None if none)."""
+    n, first = db.execute(select(func.count(), func.min(Fixture.kickoff)).select_from(Tip).join(Fixture)
+                          .where(Tip.source == "ai_leg", Tip.status == "pending", Fixture.kickoff > now + WINDOW,
+                                 Tip.id.not_in(select(BundleLeg.tip_id)))).one()
+    return n, first - WINDOW if first else None
+
+
 def leg_record(db: Session) -> dict:
     """How the AI's legs do on their own: hit rate against what their prices implied, and the AI's own estimate.
     The plan can only make money if legs land more often than their prices say."""

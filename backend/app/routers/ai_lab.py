@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from ..database import get_db
 from ..deps import admin_user
 from ..models import Bundle
-from ..serialize import tip_dict
+from ..serialize import iso, tip_dict
 from ..services import ai_staking, arbitrage
 from ..services.staking import get_plan, plan_state
 from .staking import PlanIn
@@ -16,11 +16,13 @@ router = APIRouter(prefix="/admin/ai-lab", tags=["ai-lab"], dependencies=[Depend
 
 
 def _state(db: Session) -> dict:
+    now = datetime.utcnow()
+    waiting, usable_at = ai_staking.waiting_legs(db, now)
     return {
         **plan_state(db, ai_staking.SOURCE),
         "legs": ai_staking.leg_record(db),
-        "open_legs": [{**tip_dict(t), "current_odds": price}
-                      for t, price in ai_staking.open_legs(db, datetime.utcnow())],
+        "open_legs": [{**tip_dict(t), "current_odds": price} for t, price in ai_staking.open_legs(db, now)],
+        "waiting_legs": {"count": waiting, "usable_from": iso(usable_at)},
     }
 
 

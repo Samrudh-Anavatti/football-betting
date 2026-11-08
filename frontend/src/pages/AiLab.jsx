@@ -53,7 +53,7 @@ function LegRecord({ legs }) {
 }
 
 function OpenLegs({ legs }) {
-  if (!legs.length) return <p className="text-ink-soft text-sm">No open legs in the next 48 hours.</p>
+  if (!legs.length) return <p className="text-ink-soft text-sm">No legs for matches in the next 48 hours yet.</p>
   return (
     <ol className="panel divide-y divide-ink/5">
       {legs.map((t) => (
@@ -118,7 +118,7 @@ function AiStaking() {
   const d = state || data
   if (loading && !d) return <Loading rows={4} />
   if (error && !d) return <ErrorNote error={error} />
-  const { plan, run, current, history, stats, legs, open_legs: openLegs } = d
+  const { plan, run, current, history, stats, legs, open_legs: openLegs, waiting_legs: waiting } = d
   const act = async (fn) => {
     setActionError(null)
     try {
@@ -150,9 +150,15 @@ function AiStaking() {
             <div className="panel px-5 py-8 text-center space-y-3">
               <p className="font-display text-xl font-bold">No live bundle</p>
               <p className="text-ink-soft max-w-prose mx-auto">
-                The schedule builds one as soon as the open legs reach about {odds(plan.target_odds)}. Run {run.number}, bet{' '}
-                {run.step}: stake about <span className="num font-semibold text-ink">{money(run.next_stake)}</span>.
+                The schedule builds one as soon as legs kicking off in the next 48 hours reach about {odds(plan.target_odds)}.
+                Run {run.number}, bet {run.step}: stake about <span className="num font-semibold text-ink">{money(run.next_stake)}</span>.
               </p>
+              {waiting.count > 0 && (
+                <p className="text-sm max-w-prose mx-auto">
+                  <span className="num font-semibold">{waiting.count}</span> leg{waiting.count === 1 ? '' : 's'} waiting for
+                  later matches; the first can go in a bundle from {dayLabel(waiting.usable_from)}, {kickoffTime(waiting.usable_from)}.
+                </p>
+              )}
               <button type="button" className="btn-primary" onClick={() => act(api.aiLabBuild)}>Build now</button>
             </div>
           )}

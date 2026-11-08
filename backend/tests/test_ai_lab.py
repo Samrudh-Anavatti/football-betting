@@ -63,7 +63,13 @@ def test_ai_staking_plan(client, auth, fake, monkeypatch, lab_fixtures):
             ids.append(t.id)
         db.commit()
 
+        # Three days out the legs are beyond the 48 h window: none can be bundled yet, usable from 48 h before.
+        early = KICKOFF - timedelta(days=3)
+        assert ai_staking.build_bundle(db, early) is None
+        assert ai_staking.waiting_legs(db, early) == (6, KICKOFF - timedelta(hours=48))
+
         now = KICKOFF - timedelta(days=1)
+        assert ai_staking.waiting_legs(db, now) == (0, None)  # all in range now
         b = ai_staking.build_bundle(db, now)
         # 1.25 x 1.30 x 1.35 x 1.40 x 1.45 = 4.45, then 1.50 makes 6.68 (likeliest first).
         assert [leg.tip_id for leg in b.legs] == [ids[5], ids[3], ids[2], ids[1], ids[0], ids[4]]
