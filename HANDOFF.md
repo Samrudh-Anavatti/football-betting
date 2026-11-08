@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-11-01 (**staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
+_Last updated: 2026-11-08 (**member accounts**: sign-up by email (page live, not linked until the paywall), password reset by email through Azure Communication Services, admins vs members; see "Member accounts". Paywall decision: Stripe directly, not Buy Me a Coffee. 2026-11-01: **staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
 
 ## Live resources
 
@@ -21,6 +21,7 @@ _Last updated: 2026-11-01 (**staking plan**: Ivo bundles his picks at ~6.00 with
 | Database | Azure Database for PostgreSQL `pg-football-betting-sa` (Flexible, B1ms, PG 17, UK South), database `football`. See [DATABASE.md](DATABASE.md). The old SQLite file `/home/data/football.db` is kept until 2026-11-07 as a fallback. |
 | AI | Foundry resource `foundry-football-sa` (AIServices, **Sweden Central**). Deployment **`gpt-5.6-luna`** (version 2026-07-09, Global Standard, capacity 100 = 100k tokens/min, lowered from 200 on 2026-10-27 to free quota for another app), used by the app. Azure counts each call as prompt (up to ~40k) + `max_output_tokens` (16k), so about two calls a minute fit; the OpenAI SDK retries a 429 twice (`max_retries=2`). The `claude-sonnet-5-5` deployment was deleted on 2026-10-07 (no Marketplace/SaaS resources were left behind). No fallback model: if Luna is down, analysis waits. |
 | Backups | Azure's own Postgres backups, point-in-time restore over 35 days. Storage account `stfootballbettingsa` (the old SQLite backups) **to delete on 2026-11-07**. |
+| Email | Azure Communication Services: Email service `email-football-sa` (data in UK) with domain `football-predictions.org` (customer-managed) and sender `no-reply@`; Communication Service `comm-football-sa`, whose connection string the app uses. Pay per email (~$0.00025). **Not sending yet (2026-11-08):** needs the domain TXT, SPF merged into the Google one (`v=spf1 include:_spf.google.com include:spf.protection.outlook.com ~all`) and 2 DKIM CNAMEs on Cloudflare, then domain verify + link to `comm-football-sa` + `EMAIL_CONNECTION_STRING`. |
 | Budget alert | `football-betting-monthly` on the resource group: 50 (billing currency) a month, emails at 80% actual and 100% forecast. |
 | Plans | API-Football **Pro** ($19/mo, 7,500 req/day, upgraded 2026-10-03 for a one-month trial). The Odds API **free** (500 credits/month), now only a backup. |
 | Repo | https://github.com/Samrudh-Anavatti/football-betting |
@@ -44,9 +45,12 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 | `ODDS_API_KEY` | — | The Odds API key. |
 | `FOOTBALL_SEASON` | 2026 | Season passed to API-Football (2026 = 2026/27 in Europe, MLS 2026). Bump each summer. |
 | `API_FOOTBALL_MIN_INTERVAL` | 6.5 (code default) | Seconds between API-Football calls. **Production: 0.25** (Pro allows 300/min). Does not adjust itself; if we drop back to Free, set it to 6.5. |
-| `USERS` | sam,ivo | Accounts. Each needs `PASSWORD_<NAME>`. |
+| `USERS` | sam,ivo | Admin accounts (marked `is_admin` on startup). Each needs `PASSWORD_<NAME>`. Members sign up on the site instead. |
 | `PASSWORD_SAM` / `PASSWORD_IVO` | — | Login passwords, reconciled on startup. Rotate = change + restart. |
 | `JWT_SECRET` | — | Signs login tokens. Changing it signs everyone out. |
+| `EMAIL_CONNECTION_STRING` | — | `comm-football-sa`'s connection string (`az communication list-key -n comm-football-sa -g rg-football-betting`). Missing = reset emails are logged as not sent. |
+| `EMAIL_SENDER` | no-reply@football-predictions.org | From address; must be a sender username on the domain. |
+| `SITE_URL` | https://football-predictions.org | Base of the reset link. |
 | `CORS_ORIGINS` | — | `https://football-predictions.org,https://www.football-predictions.org,http://localhost:5173` |
 | `DATABASE_URL` | — (SQLite in `DATA_DIR`) | `postgresql+psycopg://fbadmin:<pw>@pg-football-betting-sa.postgres.database.azure.com:5432/football?sslmode=require`. The only place the DB password lives. |
 | `DATA_DIR` | /home/data | Where SQLite lives when `DATABASE_URL` is unset (local, tests; the production fallback until 2026-11-07). |
@@ -143,10 +147,35 @@ starts a new run at the base stake.
   and every settled bundle. The chance of emptying the bank is shown once Ivo has 20+ settled picks to estimate from.
 * **Paywall: not built yet.** Signed-out visitors get the page blurred over made-up data (`lib/stakingSample.js`) with
   a "Members only, coming soon" card; the real plan is never sent to them (a blur only hides what the browser has).
-  Next piece: member accounts + payments (Stripe looked best: no monthly fee; check its restricted-business list for
-  betting tips first). The router's `current_user` dependency is where a membership check goes. UK ad rules (CAP) don't
+  Next piece: payments. **Decided 2026-11-07: Stripe directly** (Checkout + Customer Portal + webhook), not Buy Me a
+  Coffee memberships: BMC pays out through Stripe anyway (same policy risk), costs ~5% more, and only gives us an email
+  to match. Stripe bans "sports forecasting or odds-making with a monetary prize" (contests), not paid tips, but reviews
+  each account. Member accounts are done (see "Member accounts"); the staking GET's `admin_user` becomes "admin or
+  active member". UK ad rules (CAP) don't
   allow "guaranteed" claims for gambling, so keep the copy factual.
 * Phones: the header now shows a person icon instead of "Sign in"/"Admin" so the five sections fit at 360 px.
+
+## Member accounts (built 2026-11-08)
+
+* **Admins vs members:** `users.is_admin`. `seed.py` marks the `USERS` accounts (sam, ivo) as admins on every start
+  and resets their passwords from `PASSWORD_<NAME>`, so admins can't change passwords in the app (409). Admin, AI and
+  staking routes use `deps.admin_user` (403 for members); `current_user` is for anything a member may do.
+  `/admin/accounts` (virtual bankrolls) lists admins only.
+* **Members** sign up at `/signup` with email + password (8–72 chars) + an 18+ tick, and sign in at `/login` with
+  their email (admins use their username there). Email is stored lower-cased and unique; it isn't verified, which is
+  safe because resets only ever go to the address on the account. Members get a random `username` (`m…`), unused.
+  **`/signup` isn't linked anywhere until the paywall** (members get nothing yet); it's `noindex`.
+* **Reset:** `/forgot` always gives the same answer (doesn't reveal who has an account) and emails a link
+  `/reset#token=…` (a fragment, so the token never reaches a server or analytics; the page strips it from the address
+  bar). Only the token's SHA-256 is stored; single use, 60 min (`RESET_MINUTES`).
+* **Password change signs out other devices:** `users.token_version` goes up and tokens carry `v`; older tokens get 401.
+* **Delete account:** `/account` → Delete (password needed); removes the row. Admins can't.
+* **Attempt limits** (`app/ratelimit.py`, in memory, single worker): 10 failed sign-ins/password checks per IP per 15
+  min, 5 sign-ups per IP per hour, forgot 5 per IP and 3 per email per hour, reset 10 per IP per hour. The IP is the
+  last `X-Forwarded-For` entry (App Service's front end adds it; the API isn't behind Cloudflare's proxy).
+* **Pages:** `/login`, `/signup`, `/forgot`, `/reset`, `/account` (`pages/Auth.jsx`, `pages/Account.jsx`). The header's
+  person link goes to Sign in, Account or Admin. Privacy page covers accounts.
+* **Email:** `services/email.py` calls ACS's REST API (`/emails:send`, HMAC-signed) with httpx, no Azure SDK.
 
 ## Moving the backend (new plan, region or host)
 
