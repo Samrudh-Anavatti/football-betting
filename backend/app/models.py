@@ -296,11 +296,13 @@ class Bet(Base):
 class StakingPlan(Base):
     """Ivo's staking method: his picks combined into bundles of about `target_odds`, the stake raised after each
     loss so the next win recovers the run's losses plus base_stake × (target_odds − 1). A win starts a new run.
-    One plan for now; `bank` is only for the survival maths shown on the page."""
+    One plan per `source`: Ivo's, and the AI's (AI Lab, built from its bundle legs). `bank` is only for the survival
+    maths shown on the page."""
 
     __tablename__ = "staking_plans"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    source: Mapped[str] = mapped_column(String(8), default="ivo", unique=True)  # ivo | ai
     base_stake: Mapped[float] = mapped_column(Float, default=6.0)
     target_odds: Mapped[float] = mapped_column(Float, default=6.0)
     bank: Mapped[float] = mapped_column(Float, default=150.0)

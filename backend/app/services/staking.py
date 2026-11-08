@@ -14,10 +14,10 @@ from ..models import Bundle, StakingPlan
 from ..serialize import iso, tip_dict
 
 
-def get_plan(db: Session) -> StakingPlan:
-    plan = db.scalars(select(StakingPlan).order_by(StakingPlan.id)).first()
+def get_plan(db: Session, source: str = "ivo") -> StakingPlan:
+    plan = db.scalar(select(StakingPlan).where(StakingPlan.source == source))
     if plan is None:
-        plan = StakingPlan()
+        plan = StakingPlan(source=source)
         db.add(plan)
         db.commit()
     return plan
@@ -94,8 +94,8 @@ def bundle_dict(b: Bundle) -> dict:
     }
 
 
-def plan_state(db: Session) -> dict:
-    plan = get_plan(db)
+def plan_state(db: Session, source: str = "ivo") -> dict:
+    plan = get_plan(db, source)
     rows = plan_bundles(db, plan)
     run = run_state(rows)
     current = next((b for b in rows if b.status == "pending"), None)

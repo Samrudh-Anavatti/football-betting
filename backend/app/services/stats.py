@@ -13,10 +13,20 @@ def closing_price(db: Session, tip: Tip) -> float | None:
     """Best price in the last odds pull before kickoff — the market's final word."""
     if tip.closing_checked_at is not None:
         return tip.closing_odds
+    return _latest_price(db, tip, after=tip.created_at)
+
+
+def current_price(db: Session, tip: Tip) -> float | None:
+    """Best price in the latest odds pull (before kick-off): what the pick could be backed at now."""
+    return _latest_price(db, tip)
+
+
+def _latest_price(db: Session, tip: Tip, after: datetime | None = None) -> float | None:
+    """Best price in the last pull before kick-off; None if there's none, or none since `after`."""
     fx: Fixture = tip.fixture
-    if tip.market_id is not None:  # any board market: the frozen pre-kick-off book
+    if tip.market_id is not None:  # any board market: the book stops updating at kick-off
         book = db.get(MarketBook, fx.id)
-        if book is None or book.pulled_at <= tip.created_at or book.pulled_at > fx.kickoff:
+        if book is None or (after and book.pulled_at <= after) or book.pulled_at > fx.kickoff:
             return None
         return best_price(json.loads(book.bookmakers_json), tip.market_id, tip.selection)
     last_pull = db.scalar(
@@ -24,8 +34,8 @@ def closing_price(db: Session, tip: Tip) -> float | None:
         .where(OddsSnapshot.fixture_id == fx.id, OddsSnapshot.pulled_at <= fx.kickoff)
         .order_by(OddsSnapshot.pulled_at.desc()).limit(1)
     )
-    if last_pull is None or last_pull <= tip.created_at:
-        return None  # no pull after the tip was placed, so nothing to compare
+    if last_pull is None or (after and last_pull <= after):
+        return None  # no pull since, so nothing to compare
     q = select(OddsSnapshot.price).where(
         OddsSnapshot.fixture_id == fx.id, OddsSnapshot.pulled_at == last_pull,
         OddsSnapshot.market == tip.market, OddsSnapshot.selection == tip.selection,

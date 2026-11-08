@@ -46,7 +46,7 @@ def tip_dict(t: Tip, with_fixture: bool = True) -> dict:
         "id": t.id, "fixture_id": t.fixture_id, "author": t.author.display_name, "source": t.source,
         "ai_prediction_id": t.ai_prediction_id, "market_id": t.market_id, "market": t.market,
         "selection": t.selection, "line": t.line, "odds": t.odds, "bookmaker": t.bookmaker,
-        "stake_units": t.stake_units, "confidence": t.confidence, "reasoning": t.reasoning,
+        "stake_units": t.stake_units, "confidence": t.confidence, "reasoning": t.reasoning, "ai_probability": t.ai_probability,
         "published": t.published, "status": t.status, "profit_units": t.profit_units,
         "created_at": iso(t.created_at), "settled_at": iso(t.settled_at),
         "locked": t.fixture.kickoff <= datetime.utcnow(),
