@@ -175,6 +175,7 @@ starts a new run at the base stake.
   last `X-Forwarded-For` entry (App Service's front end adds it; the API isn't behind Cloudflare's proxy).
 * **Pages:** `/login`, `/signup`, `/forgot`, `/reset`, `/account` (`pages/Auth.jsx`, `pages/Account.jsx`). The header's
   person link goes to Sign in, Account or Admin. Privacy page covers accounts.
+* **Support** is the business WhatsApp (`lib/support.js`, wa.me link): in the footer, on `/account` and on `/forgot`.
 * **Email:** `services/email.py` calls ACS's REST API (`/emails:send`, HMAC-signed) with httpx, no Azure SDK.
 
 ## Moving the backend (new plan, region or host)
