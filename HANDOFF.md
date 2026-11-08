@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-11-08 (**member accounts**: sign-up by email (page live, not linked until the paywall), password reset by email through Azure Communication Services, admins vs members; see "Member accounts". Paywall decision: Stripe directly, not Buy Me a Coffee. 2026-11-01: **staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
+_Last updated: 2026-11-08 (**AI Lab** (`/ai-lab`, admins only): Ivo's staking plan run on the AI's own short-priced legs (prompt v4), and an arbitrage scanner over our prices; see "AI Lab". Also: **member accounts**: sign-up by email (page live, not linked until the paywall), password reset by email through Azure Communication Services, admins vs members; see "Member accounts". Paywall decision: Stripe directly, not Buy Me a Coffee. 2026-11-01: **staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
 
 ## Live resources
 
@@ -181,6 +181,38 @@ starts a new run at the base stake.
   person link goes to Sign in, Account or Admin. Privacy page covers accounts.
 * **Support** is the business WhatsApp (`lib/support.js`, wa.me link): in the footer, on `/account` and on `/forgot`.
 * **Email:** `services/email.py` calls ACS's REST API (`/emails:send`, HMAC-signed) with httpx, no Azure SDK.
+
+## AI Lab (built 2026-11-08, admins only)
+
+Nav "AI Lab" (admins only), `/ai-lab`, `pages/AiLab.jsx`; API `routers/ai_lab.py` (`/admin/ai-lab/...`, `admin_user`).
+Two tabs. Both run in the AI thread's tick (`scheduler.ai_tick`) as plain code: no model or API-Football calls.
+
+**AI staking: does Ivo's method work on the AI's picks?**
+* **Prompt v4** (`ai/prompts/v4.md`) adds a private `bundle_legs` list to `record_analysis`: up to 2 per match,
+  **1.15–1.60, AI ≥ 70% likely, at least fair** (enforced in `service._record` too: `LEG_MIN_ODDS` etc.). Stored as
+  `tips` with `source='ai_leg'`, `published=false`, `ai_probability` set. The public match view strips `bundle_legs`
+  (`public.ai_dict`), and AI tips lists only take `source='ai'`. A re-analysis replaces pending legs, except legs
+  already in a bundle. Suggested bets (1.50–3.00) are unchanged.
+* **Bundler** (`services/ai_staking.py`): whenever the AI plan has no live bundle, take open legs kicking off 30 min
+  to 48 h out, priced now (`stats.current_price`) still ≥ 1.15 and ≥ the AI's fair price; likeliest first, one per
+  match, until the combined odds are within 0.9–1.15× the target (a leg that would overshoot is skipped), max 8.
+  Stake = the plan's exact recovery stake. Settles with every other bundle (`settle_bundles`).
+* **AI plan** = `staking_plans` row with `source='ai'` (Ivo's is `source='ivo'`), its own base stake / target / bank,
+  editable on the tab. Virtual money only.
+* **What to read:** the "legs on their own" panel: leg hit rate vs the rate their prices implied (1/odds, margin
+  included) and vs the AI's own estimate. The plan can only profit if legs beat their prices; under ~100 settled legs
+  it's mostly noise.
+* **Not built yet:** an LLM check that can veto weak legs before a bundle is placed (Sam's choice: code first, then
+  an LLM check). Worth adding once there are enough settled legs to see whether the code's choices are poor.
+
+**Arbitrage** (`services/arbitrage.py`, table `arb_sightings`):
+* Each scan reads the market books of upcoming matches pulled since the last scan (`settings.arb_scanned_at`). For
+  each market group that some bookmaker prices in full at a normal margin (the fair-price test: excludes double
+  chance, scorer lists), half lines only (whole/quarter lines push), sum 1/best price over the outcomes; under 1 = an
+  arb, profit 1/sum − 1, stake shares (1/price)/sum. **Suspect** if over 10% or all at one bookmaker (bad price).
+* A sighting stays open until a later pull no longer shows it (`gone_at`) or kick-off. The tab shows open ones with
+  a stake calculator and the last 7 days (how many looked genuine, median minutes visible, average best profit).
+* Prices are API-Football's copies, refreshed hourly (5–15 min near kick-off), so check at the bookmaker first.
 
 ## Moving the backend (new plan, region or host)
 
@@ -407,7 +439,7 @@ there is no memory framework to maintain. **Fresh analysis with latest data** st
 rebuilt bundle; old ones stay readable.
 
 * Code: `backend/app/ai/` (`client.py` is the only place the client is built, `bundle.py`, `service.py`,
-  `prompts/v3.md`), endpoints in `routers/ai.py`, UI in `AiPanel.jsx` and Admin → AI. AI runs are SyncRuns with
+  `prompts/v4.md`; v4 = v3 plus the AI Lab's bundle legs, since 2026-11-08), endpoints in `routers/ai.py`, UI in `AiPanel.jsx` and Admin → AI. AI runs are SyncRuns with
   provider `claude` (historical name).
 * Tables: `ai_threads` (bundle as sent, its hash, model, prompt version), `ai_messages` (every API message as sent and
   received, with tokens and cost), `ai_predictions` (each recorded analysis plus the market's margin-free
