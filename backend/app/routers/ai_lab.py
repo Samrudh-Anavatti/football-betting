@@ -21,7 +21,8 @@ def _state(db: Session) -> dict:
     return {
         **plan_state(db, ai_staking.SOURCE),
         "legs": ai_staking.leg_record(db),
-        "open_legs": [{**tip_dict(t), "current_odds": price} for t, price in ai_staking.open_legs(db, now)],
+        "open_legs": [{**tip_dict(t), "current_odds": max(prices.values(), default=None), "prices": prices}
+                      for t, prices in ai_staking.open_legs(db, now)],
         "waiting_legs": {"count": waiting, "usable_from": iso(usable_at)},
     }
 

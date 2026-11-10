@@ -266,12 +266,16 @@ def snapshots_from_book(bookmakers: list[dict], fx: Fixture, pulled_at: datetime
     return rows
 
 
-def best_price(bookmakers: list[dict], market_id: int, value: str) -> float | None:
-    prices = [
-        p for bk in bookmakers for bet in bk.get("bets", []) if bet["id"] == market_id
+def book_prices(bookmakers: list[dict], market_id: int, value: str) -> dict[str, float]:
+    """Each bookmaker's price for one selection, by bookmaker name."""
+    return {
+        bk["name"]: p for bk in bookmakers for bet in bk.get("bets", []) if bet["id"] == market_id
         for v in bet.get("values", []) if str(v.get("value")).strip() == value and (p := _price(v.get("odd")))
-    ]
-    return max(prices) if prices else None
+    }
+
+
+def best_price(bookmakers: list[dict], market_id: int, value: str) -> float | None:
+    return max(book_prices(bookmakers, market_id, value).values(), default=None)
 
 
 def market_probs(markets: list[dict]) -> dict:

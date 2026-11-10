@@ -87,7 +87,7 @@ def survivable_losses(plan: StakingPlan) -> int:
 
 def bundle_dict(b: Bundle) -> dict:
     return {
-        "id": b.id, "run": b.run, "step": b.step, "odds": b.odds, "stake": b.stake, "status": b.status,
+        "id": b.id, "run": b.run, "step": b.step, "odds": b.odds, "bookmaker": b.bookmaker, "stake": b.stake, "status": b.status,
         "profit": b.profit, "returns": round(b.stake * b.odds, 2), "created_at": iso(b.created_at),
         "settled_at": iso(b.settled_at),
         "legs": [{"tip_id": leg.tip_id, "odds": leg.odds, "tip": tip_dict(leg.tip)} for leg in b.legs],

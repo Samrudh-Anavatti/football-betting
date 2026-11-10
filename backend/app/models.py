@@ -320,6 +320,7 @@ class Bundle(Base):
     run: Mapped[int] = mapped_column(Integer)
     step: Mapped[int] = mapped_column(Integer)
     odds: Mapped[float] = mapped_column(Float)  # combined, when placed
+    bookmaker: Mapped[str | None] = mapped_column(String(40))  # where it's priced (AI plan); a multi is placed at one
     stake: Mapped[float] = mapped_column(Float)
     status: Mapped[str] = mapped_column(String(8), default="pending")  # pending|won|lost|void
     profit: Mapped[float | None] = mapped_column(Float)

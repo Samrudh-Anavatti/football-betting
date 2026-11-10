@@ -33,6 +33,20 @@ def test_pick_legs():
     assert ai_staking.pick_legs(legs[:2], 5.0) is None  # not enough yet
 
 
+def test_pick_bundle_one_bookmaker():
+    # The best price for each leg across books would reach 5.40-6.90 (1.6 x 1.6 x 1.6 x 1.4 = 5.73), but no single
+    # bookmaker does: Bet365 3.84 (it doesn't price the fourth), Pinnacle 5.04.
+    a, b, c, d = leg(1, 0.9), leg(2, 0.85), leg(3, 0.8), leg(4, 0.78)
+    legs = [(a, {"Bet365": 1.6, "Pinnacle": 1.5}), (b, {"Bet365": 1.5, "Pinnacle": 1.6}),
+            (c, {"Bet365": 1.6, "Pinnacle": 1.5}), (d, {"Pinnacle": 1.4})]
+    assert ai_staking.pick_bundle(legs, 6.0) is None
+    # With a fifth leg both can: Bet365 in four legs (6.14), Pinnacle in five (6.55). Fewer legs are likelier to land.
+    legs.append((leg(5, 0.75), {"Bet365": 1.6, "Pinnacle": 1.3}))
+    bookmaker, chosen = ai_staking.pick_bundle(legs, 6.0)
+    assert bookmaker == "Bet365" and [t.fixture_id for t, _ in chosen] == [1, 2, 3, 5]
+    assert [p for _, p in chosen] == [1.6, 1.5, 1.6, 1.6]
+
+
 @pytest.fixture()
 def lab_fixtures():
     """Six matches of our own; removed afterwards so the scheduler tests don't see them."""
@@ -50,7 +64,7 @@ def lab_fixtures():
 def test_ai_staking_plan(client, auth, fake, monkeypatch, lab_fixtures):
     fake.af_fixtures = [af_fixture(2000 + i, (100 + i, f"Home {i}"), (200 + i, f"Away {i}"), KICKOFF) for i in range(6)]
     client.post(f"{API}/admin/sync/fixtures", json={"league_ids": [39], "include_standings": False}, headers=auth)
-    monkeypatch.setattr(ai_staking, "current_price", lambda db, t: t.odds)
+    monkeypatch.setattr(ai_staking, "current_prices", lambda db, t: {"Bet365": t.odds, "William Hill": t.odds - 0.05})
     with SessionLocal() as db:
         auto = 1  # any user
         ids = []
@@ -73,7 +87,7 @@ def test_ai_staking_plan(client, auth, fake, monkeypatch, lab_fixtures):
         b = ai_staking.build_bundle(db, now)
         # 1.25 x 1.30 x 1.35 x 1.40 x 1.45 = 4.45, then 1.50 makes 6.68 (likeliest first).
         assert [leg.tip_id for leg in b.legs] == [ids[5], ids[3], ids[2], ids[1], ids[0], ids[4]]
-        assert b.odds == 6.68 and b.stake == round(30 / 5.68, 2) and (b.run, b.step) == (1, 1)
+        assert b.bookmaker == "Bet365" and b.odds == 6.68 and b.stake == round(30 / 5.68, 2) and (b.run, b.step) == (1, 1)
         assert ai_staking.build_bundle(db, now) is None  # one live bundle at a time
         bundle_id = b.id
 

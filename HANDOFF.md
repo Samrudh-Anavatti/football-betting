@@ -196,7 +196,17 @@ Two tabs. Both run in the AI thread's tick (`scheduler.ai_tick`) as plain code: 
 * **Bundler** (`services/ai_staking.py`): whenever the AI plan has no live bundle, take open legs kicking off 30 min
   to 48 h out, priced now (`stats.current_price`) still ≥ 1.15 and ≥ the AI's fair price; likeliest first, one per
   match, until the combined odds are within 0.9–1.15× the target (a leg that would overshoot is skipped), max 8.
+  **Priced at one bookmaker** (since 2026-11-10; a multi can't mix bookmakers): it builds the bundle at each
+  bookmaker with that bookmaker's prices and keeps the one most likely to land (product of the AI's probabilities),
+  then the higher odds; `bundles.bookmaker` records it and the slip shows it. Ivo's bundles keep his own prices.
   Stake = the plan's exact recovery stake. Settles with every other bundle (`settle_bundles`).
+* **Next (agreed 2026-11-10): Claude Opus 5.5 builds the bundle** ("slate" job, about twice a day, over every
+  candidate leg in the next 48 h), on Sam's Anthropic API credit ($100/month, available about 2026-11-17).
+  Luna keeps the per-match reports and becomes the backup if Claude fails or its budget runs out; admin spend split
+  by provider. If the slate costs well under $100, the reports move to a cheap Claude model later.
+* **Staking maths (checked 2026-11-10):** at £6 base and 6.00, a £150 bank covers 9 losing bundles (£124.79), and
+  at fair prices a bundle wins 1 in 6, so a run wins 80.6% of the time and the average is £0. Profit needs legs that
+  land more often than their prices say: legs at 1.50 landing 75% (vs ~65% implied) make 95% of runs win.
 * **AI plan** = `staking_plans` row with `source='ai'` (Ivo's is `source='ivo'`), its own base stake / target / bank,
   editable on the tab. Virtual money only.
 * **What to read:** the "legs on their own" panel: leg hit rate vs the rate their prices implied (1/odds, margin

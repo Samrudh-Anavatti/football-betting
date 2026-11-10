@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Bet, Fixture, MarketBook, OddsSnapshot, Tip, User
-from .markets import best_price
+from .markets import book_prices
 
 
 def closing_price(db: Session, tip: Tip) -> float | None:
@@ -21,29 +21,40 @@ def current_price(db: Session, tip: Tip) -> float | None:
     return _latest_price(db, tip)
 
 
+def current_prices(db: Session, tip: Tip) -> dict[str, float]:
+    """Each bookmaker's price in the latest pull before kick-off, by bookmaker name."""
+    return _latest_prices(db, tip)
+
+
 def _latest_price(db: Session, tip: Tip, after: datetime | None = None) -> float | None:
     """Best price in the last pull before kick-off; None if there's none, or none since `after`."""
+    return max(_latest_prices(db, tip, after).values(), default=None)
+
+
+def _latest_prices(db: Session, tip: Tip, after: datetime | None = None) -> dict[str, float]:
     fx: Fixture = tip.fixture
     if tip.market_id is not None:  # any board market: the book stops updating at kick-off
         book = db.get(MarketBook, fx.id)
         if book is None or (after and book.pulled_at <= after) or book.pulled_at > fx.kickoff:
-            return None
-        return best_price(json.loads(book.bookmakers_json), tip.market_id, tip.selection)
+            return {}
+        return book_prices(json.loads(book.bookmakers_json), tip.market_id, tip.selection)
     last_pull = db.scalar(
         select(OddsSnapshot.pulled_at)
         .where(OddsSnapshot.fixture_id == fx.id, OddsSnapshot.pulled_at <= fx.kickoff)
         .order_by(OddsSnapshot.pulled_at.desc()).limit(1)
     )
     if last_pull is None or (after and last_pull <= after):
-        return None  # no pull since, so nothing to compare
-    q = select(OddsSnapshot.price).where(
+        return {}  # no pull since, so nothing to compare
+    q = select(OddsSnapshot.bookmaker, OddsSnapshot.price).where(
         OddsSnapshot.fixture_id == fx.id, OddsSnapshot.pulled_at == last_pull,
         OddsSnapshot.market == tip.market, OddsSnapshot.selection == tip.selection,
     )
     if tip.line is not None:
         q = q.where(OddsSnapshot.line == tip.line)
-    prices = list(db.scalars(q))
-    return max(prices) if prices else None
+    prices: dict[str, float] = {}
+    for bookmaker, price in db.execute(q):
+        prices[bookmaker] = max(price, prices.get(bookmaker, 0))
+    return prices
 
 
 def record_closing_prices(db: Session, tips) -> int:

@@ -1,8 +1,8 @@
 """The AI staking test (AI Lab): Ivo's staking plan run on the AI's bundle legs instead of his picks.
 
 The AI records up to two short-priced, very likely legs per match (`ai_leg` tips, prompt v4). Whenever the AI plan
-has no live bundle, `build_bundle` combines open legs into one at about the plan's target odds, with the plan's exact
-recovery stake, and the usual settlement settles it. Plain code, no model call: the judgement per match is the AI's.
+has no live bundle, `build_bundle` combines open legs into one at about the plan's target odds, priced at a single
+bookmaker (a multi can't mix them), with the plan's exact recovery stake, and the usual settlement settles it. Plain code, no model call: the judgement per match is the AI's.
 """
 import math
 from datetime import datetime, timedelta
@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from ..ai.service import LEG_MIN_ODDS
 from ..models import Bundle, BundleLeg, Fixture, Tip
 from .staking import get_plan, plan_bundles, run_state, stake_for
-from .stats import current_price
+from .stats import current_prices
 
 SOURCE = "ai"
 WINDOW = timedelta(hours=48)  # legs kicking off within this
@@ -22,12 +22,12 @@ TOLERANCE = (0.9, 1.15)  # a bundle's odds may land this far either side of the 
 MAX_LEGS = 8
 
 
-def open_legs(db: Session, now: datetime) -> list[tuple[Tip, float | None]]:
-    """Legs that could go in a bundle now, with the price each could be backed at, likeliest first."""
+def open_legs(db: Session, now: datetime) -> list[tuple[Tip, dict[str, float]]]:
+    """Legs that could go in a bundle now, with each bookmaker's price for them, likeliest first."""
     q = (select(Tip).join(Fixture)
          .where(Tip.source == "ai_leg", Tip.status == "pending", Fixture.kickoff > now + LEAD,
                 Fixture.kickoff <= now + WINDOW, Tip.id.not_in(select(BundleLeg.tip_id))))
-    legs = [(t, current_price(db, t)) for t in db.scalars(q)]
+    legs = [(t, current_prices(db, t)) for t in db.scalars(q)]
     return sorted(legs, key=lambda x: (-(x[0].ai_probability or 0), x[0].fixture.kickoff))
 
 
@@ -50,6 +50,20 @@ def pick_legs(legs: list[tuple[Tip, float | None]], target: float) -> list[tuple
     return chosen if chosen and odds >= lo else None
 
 
+def pick_bundle(legs: list[tuple[Tip, dict[str, float]]], target: float) -> tuple[str, list[tuple[Tip, float]]] | None:
+    """A multi is placed at one bookmaker, so build the bundle at each in turn with its own prices, and keep the one
+    most likely to land (by the AI's probabilities), then the higher odds. None if no bookmaker reaches the target."""
+    best, best_key = None, None
+    for bookmaker in sorted({b for _, prices in legs for b in prices}):
+        chosen = pick_legs([(t, prices.get(bookmaker)) for t, prices in legs], target)
+        if chosen is None:
+            continue
+        key = (math.prod(t.ai_probability or 0 for t, _ in chosen), math.prod(p for _, p in chosen))
+        if best_key is None or key > best_key:
+            best, best_key = (bookmaker, chosen), key
+    return best
+
+
 def build_bundle(db: Session, now: datetime | None = None) -> Bundle | None:
     """Make the AI plan's next bundle if it has none live and the open legs reach the target. Commits."""
     now = now or datetime.utcnow()
@@ -57,12 +71,13 @@ def build_bundle(db: Session, now: datetime | None = None) -> Bundle | None:
     rows = plan_bundles(db, plan)
     if any(b.status == "pending" for b in rows):
         return None  # the next stake depends on how the live one ends
-    picked = pick_legs(open_legs(db, now), plan.target_odds)
-    if picked is None:
+    found = pick_bundle(open_legs(db, now), plan.target_odds)
+    if found is None:
         return None
+    bookmaker, picked = found
     odds = round(math.prod(p for _, p in picked), 2)
     run = run_state(rows)
-    bundle = Bundle(plan_id=plan.id, run=run["number"], step=run["step"], odds=odds,
+    bundle = Bundle(plan_id=plan.id, run=run["number"], step=run["step"], odds=odds, bookmaker=bookmaker,
                     stake=stake_for(plan, run["losses"], odds),
                     legs=[BundleLeg(tip_id=t.id, odds=p) for t, p in picked])
     db.add(bundle)
