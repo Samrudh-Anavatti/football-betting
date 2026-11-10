@@ -37,6 +37,7 @@ export function BundleSlip({ bundle, scale = 1, losses }) {
             Run {bundle.run}, bet {bundle.step}
           </span>
           {losses > 0 && <span>recovering {money(losses * scale)}</span>}
+          {bundle.bookmaker && <span>at {bundle.bookmaker}</span>}
           <span className="ml-auto">Placed {shortDate(bundle.created_at)}</span>
         </header>
         <ol className="divide-y divide-dashed divide-ink/15 border-y border-dashed border-ink/15">
