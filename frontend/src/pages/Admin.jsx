@@ -3,6 +3,7 @@ import AccountsTab from '../components/admin/AccountsTab.jsx'
 import AiTab from '../components/admin/AiTab.jsx'
 import BundlesTab from '../components/admin/BundlesTab.jsx'
 import DataTab from '../components/admin/DataTab.jsx'
+import MembersTab from '../components/admin/MembersTab.jsx'
 import PicksTab from '../components/admin/PicksTab.jsx'
 import { Loading } from '../components/ui.jsx'
 import { useAuth } from '../lib/auth.jsx'
@@ -13,6 +14,7 @@ const TABS = [
   { key: 'bundles', label: 'Bundles', el: BundlesTab },
   { key: 'ai', label: 'AI', el: AiTab },
   { key: 'accounts', label: 'Accounts', el: AccountsTab },
+  { key: 'members', label: 'Members', el: MembersTab },
 ]
 
 export default function Admin() {

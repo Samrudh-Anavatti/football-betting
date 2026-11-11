@@ -1,6 +1,7 @@
 import { Link, NavLink } from 'react-router-dom'
 import { openCookieSettings } from '../lib/analytics.js'
 import { useAuth } from '../lib/auth.jsx'
+import { useMembershipInfo } from '../lib/membership.js'
 import { WHATSAPP_URL } from '../lib/support.js'
 
 const NAV = [
@@ -13,6 +14,7 @@ const NAV = [
 
 export default function Shell({ children }) {
   const { user } = useAuth()
+  const membership = useMembershipInfo()
   const me = !user ? { to: '/login', label: 'Sign in' } : user.is_admin ? { to: '/admin', label: 'Admin' } : { to: '/account', label: 'Account' }
   // The current page gets an amber bar along the bottom of the header.
   const link = ({ isActive }) =>
@@ -58,9 +60,15 @@ export default function Shell({ children }) {
             Bet with money you can afford to lose. Free support at BeGambleAware.org.
           </span>
           <span className="sm:ml-auto">Fixtures, research and prices by API-Football</span>
-          <span className="flex gap-4">
+          <span className="flex flex-wrap gap-x-4 gap-y-2">
             <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer" className="hover:text-white underline underline-offset-4">Help on WhatsApp</a>
             <Link to="/friends" className="hover:text-white underline underline-offset-4">Football Friends</Link>
+            {membership?.open && (
+              <>
+                <Link to="/membership" className="hover:text-white underline underline-offset-4">Membership</Link>
+                <Link to="/terms" className="hover:text-white underline underline-offset-4">Terms</Link>
+              </>
+            )}
             <Link to="/privacy" className="hover:text-white underline underline-offset-4">Privacy</Link>
             <button type="button" className="hover:text-white underline underline-offset-4" onClick={openCookieSettings}>
               Cookie settings

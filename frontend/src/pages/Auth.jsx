@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
+import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ErrorNote, Loading } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
@@ -59,6 +59,7 @@ const linkCls = 'underline underline-offset-4 hover:text-ink'
 export function Login() {
   const { user, checking, login } = useAuth()
   const done = useDone()
+  const { search } = useLocation()
   const [name, setName] = useState('')
   const [password, setPassword] = useState('')
   if (checking) return <Loading />
@@ -70,9 +71,14 @@ export function Login() {
       busyLabel="Signing in…"
       onSubmit={async () => done(await login(name, password))}
       footer={
-        <p>
-          <Link to="/forgot" className={linkCls}>Forgot your password?</Link>
-        </p>
+        <>
+          <p>
+            <Link to="/forgot" className={linkCls}>Forgot your password?</Link>
+          </p>
+          <p>
+            New here? <Link to={`/signup${search}`} className={linkCls}>Create an account</Link>
+          </p>
+        </>
       }
     >
       <Field label="Email" autoComplete="username" value={name} onChange={(e) => setName(e.target.value)} />
@@ -84,6 +90,7 @@ export function Login() {
 export function Signup() {
   const { user, checking, signIn } = useAuth()
   const done = useDone()
+  const { search } = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [adult, setAdult] = useState(false)
@@ -97,7 +104,7 @@ export function Signup() {
       onSubmit={async () => done(signIn(await api.signup({ email, password, adult })))}
       footer={
         <p>
-          Already have one? <Link to="/login" className={linkCls}>Sign in</Link>
+          Already have one? <Link to={`/login${search}`} className={linkCls}>Sign in</Link>
         </p>
       }
     >

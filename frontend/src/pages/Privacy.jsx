@@ -8,8 +8,8 @@ export default function Privacy() {
       <h1 className="text-3xl sm:text-4xl leading-tight text-ink">Privacy</h1>
       <p className="mt-3">
         Football Predictions AI publishes football picks and match data. You don't need an account to use it. If you
-        make one, we keep your email address and password; we don't ask for your name or payment details. This page
-        explains what we collect and why.
+        make one, we keep your email address and password. If you become a member, our payment provider handles your
+        card; we never see it. This page explains what we collect and why.
       </p>
 
       <H>Analytics</H>
@@ -42,6 +42,16 @@ export default function Privacy() {
         delete your account at any time from the account page, which removes your email address straight away. To stop
         password guessing, our server briefly remembers the IP address of sign-in and reset attempts, in memory only,
         for up to an hour.
+      </p>
+
+      <H>Membership payments</H>
+      <p>
+        Payments are taken by <strong>Stripe</strong>, which collects your card details and billing address on its own
+        secure page; we never see or store your card number. Stripe tells us your billing address country, the country
+        your card was issued in, and when and how much you paid. We keep these with your account, and keep payment
+        records for six years after a payment because tax law requires it (VAT on online services depends on where you
+        live); if you delete your account, those records stay without your email address. Stripe keeps its own records
+        as described in its privacy policy at stripe.com/privacy.
       </p>
 
       <H>Contact</H>

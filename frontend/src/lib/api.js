@@ -20,7 +20,7 @@ export function setToken(t) {
   }
 }
 
-async function request(path, { method = 'GET', body } = {}) {
+async function request(path, { method = 'GET', body, raw = false } = {}) {
   const headers = {}
   if (body) headers['Content-Type'] = 'application/json'
   const token = getToken()
@@ -41,7 +41,7 @@ async function request(path, { method = 'GET', body } = {}) {
     throw err
   }
   if (res.status === 204) return null
-  return res.json()
+  return raw ? res : res.json()
 }
 
 function qs(params) {
@@ -71,6 +71,13 @@ export const api = {
   resetPassword: (token, password) => request('/auth/reset', { method: 'POST', body: { token, password } }),
   changePassword: (body) => request('/auth/password', { method: 'PUT', body }),
   deleteAccount: (password) => request('/auth/delete-account', { method: 'POST', body: { password } }),
+
+  // membership
+  membership: () => request('/membership'),
+  joinMembership: (body) => request('/membership/checkout', { method: 'POST', body }),
+  membershipPortal: () => request('/membership/portal', { method: 'POST' }),
+  members: () => request('/admin/members'),
+  paymentsCsv: () => request('/admin/members/payments.csv', { raw: true }).then((r) => r.blob()),
 
   // integrations
   integrations: () => request('/admin/integrations'),

@@ -25,12 +25,19 @@ export function AuthProvider({ children }) {
 
   const login = useCallback(async (username, password) => signIn(await api.login(username, password)), [signIn])
 
+  // After joining: the webhook, not the browser, makes someone a member, so re-read the account.
+  const refresh = useCallback(async () => {
+    const u = await api.me()
+    setUser(u)
+    return u
+  }, [])
+
   const logout = useCallback(() => {
     setToken(null)
     setUser(null)
   }, [])
 
-  return <AuthContext.Provider value={{ user, checking, login, signIn, logout }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ user, checking, login, signIn, logout, refresh }}>{children}</AuthContext.Provider>
 }
 
 export const useAuth = () => useContext(AuthContext)

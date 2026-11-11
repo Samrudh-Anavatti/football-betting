@@ -33,6 +33,15 @@ export const PAGES = {
     description:
       "Our picks combined into bets at around 6.00, with stakes that win back every loss. Every bundle and result on the record.",
   },
+  '/membership': {
+    title: `Membership: our staking plan | ${SITE}`,
+    description:
+      'Join to follow our staking plan: our picks bundled at about 6.00 with stakes that win back every loss. Monthly, cancel any time.',
+  },
+  '/terms': {
+    title: `Terms | ${SITE}`,
+    description: 'The terms for using Football Predictions AI and paying for membership.',
+  },
   '/friends': {
     title: `Football Friends | ${SITE}`,
     description: 'Football sites run by people we know and rate.',

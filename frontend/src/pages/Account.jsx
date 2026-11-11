@@ -1,8 +1,9 @@
-import { useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { ErrorNote, Loading } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
+import { fullDate } from '../lib/membership.js'
 import { WHATSAPP_URL } from '../lib/support.js'
 import { Field } from './Auth.jsx'
 
@@ -48,6 +49,72 @@ function ChangePassword() {
   )
 }
 
+// Back from Stripe Checkout (?joined=1): the payment lands through Stripe's webhook a moment later, so re-read the
+// account every couple of seconds until it shows, for up to half a minute.
+function useJoined() {
+  const { user, refresh } = useAuth()
+  const [params, setParams] = useSearchParams()
+  const joined = params.get('joined') === '1'
+  const [waiting, setWaiting] = useState(joined && !user?.membership.member)
+  useEffect(() => {
+    if (!joined) return
+    let tries = 0
+    const timer = setInterval(async () => {
+      tries += 1
+      const u = await refresh().catch(() => null)
+      if (u?.membership.member || tries >= 15) {
+        clearInterval(timer)
+        setWaiting(false)
+        setParams({}, { replace: true })
+      }
+    }, 2000)
+    return () => clearInterval(timer)
+  }, [joined]) // eslint-disable-line react-hooks/exhaustive-deps
+  return waiting
+}
+
+function MembershipCard() {
+  const { user } = useAuth()
+  const waiting = useJoined()
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState(null)
+  const m = user.membership
+  const manage = async () => {
+    setBusy(true)
+    setError(null)
+    try {
+      window.location.assign((await api.membershipPortal()).url)
+    } catch (err) {
+      setError(err)
+      setBusy(false)
+    }
+  }
+  let line
+  if (waiting) line = 'Payment received. Setting up your membership…'
+  else if (m.member && m.status === 'past_due')
+    line = `Your last payment didn't go through. Update your card by ${fullDate(m.access_until)} to keep access.`
+  else if (m.member && (m.cancelling || m.status === 'canceled'))
+    line = `Cancelled: you keep access until ${fullDate(m.paid_until)}, and won't be charged again.`
+  else if (m.member) line = `Member since ${fullDate(m.member_since)}. Renews on ${fullDate(m.paid_until)}.`
+  else if (m.status === 'canceled' || m.paid_until) line = 'Your membership has ended.'
+  return (
+    <section className="panel p-6 space-y-4">
+      <h2 className="text-2xl">Membership</h2>
+      {line ? <p>{line}</p> : <p className="text-ink-soft">You're not a member.</p>}
+      <div className="flex flex-wrap gap-3">
+        {m.member && !waiting && <Link to="/staking" className="btn-primary">Staking plan</Link>}
+        {!m.member && !waiting && <Link to="/membership" className="btn-primary">{line ? 'Join again' : 'See membership'}</Link>}
+        {m.can_manage && (
+          <button type="button" className="btn-ghost" onClick={manage} disabled={busy}>
+            {busy ? 'Opening…' : 'Manage or cancel, card, invoices'}
+          </button>
+        )}
+      </div>
+      <ErrorNote error={error} />
+    </section>
+  )
+}
+
 function DeleteAccount() {
   const { logout } = useAuth()
   const [open, setOpen] = useState(false)
@@ -65,7 +132,10 @@ function DeleteAccount() {
   return (
     <form onSubmit={submit} className="panel p-6 space-y-4 border-red/40">
       <h2 className="text-2xl">Delete account</h2>
-      <p className="text-sm">This removes your account and email address straight away. It can't be undone.</p>
+      <p className="text-sm">
+        This removes your account and email address straight away. It can't be undone. If you're a member, it also
+        cancels your membership at once, with no refund for the rest of the month.
+      </p>
       <Field label="Password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
       <ErrorNote error={error} />
       <div className="flex gap-3">
@@ -90,6 +160,7 @@ export default function Account() {
         </div>
         <button type="button" className="sm:ml-auto btn-ghost" onClick={logout}>Sign out</button>
       </div>
+      <MembershipCard />
       <ChangePassword />
       <p className="text-sm text-ink-soft">
         Forgotten your password? Sign out and use <Link to="/forgot" className="underline underline-offset-4">reset password</Link>.

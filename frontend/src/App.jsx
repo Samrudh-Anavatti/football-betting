@@ -5,6 +5,8 @@ import Fixtures from './pages/Fixtures.jsx'
 import Match from './pages/Match.jsx'
 import History from './pages/History.jsx'
 import Privacy from './pages/Privacy.jsx'
+import Membership from './pages/Membership.jsx'
+import Terms from './pages/Terms.jsx'
 import Friends from './pages/Friends.jsx'
 import Staking from './pages/Staking.jsx'
 import ConsentBanner from './components/ConsentBanner.jsx'
@@ -32,6 +34,8 @@ export default function App() {
         <Route path="/history" element={<History />} />
         <Route path="/staking" element={<Staking />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/membership" element={<Membership />} />
+        <Route path="/terms" element={<Terms />} />
         <Route path="/friends" element={<Friends />} />
         <Route path="/match/:slug" element={<Match />} />
         <Route path="/admin" element={<Admin />} />

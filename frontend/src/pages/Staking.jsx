@@ -4,7 +4,9 @@ import { ErrorNote, LeagueBadge, Loading, Price, SectionHead } from '../componen
 import { useApi } from '../hooks/useApi.js'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
+import { formatPrice } from '../lib/business.js'
 import { dayLabel, kickoffTime, money, odds, pct, pickLabel, shortDate } from '../lib/format.js'
+import { useMembershipInfo } from '../lib/membership.js'
 import { matchPath } from '../lib/seo.js'
 import { bundleWinChance, ladder, streakChance } from '../lib/staking.js'
 import { SAMPLE_PLAN } from '../lib/stakingSample.js'
@@ -269,6 +271,7 @@ function Members() {
 
 // Non-members see the page's shape under a blur, filled with made-up data (lib/stakingSample.js).
 function Preview() {
+  const info = useMembershipInfo()
   return (
     <div className="relative">
       <div aria-hidden inert="" data-nosnippet="" className="pointer-events-none select-none blur-[6px] opacity-60">
@@ -282,12 +285,19 @@ function Preview() {
               <path d="M8 11V8a4 4 0 0 1 8 0v3" />
             </svg>
           </span>
-          <p className="mt-3 text-sm font-semibold uppercase tracking-wider text-amber-dark">Members only, coming soon</p>
+          <p className="mt-3 text-sm font-semibold uppercase tracking-wider text-amber-dark">
+            {info?.open ? 'Members only' : 'Members only, coming soon'}
+          </p>
           <h2 className="mt-1 text-2xl">Our staking plan</h2>
           <p className="mt-2 text-ink-soft">
             Our picks combined into bets at around 6.00, with stakes that win back every loss. Follow each bundle live,
             scaled to your own stake, with every result on the record.
           </p>
+          {info?.open && (
+            <Link to="/membership" className="btn-primary mt-4">
+              Join for {formatPrice(info.price)} a month
+            </Link>
+          )}
         </div>
       </div>
     </div>
@@ -299,7 +309,7 @@ export default function Staking() {
   return (
     <section className="space-y-6">
       <SectionHead title="Staking plan" />
-      {checking ? <Loading rows={4} /> : user?.is_admin ? <Members /> : <Preview />}
+      {checking ? <Loading rows={4} /> : user?.is_admin || user?.membership?.member ? <Members /> : <Preview />}
     </section>
   )
 }
