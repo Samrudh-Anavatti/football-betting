@@ -3,7 +3,8 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-11-08 (**Nations League** added as a main league. **AI Lab** (`/ai-lab`, admins only): Ivo's staking plan run on the AI's own short-priced legs (prompt v4), and an arbitrage scanner over our prices; see "AI Lab". Also: **member accounts**: sign-up by email (page live, not linked until the paywall), password reset by email through Azure Communication Services, admins vs members; see "Member accounts". Paywall decision: Stripe directly, not Buy Me a Coffee. 2026-11-01: **staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
+_Last updated: 2026-11-11 (**Membership through Stripe built, switched off** until Ivo's business has a Stripe
+account: see "Membership", which has the setup checklist. Earlier, 2026-11-08: **Nations League** added as a main league. **AI Lab** (`/ai-lab`, admins only): Ivo's staking plan run on the AI's own short-priced legs (prompt v4), and an arbitrage scanner over our prices; see "AI Lab". Also: **member accounts**: sign-up by email (page live, not linked until the paywall), password reset by email through Azure Communication Services, admins vs members; see "Member accounts". Paywall decision: Stripe directly, not Buy Me a Coffee. 2026-11-01: **staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
 
 ## Live resources
 
@@ -64,6 +65,11 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 | `BACKUP_CONTAINER_URL` | — | No longer read (SQLite backups retired 2026-10-24); remove with the storage account on 2026-11-07. |
 | `SCHEDULE_RESERVE` | 2000 | Default for the card's "stop for the day when this many are left". The card's value (stored in the DB) wins once saved. |
 | `SCM_DO_BUILD_DURING_DEPLOYMENT` | true | Azure pip-installs requirements on deploy. |
+| `STRIPE_API_KEY` | — | A Stripe **restricted** key (`rk_…`), permissions in "Membership". Joining is off until this, the next two, are set. |
+| `STRIPE_WEBHOOK_SECRET` | — | The webhook endpoint's signing secret (`whsec_…`). |
+| `STRIPE_PRICE_ID` | — | The monthly membership Price (`price_…`). The site shows its amount from Stripe. |
+| `STRIPE_AUTOMATIC_TAX` | off | `on` makes Checkout add tax with Stripe Tax. Only after registrations are added in Stripe (see "Membership"). |
+| `GRACE_DAYS` | 3 | Days of access after the paid month ends (failed renewal or cancelled). |
 
 GitHub Actions (Settings → Secrets and variables → Actions):
 `AZURE_WEBAPP_NAME` (variable), `AZURE_WEBAPP_PUBLISH_PROFILE` (secret),
@@ -158,6 +164,55 @@ starts a new run at the base stake.
   active member". UK ad rules (CAP) don't
   allow "guaranteed" claims for gambling, so keep the copy factual.
 * Phones: the header now shows a person icon instead of "Sign in"/"Admin" so the five sections fit at 360 px.
+
+## Membership (built 2026-11-11, off until Stripe is set up)
+
+Members pay monthly through **Stripe** and get the staking plan (`GET /staking` takes `deps.member_user`: admins, or
+members in date). Price decided 2026-11-11: about £3.99/month, monthly only, sold worldwide. Code:
+`services/billing.py`, `routers/membership.py`, pages `Membership.jsx`, `Terms.jsx`, the account page's card, Admin →
+Members. While the three `STRIPE_*` settings are missing, `/membership` says "Opening soon", the footer doesn't link
+it or the terms, and join returns 503.
+
+* **Flow:** `/membership` → (sign up / in) → tick terms + "start now" (waives the UK/EU 14-day cancellation right once
+  access starts; `users.terms_accepted_at`) → Stripe Checkout (billing address required: it's the tax evidence) →
+  back to `/account?joined=1`, which re-reads the account until the webhook has landed. Members manage, cancel and
+  change card in the **Customer Portal** (account page button); we have no cancel UI of our own.
+* **Access:** `paid_until` = end of the last paid invoice's period (`invoice.paid`), plus `GRACE_DAYS` (3). A failed
+  renewal and a cancellation both run out the same way; a late payment extends it again. **Refund (full), dispute or
+  early fraud warning** end access at once and cancel the subscription. Only the webhook changes membership.
+* **Webhook:** `POST /api/v1/membership/webhook`, signature checked, each event handled once (`stripe_events`).
+  Events (`billing.EVENTS`): `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
+  `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed`, `customer.updated`,
+  `charge.refunded`, `charge.dispute.created`, `radar.early_fraud_warning.created`.
+* **Where payers are (tax):** every paid invoice is a `payments` row with amount, tax, currency, **billing country and
+  card country** (two pieces of evidence, as EU VAT rules want). Admin → Members shows the last 12 months by country
+  and downloads all payments as CSV for the accountant. Rows outlive a deleted account (user cleared): keep 6 years.
+* **Deleting an account** cancels a live subscription first (502 and nothing deleted if Stripe can't be reached).
+* **Business details** for the terms page: `frontend/src/lib/business.js` (name, company number, address, VAT,
+  contact email). Fill in before opening. `/terms` is a plain-English **draft** for Ivo (and ideally a solicitor) to
+  review.
+
+**Setting up Stripe (do it in a sandbox first, then again in live mode):**
+1. Ivo's business opens the Stripe account (its legal details, bank account, a representative's ID). Add Sam as a
+   team member (Developer or Administrator). Business type: information/digital subscription about sports betting;
+   describe it plainly (tips and a staking plan; no bets taken, no prizes). Statement descriptor e.g.
+   `FOOTBALLPREDICTIONS`.
+2. Product "Membership" with one Price: GBP, monthly, recurring, tax behaviour **inclusive** (the price shown is what
+   they pay). Copy the `price_…` id.
+3. Settings → Billing → Customer portal: allow cancelling (at the end of the period), updating the payment method and
+   invoice history; no plan switching. Links: football-predictions.org/terms and /privacy.
+4. Settings → Billing → Subscriptions and emails: Smart Retries on, email customers about failed payments and expiring
+   cards, send receipts.
+5. Developers → Webhooks: endpoint `https://api.football-predictions.org/api/v1/membership/webhook`, the events above.
+   Copy the signing secret.
+6. Developers → API keys → restricted key with **write** on Customers, Checkout Sessions, Customer portal, Subscriptions
+   and **read** on Prices, Payment methods, Charges. Nothing else.
+7. App Service: `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, restart. Test with Stripe's test cards:
+   join, renew (test clocks), fail a payment, cancel in the portal, refund. Then repeat 2–7 in live mode.
+8. **Tax** (with an accountant): which registrations are needed (UK VAT from £90k; EU VAT on digital services from the
+   first sale to an EU consumer, usually through the EU's non-Union OSS scheme; other countries vary). Then in Stripe
+   Tax: head office address, the registrations, a product tax code chosen from Stripe's list, and
+   `STRIPE_AUTOMATIC_TAX=on`. Until registrations exist, Stripe Tax silently charges no tax, so leave it off.
 
 ## Member accounts (built 2026-11-08)
 
@@ -302,7 +357,9 @@ the settings above.
   the `BACKUP_CONTAINER_URL` setting, the web app's managed-identity role on it, and `/home/data/football.db`.
 * [ ] Price-movement chart from odds history; closing-line value per pick. (The schedule now captures a closing
   book 5–10 min before every kick-off, so the data for this is there.)
-* [x] Staking plan (2026-11-01), see "Staking plan". **Next: the paywall** (member accounts + payments).
+* [x] Staking plan (2026-11-01), see "Staking plan".
+* [x] Paywall built (2026-11-11), see "Membership". **Next:** Ivo's business details + Stripe account, then the setup
+  checklist there; tax advice before selling outside the UK at volume.
 * [x] Refresh schedule (2026-10-12). **Check real usage on the Schedule card after a full weekend** against the
   estimates below, before adding leagues.
 
