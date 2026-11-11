@@ -4,6 +4,7 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Annotated
 
+import stripe
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import AfterValidator, BaseModel
 from sqlalchemy import select
@@ -15,7 +16,7 @@ from ..deps import current_user
 from ..models import User
 from ..ratelimit import check, client_ip, hit
 from ..security import hash_password, hash_reset_token, make_token, new_reset_token, verify_password
-from ..services import email
+from ..services import billing, email
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -26,7 +27,7 @@ LOGIN_LIMIT = (10, 15 * 60)  # failed attempts per IP
 
 def me_dict(u: User) -> dict:
     return {"id": u.id, "username": u.username, "display_name": u.display_name, "email": u.email,
-            "is_admin": u.is_admin}
+            "is_admin": u.is_admin, "membership": billing.membership_dict(u)}
 
 
 def _signed_in(u: User) -> dict:
@@ -135,7 +136,14 @@ def delete_account(body: DeleteIn, request: Request, db: Session = Depends(get_d
     if not verify_password(body.password, user.password_hash):
         hit("login", ip, *LOGIN_LIMIT)
         raise HTTPException(403, "Wrong password")
-    db.delete(db.get(User, user.id))
+    user = db.get(User, user.id)
+    if user.subscription_id and billing.has_subscription(user):  # or Stripe would carry on charging the card
+        try:
+            billing.cancel_now(user.subscription_id)
+        except stripe.StripeError:
+            raise HTTPException(502, "We couldn't cancel your membership just now, so nothing was deleted. Try again "
+                                     "in a few minutes.")
+    db.delete(user)
     db.commit()
 
 

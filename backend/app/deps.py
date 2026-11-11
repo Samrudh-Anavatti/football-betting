@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .models import User
 from .security import read_token
+from .services.billing import is_member
 
 
 def current_user(authorization: str | None = Header(default=None), db: Session = Depends(get_db)) -> User:
@@ -21,4 +22,11 @@ def current_user(authorization: str | None = Header(default=None), db: Session =
 def admin_user(user: User = Depends(current_user)) -> User:
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="Admins only")
+    return user
+
+
+def member_user(user: User = Depends(current_user)) -> User:
+    """Admins, and members whose paid month (plus the grace days) hasn't run out."""
+    if not is_member(user):
+        raise HTTPException(status_code=403, detail="Members only")
     return user

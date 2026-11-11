@@ -223,6 +223,19 @@ class User(Base):
     reset_token_hash: Mapped[str | None] = mapped_column(String(64))
     reset_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
     starting_bankroll: Mapped[float] = mapped_column(Float, default=1000.0)
+    # Membership (Stripe). Access runs to `paid_until` (the end of the last paid month) plus a few days' grace,
+    # so a failed renewal or a cancellation ends it the same way. Only the webhook changes these.
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(40), index=True)
+    subscription_id: Mapped[str | None] = mapped_column(String(40))
+    subscription_status: Mapped[str | None] = mapped_column(String(20))  # Stripe's: active, past_due, canceled...
+    cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False)
+    paid_until: Mapped[datetime | None] = mapped_column(DateTime)
+    member_since: Mapped[datetime | None] = mapped_column(DateTime)
+    # Where the member is, for tax: the billing address country and the card's issuing country (ISO 3166 alpha-2).
+    billing_country: Mapped[str | None] = mapped_column(String(2))
+    card_country: Mapped[str | None] = mapped_column(String(2))
+    # Agreed to the terms and to starting at once (waiving the 14-day cancellation right) before checkout.
+    terms_accepted_at: Mapped[datetime | None] = mapped_column(DateTime)
 
 
 class Tip(Base):
@@ -340,6 +353,36 @@ class BundleLeg(Base):
     odds: Mapped[float] = mapped_column(Float)  # the pick's odds when bundled
 
     tip: Mapped[Tip] = relationship(lazy="selectin")
+
+
+class Payment(Base):
+    """One paid membership invoice: the record of who paid what, where, for tax (VAT is owed where the customer is).
+    Kept when the account is deleted (user_id cleared): financial records must be kept for six years."""
+
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    invoice_id: Mapped[str] = mapped_column(String(40), unique=True)
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(40))
+    amount: Mapped[int] = mapped_column(Integer)  # minor units (pence), what was charged, tax included
+    tax: Mapped[int] = mapped_column(Integer, default=0)  # minor units, if Stripe Tax added any
+    currency: Mapped[str] = mapped_column(String(3))
+    billing_country: Mapped[str | None] = mapped_column(String(2))
+    card_country: Mapped[str | None] = mapped_column(String(2))
+    period_start: Mapped[datetime | None] = mapped_column(DateTime)
+    period_end: Mapped[datetime | None] = mapped_column(DateTime)
+    paid_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+
+
+class StripeEvent(Base):
+    """Webhook events already handled: Stripe can send one more than once."""
+
+    __tablename__ = "stripe_events"
+
+    id: Mapped[str] = mapped_column(String(80), primary_key=True)
+    type: Mapped[str] = mapped_column(String(60))
+    received_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
 class ArbSighting(Base):

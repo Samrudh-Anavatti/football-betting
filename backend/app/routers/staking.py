@@ -1,4 +1,4 @@
-"""The staking plan and Ivo's bundle builder. Admins only for now; members get to read it once there's a paywall."""
+"""The staking plan and Ivo's bundle builder. Members can read it; only admins change it."""
 import math
 from datetime import datetime
 
@@ -8,14 +8,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import admin_user
+from ..deps import admin_user, member_user
 from ..models import Bundle, BundleLeg, Tip
 from ..services.staking import bundle_dict, get_plan, plan_bundles, plan_state, run_state, stake_for
 
-router = APIRouter(prefix="/staking", tags=["staking"], dependencies=[Depends(admin_user)])
+router = APIRouter(prefix="/staking", tags=["staking"])
 
 
-@router.get("")
+@router.get("", dependencies=[Depends(member_user)])
 def state(db: Session = Depends(get_db)):
     return plan_state(db)
 
@@ -26,7 +26,7 @@ class PlanIn(BaseModel):
     bank: float = Field(gt=0)
 
 
-@router.put("/plan")
+@router.put("/plan", dependencies=[Depends(admin_user)])
 def update_plan(body: PlanIn, db: Session = Depends(get_db)):
     plan = get_plan(db)
     for k, v in body.model_dump().items():
@@ -40,7 +40,7 @@ class BundleIn(BaseModel):
     stake: float | None = Field(None, gt=0)  # what was actually staked; defaults to the exact stake for this step
 
 
-@router.post("/bundles", status_code=201)
+@router.post("/bundles", status_code=201, dependencies=[Depends(admin_user)])
 def create_bundle(body: BundleIn, db: Session = Depends(get_db)):
     plan = get_plan(db)
     rows = plan_bundles(db, plan)
@@ -70,7 +70,7 @@ def create_bundle(body: BundleIn, db: Session = Depends(get_db)):
     return bundle_dict(b)
 
 
-@router.delete("/bundles/{bundle_id}", status_code=204)
+@router.delete("/bundles/{bundle_id}", status_code=204, dependencies=[Depends(admin_user)])
 def delete_bundle(bundle_id: int, db: Session = Depends(get_db)):
     """Undo a bundle made by mistake. Settled bundles are the record and stay."""
     b = db.get(Bundle, bundle_id)
