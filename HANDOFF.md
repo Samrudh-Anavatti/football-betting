@@ -165,7 +165,19 @@ starts a new run at the base stake.
   allow "guaranteed" claims for gambling, so keep the copy factual.
 * Phones: the header now shows a person icon instead of "Sign in"/"Admin" so the five sections fit at 360 px.
 
-## Membership (built 2026-11-11, off until Stripe is set up)
+## Membership (built 2026-11-11, off; payment provider on hold)
+
+> **2026-11-12: Stripe on hold.** Ivo expects Stripe to close the account once someone reviews a betting-tips site.
+> Stripe's written list bans "sports forecasting or odds-making *with a monetary or material prize*" (prize
+> competitions), not paid tips, but a reviewer may read it widely and hold the balance. Sam is looking at other
+> providers. Shortlist so far: **Whop** (used widely by betting-picks sellers; says it is merchant of record and handles
+> UK/EU VAT, which matters as we sell worldwide; check its seller terms), PayPal (gambling-related needs its prior
+> approval), high-risk merchant accounts (fees and reserves, likely not worth it at this volume). Ruled out: Paddle
+> (bans betting-related products), Lemon Squeezy (Stripe-owned). Questions for any provider: tips/staking subscription
+> allowed (in writing)? merchant of record for VAT? fees, reserves, payouts? webhooks + API for membership status?
+> self-serve cancel? **Switching provider = rewriting the Stripe calls and webhook in `services/billing.py`**; access
+> (`paid_until` + grace), `payments` by country, the pages, terms, admin tab and the delete fix all stay. Ivo's business
+> details (for `lib/business.js` and the provider sign-up) are still to come.
 
 Members pay monthly through **Stripe** and get the staking plan (`GET /staking` takes `deps.member_user`: admins, or
 members in date). Price decided 2026-11-11: about £3.99/month, monthly only, sold worldwide. Code:
