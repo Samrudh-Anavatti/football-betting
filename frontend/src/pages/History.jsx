@@ -16,7 +16,7 @@ export default function History() {
   const tips = useApi(() => api.tips('settled', 1000), [])
 
   return (
-    <section>
+    <section data-tour="history">
       <SectionHead title="Past picks" count={tips.data?.length || null} />
       {tips.loading ? (
         <Loading rows={8} />

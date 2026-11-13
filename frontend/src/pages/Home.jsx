@@ -39,7 +39,7 @@ function Ledger({ record }) {
     ['Average odds', record.avg_odds ?? '–'],
   ]
   return (
-    <div className="mt-8">
+    <div data-tour="record" className="mt-8">
       <p className={`num wide font-black leading-[0.85] tracking-[-0.04em] text-[clamp(2.75rem,8vw,4.75rem)] ${profit >= 0 ? 'text-pitch-bright' : 'text-red'}`}>
         {profit < 0 ? '−' : '+'}
         {pounds(profit, 2)}
@@ -84,7 +84,7 @@ export default function Home() {
         </div>
       </section>
 
-      <section>
+      <section data-tour="picks">
         <SectionHead title="Open picks" count={tips.data?.length || null} />
         {tips.loading ? (
           <Loading />

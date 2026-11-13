@@ -332,7 +332,7 @@ export default function AiLab() {
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 className="text-4xl sm:text-5xl leading-none">AI Lab</h1>
+        <h1 data-tour="ai-lab" className="text-4xl sm:text-5xl leading-none">AI Lab</h1>
         <nav className="segmented" aria-label="AI Lab sections">
           {TABS.map((t) => (
             <button key={t.key} type="button" aria-current={t.key === active.key ? 'page' : undefined}

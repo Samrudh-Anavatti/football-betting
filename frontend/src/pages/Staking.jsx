@@ -322,7 +322,7 @@ function Preview() {
 export default function Staking() {
   const { user, checking } = useAuth()
   return (
-    <section className="space-y-6">
+    <section data-tour="staking" className="space-y-6">
       <SectionHead title="Staking plan" />
       {checking ? <Loading rows={4} /> : user?.is_admin || user?.membership?.member ? <Members /> : <Preview />}
     </section>

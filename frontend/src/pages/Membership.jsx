@@ -117,7 +117,7 @@ export default function Membership() {
           confidential support at BeGambleAware.org.
         </p>
       </article>
-      <aside className="panel p-6">
+      <aside data-tour="join" className="panel p-6">
         <JoinPanel info={info} />
       </aside>
     </div>

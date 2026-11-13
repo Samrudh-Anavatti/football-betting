@@ -284,7 +284,7 @@ export default function Match() {
       {!admin && <PublicAi ai={data.ai} fx={fx} board={data.odds} />}
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_1fr]">
-        <section className="space-y-3 min-w-0">
+        <section data-tour="prices" className="space-y-3 min-w-0">
           <div className="flex flex-wrap items-baseline gap-3">
             <h2 className="text-2xl">Prices</h2>
             <Freshness at={data.odds.pulled_at} warnAfter={6} staleAfter={24} />

@@ -9,7 +9,7 @@ const NAV = [
   { to: '/fixtures', label: 'Fixtures' },
   { to: '/results', label: 'Results' },
   { to: '/history', label: 'History' },
-  { to: '/staking', label: 'Staking' },
+  { to: '/staking', label: 'Staking', tour: 'nav-staking' },
 ]
 
 export default function Shell({ children }) {
@@ -35,7 +35,7 @@ export default function Shell({ children }) {
           </NavLink>
           <nav className="flex items-stretch h-full min-w-0 overflow-x-auto" aria-label="Main">
             {(user?.is_admin ? [...NAV, { to: '/ai-lab', label: 'AI Lab' }] : NAV).map((n) => (
-              <NavLink key={n.to} to={n.to} end={n.end} className={link}>
+              <NavLink key={n.to} to={n.to} end={n.end} className={link} data-tour={n.tour}>
                 {n.label}
               </NavLink>
             ))}

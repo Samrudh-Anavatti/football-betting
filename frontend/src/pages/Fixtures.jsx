@@ -55,7 +55,7 @@ export default function Fixtures({ results = false }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-end gap-3">
+      <div data-tour="fixtures" className="flex flex-wrap items-end gap-3">
         <h1 className="text-4xl sm:text-5xl leading-none">{results ? 'Results' : 'Fixtures'}</h1>
         <div className="ml-auto segmented" role="group" aria-label="Date range">
           {RANGES.map((d) => (

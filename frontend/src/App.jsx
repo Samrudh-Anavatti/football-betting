@@ -10,6 +10,7 @@ import Terms from './pages/Terms.jsx'
 import Friends from './pages/Friends.jsx'
 import Staking from './pages/Staking.jsx'
 import ConsentBanner from './components/ConsentBanner.jsx'
+import Tour from './components/Tour.jsx'
 import Admin from './pages/Admin.jsx'
 import Account from './pages/Account.jsx'
 import AiLab from './pages/AiLab.jsx'
@@ -49,6 +50,7 @@ export default function App() {
       </Routes>
       <StaticMeta />
       <ConsentBanner />
+      <Tour />
     </Shell>
   )
 }

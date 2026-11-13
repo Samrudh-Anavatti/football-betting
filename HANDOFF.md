@@ -226,6 +226,23 @@ it or the terms, and join returns 503.
    Tax: head office address, the registrations, a product tax code chosen from Stripe's list, and
    `STRIPE_AUTOMATIC_TAX=on`. Until registrations exist, Stripe Tax silently charges no tax, so leave it off.
 
+## Mr Predictions' welcome (built 2026-11-13)
+
+Ivo's character (a Grok-made presenter he posts on Instagram) welcomes visitors: the page dims, one part stays
+lit, and he points at it from a card with a line of text. A click anywhere (or Enter) moves on; Escape or Skip
+ends it; the last click puts the page back to normal. Three stops on the home page (the record, open picks, the
+Staking link), one on fixtures, results, history, staking, match pages, membership and the AI Lab. **Once per page
+per visit** (sessionStorage); `?tour=1` on any page shows it again. Nothing animates, so three quick clicks clear it.
+
+* Code: `components/Tour.jsx` (overlay, placement, arrow) and `lib/tour.js` (the stops and their text). Each stop
+  names a `data-tour="…"` attribute on the page; a stop whose anchor isn't there (no open picks yet) is skipped,
+  and the tour waits up to 5 s for the first anchor so pages that load data first still start on stop one.
+* Images: `public/mr-predictions.jpg` (him at the desk, 480 px wide) and `public/mr-predictions-face.jpg` (phones),
+  cropped from the scene Ivo supplied (`image.png` in the repo root, untracked). A stop can set `image` for its
+  own pose once there are more.
+* A bug in the welcome can't take the site down: it's wrapped in an error boundary that just hides it.
+* To show it on every visit instead, drop the `seen` check in `Tour.jsx`.
+
 ## Member accounts (built 2026-11-08)
 
 * **Admins vs members:** `users.is_admin`. `seed.py` marks the `USERS` accounts (sam, ivo) as admins on every start
