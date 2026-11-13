@@ -374,7 +374,7 @@ export default function DataTab() {
         here and on match pages fetch anything sooner. Season {data.season}.
       </p>
       <ScheduleCard provider={af} />
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <ProviderCard provider={af} onChecked={refresh}>
           <FixturesAction provider={af} selected={sel} pacing={data.pacing_seconds} onChange={refresh} />
           <MarketsAction provider={af} selected={sel} onChange={refresh} />

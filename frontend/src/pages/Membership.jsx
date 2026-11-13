@@ -86,7 +86,7 @@ function JoinPanel({ info }) {
 export default function Membership() {
   const info = useMembershipInfo()
   return (
-    <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] items-start">
+    <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_24rem] items-start">
       <article className="space-y-5 text-[15px] leading-relaxed max-w-prose">
         <div>
           <h1 className="text-4xl sm:text-5xl leading-none">Membership</h1>

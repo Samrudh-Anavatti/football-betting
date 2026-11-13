@@ -229,7 +229,7 @@ function MarketCard({ market, fx, onPick, bookmakers, defaultOpen, filter }) {
             <LinesTable market={market} fx={fx} onPick={onPick} />
           ) : (
             <>
-              <div className={`grid gap-2 ${market.layout === 'list' ? 'sm:grid-cols-2' : selections.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
+              <div className={`grid grid-cols-1 gap-2 ${market.layout === 'list' ? 'sm:grid-cols-2' : selections.length >= 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
                 {(market.layout === 'list' && !all && !filter ? selections.slice(0, LIST_PREVIEW) : selections).map((s) => (
                   <SelTile key={s.value} sel={s} market={market} fx={fx} onPick={onPick} />
                 ))}

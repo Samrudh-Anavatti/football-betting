@@ -117,7 +117,7 @@ export default function AiTab() {
         </p>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Records records={data.records} />
         <Scores scores={data.scores} />
       </div>

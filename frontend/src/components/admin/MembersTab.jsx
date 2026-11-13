@@ -52,7 +52,8 @@ export default function MembersTab() {
         </SectionHead>
         <ErrorNote error={csvError} />
         {data.by_country.length ? (
-          <table className="panel w-full text-sm">
+          <div className="panel overflow-x-auto">
+          <table className="w-full text-sm">
             <thead className="text-ink-soft text-left">
               <tr>
                 <th className="px-4 py-2 font-normal">Country</th>
@@ -76,6 +77,7 @@ export default function MembersTab() {
               ))}
             </tbody>
           </table>
+          </div>
         ) : (
           <Empty title="No payments yet" />
         )}

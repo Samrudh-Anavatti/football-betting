@@ -139,11 +139,20 @@ function AiStaking() {
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] items-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_22rem] items-start">
         <div className="space-y-3">
           {current ? (
             <>
-              <BundleSlip bundle={current} losses={run.losses} />
+              <BundleSlip
+                bundle={current}
+                losses={run.losses}
+                onSettle={(tip, status) =>
+                  act(async () => {
+                    await api.settleTip(tip.id, status)
+                    return api.aiLabStaking()
+                  })
+                }
+              />
               <button type="button" className="btn-ghost text-sm" onClick={removeCurrent}>Delete this bundle</button>
             </>
           ) : (
@@ -186,7 +195,7 @@ function AiStaking() {
 
       <section>
         <SectionHead title="Plan" />
-        <div className="grid gap-6 lg:grid-cols-2 items-start">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
           <div className="space-y-3">
             <p className="text-[15px] text-ink-soft max-w-prose">
               The AI's own virtual plan, separate from ours: a win makes {money(plan.target_profit)}; {money(plan.bank)}{' '}
@@ -242,7 +251,7 @@ function Arbitrage() {
   const { live, recent, stats, scanned_at: scannedAt } = data
   return (
     <div className="space-y-8">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
         <div className="space-y-3 text-[15px] max-w-prose">
           <p>
             Markets where the best prices across our five bookmakers add up to under 100%: back every outcome in these
@@ -270,7 +279,7 @@ function Arbitrage() {
       <section>
         <SectionHead title="Open now" count={live.length || null} />
         {live.length ? (
-          <ol className="grid gap-3 lg:grid-cols-2">{live.map((a) => <ArbCard key={a.id} a={a} total={total} />)}</ol>
+          <ol className="grid grid-cols-1 gap-3 lg:grid-cols-2">{live.map((a) => <ArbCard key={a.id} a={a} total={total} />)}</ol>
         ) : (
           <p className="text-ink-soft text-sm">None in the latest prices.</p>
         )}

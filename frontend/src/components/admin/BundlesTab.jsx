@@ -85,7 +85,7 @@ function Builder({ state, tips, onCreated }) {
     return <Empty title="No open picks to bundle">Make today's picks first, then come back to bundle them.</Empty>
 
   return (
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] items-start">
+    <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_18rem] items-start">
       <ul className="panel divide-y divide-ink/5">
         {tips.map((t) => {
           const on = chosen.includes(t.id)

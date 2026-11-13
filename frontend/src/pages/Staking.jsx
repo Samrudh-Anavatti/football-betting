@@ -30,7 +30,9 @@ export function ResultMark({ status }) {
 }
 
 // The live bundle, printed as a slip: each pick with its price, then the combined odds, stake and return.
-export function BundleSlip({ bundle, scale = 1, losses }) {
+// `onSettle(tip, status)`: admins can settle a leg by hand once its match has kicked off, for markets the
+// automatic settlement can't decide (or a result the data provider never sent).
+export function BundleSlip({ bundle, scale = 1, losses, onSettle }) {
   return (
     <div className="slip-shadow">
       <article className="perforated rounded-t-xl bg-paper">
@@ -60,22 +62,35 @@ export function BundleSlip({ bundle, scale = 1, losses }) {
                 </Link>
               </div>
               {tip.status !== 'pending' && <ResultMark status={tip.status} />}
+              {tip.status === 'pending' && onSettle && new Date(tip.fixture.kickoff) < Date.now() && (
+                <select
+                  className="input py-1 w-auto text-sm"
+                  defaultValue=""
+                  aria-label="Settle this leg"
+                  onChange={(e) => e.target.value && onSettle(tip, e.target.value)}
+                >
+                  <option value="">Settle…</option>
+                  <option value="won">Won</option>
+                  <option value="lost">Lost</option>
+                  <option value="void">Void</option>
+                </select>
+              )}
               <Price value={price} />
             </li>
           ))}
         </ol>
         <footer className="px-4 pt-3 pb-6 grid grid-cols-3 gap-3 items-end">
-          <div>
+          <div className="min-w-0">
             <p className="text-sm text-ink-soft">Odds</p>
             <Price value={bundle.odds} board />
           </div>
-          <div>
+          <div className="min-w-0">
             <p className="text-sm text-ink-soft">Stake</p>
-            <p className="num text-2xl font-bold">{money(bundle.stake * scale)}</p>
+            <p className="num text-xl sm:text-2xl font-bold truncate">{money(bundle.stake * scale)}</p>
           </div>
-          <div className="text-right">
+          <div className="min-w-0 text-right">
             <p className="text-sm text-ink-soft">Returns</p>
-            <p className="num text-2xl font-bold text-pitch">{money(bundle.returns * scale)}</p>
+            <p className="num text-xl sm:text-2xl font-bold text-pitch truncate">{money(bundle.returns * scale)}</p>
           </div>
         </footer>
       </article>
@@ -168,7 +183,7 @@ function PlanView({ data, hitRate }) {
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
         <div className="space-y-3">
           {current ? (
             <BundleSlip bundle={current} scale={scale} losses={run.losses} />
@@ -217,7 +232,7 @@ function PlanView({ data, hitRate }) {
 
       <section>
         <SectionHead title="How it works" />
-        <div className="grid gap-6 lg:grid-cols-2 items-start">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2 items-start">
           <div className="space-y-3 text-[15px] leading-relaxed max-w-prose">
             <p>
               We combine our picks into one bet at odds of about {odds(plan.target_odds)}. A win makes{' '}
