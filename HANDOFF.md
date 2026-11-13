@@ -267,6 +267,10 @@ Two tabs. Both run in the AI thread's tick (`scheduler.ai_tick`) as plain code: 
   bookmaker with that bookmaker's prices and keeps the one most likely to land (product of the AI's probabilities),
   then the higher odds; `bundles.bookmaker` records it and the slip shows it. Ivo's bundles keep his own prices.
   Stake = the plan's exact recovery stake. Settles with every other bundle (`settle_bundles`).
+* **A leg that doesn't settle** (its market has no rule in `settlement.py`, or the half-time score never arrived for a
+  halves market) can be settled by hand on the live slip (admins; a "Settle…" menu appears once the match has kicked
+  off, since 2026-11-13). The bundle then settles from its legs and the next one is built on the next tick. Picks
+  with `source='ai_leg'` aren't listed in Admin → Picks (Ivo's only).
 * **Next (agreed 2026-11-10): Claude Opus 5.5 builds the bundle** ("slate" job, about twice a day, over every
   candidate leg in the next 48 h), on Sam's Anthropic API credit ($100/month, available about 2026-11-17).
   Luna keeps the per-match reports and becomes the backup if Claude fails or its budget runs out; admin spend split
