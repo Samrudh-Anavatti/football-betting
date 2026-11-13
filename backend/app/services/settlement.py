@@ -135,6 +135,15 @@ def _score(v: str) -> tuple[int, int] | None:
         return None
 
 
+def _only_scorer(v: str, h: int, a: int) -> str | None:
+    """Team to score first/last, without a goal timeline: decidable only when at most one side scored."""
+    if h == 0 and a == 0:
+        return _wl(v.lower() == "no goal")
+    if h > 0 and a > 0:
+        return None  # by hand
+    return _wl(v == ("Home" if h else "Away"))
+
+
 def market_outcome(market: str, value: str, h: int, a: int, hh: int | None, ha: int | None) -> str | None:
     """Settle an API-Football market by name. hh/ha = half-time score (may be unknown)."""
     from .markets import parse_value
@@ -173,6 +182,8 @@ def market_outcome(market: str, value: str, h: int, a: int, hh: int | None, ha: 
         "Results/Both Teams Score": lambda: (
             _wl(v == f"{_res(h, a)}/{'Yes' if h > 0 and a > 0 else 'No'}") if "/" in v else None),
         "Result/Total Goals": lambda: _result_total(v, h, a),
+        "Team To Score First": lambda: _only_scorer(v, h, a),
+        "Team To Score Last": lambda: _only_scorer(v, h, a),
         "Total Goals/Both Teams To Score": lambda: _total_btts(v, h, a),
     }
     halves = {

@@ -70,6 +70,11 @@ def test_handicap_and_team_goal_outcomes():
     assert market_outcome("Number Of Goals In Match", "2 or 3 goals", 2, 1, 1, 1) == "won"
     assert market_outcome("Exact Goals Number", "more 4", 3, 2, 1, 1) == "won"
     assert market_outcome("Second Half Exact Goals Number", "1", 2, 1, 1, 1) == "won"
+    # San Marino 0-2 Belarus: only one side scored, so first and last scorer are known; 2-1 needs the timeline.
+    assert market_outcome("Team To Score First", "Away", 0, 2, 0, 1) == "won"
+    assert market_outcome("Team To Score Last", "Home", 0, 2, 0, 1) == "lost"
+    assert market_outcome("Team To Score First", "No goal", 0, 0, 0, 0) == "won"
+    assert market_outcome("Team To Score First", "Home", 2, 1, 1, 1) is None
 
 
 def test_value_parsing_and_codes():
