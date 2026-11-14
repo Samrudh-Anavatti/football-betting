@@ -1,12 +1,14 @@
 import { useState } from 'react'
-import { Link, Navigate, useSearchParams } from 'react-router-dom'
-import { ErrorNote, Freshness, LeagueBadge, Loading, Price, SectionHead } from '../components/ui.jsx'
-import { useApi } from '../hooks/useApi.js'
-import { api } from '../lib/api.js'
-import { useAuth } from '../lib/auth.jsx'
-import { ago, dayLabel, kickoffTime, money, odds, pct, pickLabel, shortDate, signed, teamify } from '../lib/format.js'
-import { matchPath } from '../lib/seo.js'
-import { BundleHistory, BundleSlip, Ladder, Stat } from './Staking.jsx'
+import { Link } from 'react-router-dom'
+import { useApi } from '../../hooks/useApi.js'
+import { api } from '../../lib/api.js'
+import { ago, dayLabel, kickoffTime, money, odds, pct, pickLabel, shortDate, signed, teamify } from '../../lib/format.js'
+import { matchPath } from '../../lib/seo.js'
+import { BundleHistory, BundleSlip, Ladder, Stat } from '../../pages/Staking.jsx'
+import { ErrorNote, Freshness, LeagueBadge, Loading, Price, SectionHead } from '../ui.jsx'
+
+// The AI Lab: the AI's own recovery-ladder staking test and the arbitrage scanner. Admin → AI Lab since 2026-11-14,
+// when the public-facing AI staking became Tonight's bundles (pages/Tonight.jsx).
 
 function MatchLine({ fixture }) {
   return (
@@ -317,30 +319,29 @@ function Arbitrage() {
 }
 
 const TABS = [
-  { key: 'staking', label: 'AI staking', el: AiStaking },
+  { key: 'staking', label: 'AI staking ladder', el: AiStaking },
   { key: 'arbs', label: 'Arbitrage', el: Arbitrage },
 ]
 
-export default function AiLab() {
-  const { user, checking } = useAuth()
-  const [params, setParams] = useSearchParams()
-  if (checking) return <Loading />
-  if (!user) return <Navigate to="/login?next=/ai-lab" replace />
-  if (!user.is_admin) return <Navigate to="/" replace />
-  const active = TABS.find((t) => t.key === params.get('tab')) || TABS[0]
+export default function AiLabTab() {
+  const [key, setKey] = useState(TABS[0].key)
+  const active = TABS.find((t) => t.key === key) || TABS[0]
   const Tab = active.el
   return (
     <div className="space-y-6">
       <div className="flex flex-wrap items-center gap-3">
-        <h1 data-tour="ai-lab" className="text-4xl sm:text-5xl leading-none">AI Lab</h1>
         <nav className="segmented" aria-label="AI Lab sections">
           {TABS.map((t) => (
             <button key={t.key} type="button" aria-current={t.key === active.key ? 'page' : undefined}
-              onClick={() => setParams({ tab: t.key })} className={`segment px-4 ${t.key === active.key ? 'segment-on' : ''}`}>
+              onClick={() => setKey(t.key)} className={`segment px-4 ${t.key === active.key ? 'segment-on' : ''}`}>
               {t.label}
             </button>
           ))}
         </nav>
+        <p className="text-sm text-ink-soft">
+          The ladder is the test of whether the AI's legs beat their prices; what people use is{' '}
+          <Link to="/tonight" className="link">Tonight's bundles</Link>.
+        </p>
       </div>
       <Tab />
     </div>

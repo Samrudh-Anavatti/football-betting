@@ -1,5 +1,6 @@
 import { Navigate, useSearchParams } from 'react-router-dom'
 import AccountsTab from '../components/admin/AccountsTab.jsx'
+import AiLabTab from '../components/admin/AiLabTab.jsx'
 import AiTab from '../components/admin/AiTab.jsx'
 import BundlesTab from '../components/admin/BundlesTab.jsx'
 import DataTab from '../components/admin/DataTab.jsx'
@@ -13,6 +14,7 @@ const TABS = [
   { key: 'picks', label: 'Picks', el: PicksTab },
   { key: 'bundles', label: 'Bundles', el: BundlesTab },
   { key: 'ai', label: 'AI', el: AiTab },
+  { key: 'lab', label: 'AI Lab', el: AiLabTab },
   { key: 'accounts', label: 'Accounts', el: AccountsTab },
   { key: 'members', label: 'Members', el: MembersTab },
 ]

@@ -3,7 +3,10 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-11-11 (**Membership through Stripe built, switched off** until Ivo's business has a Stripe
+_Last updated: 2026-11-14 (**Tonight's bundles** at `/tonight`, admins only while tested: the AI's legs built into
+up to three bundles for the matches someone is about to watch, flat stakes, on the record; the long-term plan is one
+free a day, more for members. The AI Lab's ladder and arbitrage moved to Admin → AI Lab. See "Tonight's bundles".
+2026-11-13: **Mr Predictions' welcome**. 2026-11-11: **Membership through Stripe built, switched off** until Ivo's business has a Stripe
 account: see "Membership", which has the setup checklist. Earlier, 2026-11-08: **Nations League** added as a main league. **AI Lab** (`/ai-lab`, admins only): Ivo's staking plan run on the AI's own short-priced legs (prompt v4), and an arbitrage scanner over our prices; see "AI Lab". Also: **member accounts**: sign-up by email (page live, not linked until the paywall), password reset by email through Azure Communication Services, admins vs members; see "Member accounts". Paywall decision: Stripe directly, not Buy Me a Coffee. 2026-11-01: **staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
 
 ## Live resources
@@ -231,7 +234,7 @@ it or the terms, and join returns 503.
 Ivo's character (a Grok-made presenter he posts on Instagram) welcomes visitors: the page dims, one part stays
 lit, and he points at it from a card with a line of text. A click anywhere (or Enter) moves on; Escape or Skip
 ends it; the last click puts the page back to normal. Three stops on the home page (the record, open picks, the
-Staking link), one on fixtures, results, history, staking, match pages, membership and the AI Lab. **Once per page
+Staking link), one on fixtures, results, history, staking, match pages, membership and Tonight's bundles. **Once per page
 per visit** (sessionStorage); `?tour=1` on any page shows it again. Nothing animates, so three quick clicks clear it.
 
 * Code: `components/Tour.jsx` (overlay, placement, arrow) and `lib/tour.js` (the stops and their text). Each stop
@@ -272,10 +275,44 @@ per visit** (sessionStorage); `?tour=1` on any page shows it again. Nothing anim
 * **Support** is the business WhatsApp (`lib/support.js`, wa.me link): in the footer, on `/account` and on `/forgot`.
 * **Email:** `services/email.py` calls ACS's REST API (`/emails:send`, HMAC-signed) with httpx, no Azure SDK.
 
-## AI Lab (built 2026-11-08, admins only)
+## Tonight's bundles (built 2026-11-14, admins only while tested)
 
-Nav "AI Lab" (admins only), `/ai-lab`, `pages/AiLab.jsx`; API `routers/ai_lab.py` (`/admin/ai-lab/...`, `admin_user`).
-Two tabs. Both run in the AI thread's tick (`scheduler.ai_tick`) as plain code: no model or API-Football calls.
+The public face of the AI staking, for a casual viewer: someone sitting down to watch a few matches who wants two
+or three bundles to cheer for, dinner money if they land, not a bankroll plan. Nav "Tonight" (admins only for now),
+`/tonight` (`/ai-lab` redirects there), `pages/Tonight.jsx`; API `routers/tonight.py` (`/tonight/...`), code in
+`services/tonight.py`. The page shows no probabilities, implied rates or fair prices: a session picker, the matches
+to tick, a target, a stake box, the slips, one honesty line, and the record.
+
+* **Sessions:** upcoming matches (next 3 days, not within 5 min of kick-off) that have open AI legs, in kick-off
+  order; a match kicking off more than 2 h 30 after a session's first starts a new session. A session needs two
+  matches. Shown as "Today, 20:00–20:45 · 5 matches · 9 legs".
+* **Request:** session + ticked matches (all by default) + target (**Safer 3.00, Standard 6.00, Big night 10.00**,
+  `TARGETS`). `build` makes **up to three bundles** from the legs on those matches: the same picker as the ladder
+  (`ai_staking.pick_bundle`: likeliest legs first, one bookmaker per bundle, odds within 0.9–1.15× the target) run
+  repeatedly, each bundle from legs the earlier ones didn't use, so one leg failing doesn't sink all three. Both of a
+  match's legs may be used (the prompt asks for two that don't move together). Since 2026-11-14 the picker also
+  swaps one leg for a longer price when the greedy pick stops just short of the band.
+* **Deterministic:** a request is keyed by (session, sorted match ids, target) in `session_bundles.key`; the same
+  request returns the bundles made before, so refreshing or a second viewer gets the same slips. Different ticks make
+  a different request (and may share legs with the first).
+* **Flat stakes:** no run/step. The stake box only scales the figures (saved in `localStorage` `fb.tonight`).
+* **Data:** `session_bundles` (session_at, key, position, target, odds, bookmaker, status, profit in units at one
+  unit staked, user_id of whoever asked) and `session_bundle_legs` (a leg may sit in many; unlike `bundle_legs`).
+  Settled with every other bundle (`staking.settle_bundles` → `tonight.settle`); hand-settling a pick re-decides
+  them too. The record (`/tonight/record`) counts every bundle ever shown once, at one unit each, grouped by session.
+* **The plan (agreed 2026-11-14):** visitors are steered to Tonight's bundles (home page, Mr Predictions); **one
+  bundle a day free** to anyone signed in (the default request of the biggest session), more bundles, custom ticks and
+  the other targets for members behind the paywall. To open it up: swap `admin_user` in `routers/tonight.py` for that
+  rule, drop the admin check in `pages/Tonight.jsx`, take `noindex` off `/tonight` in `lib/seo.js`, and put
+  "Tonight" in the main nav (which needs rethinking at phone width: six entries don't fit). Claude Opus choosing the
+  legs (see the AI Lab's "Next") improves these bundles too, since they come from the same legs.
+
+## AI Lab (built 2026-11-08; Admin → AI Lab since 2026-11-14)
+
+Admin → AI Lab, `components/admin/AiLabTab.jsx` (was its own page at `/ai-lab`, which is now Tonight's bundles);
+API `routers/ai_lab.py` (`/admin/ai-lab/...`, `admin_user`).
+Two sub-tabs. Both run in the AI thread's tick (`scheduler.ai_tick`) as plain code: no model or API-Football calls.
+The ladder here is the *test* (do the AI's legs beat their prices?); what people use is Tonight's bundles above.
 
 **AI staking: does Ivo's method work on the AI's picks?**
 * **Prompt v4** (`ai/prompts/v4.md`) adds a private `bundle_legs` list to `record_analysis`: up to 2 per match,
@@ -397,6 +434,8 @@ the settings above.
 * [ ] Price-movement chart from odds history; closing-line value per pick. (The schedule now captures a closing
   book 5–10 min before every kick-off, so the data for this is there.)
 * [x] Staking plan (2026-11-01), see "Staking plan".
+* [x] Tonight's bundles (2026-11-14), see there. **Next:** test it over a real weekend behind the admin flag, then
+  the free-one-a-day rule and the public nav; Claude Opus on the legs when Sam's API credit lands (~2026-11-17).
 * [x] Paywall built (2026-11-11), see "Membership". **Next:** Ivo's business details + Stripe account, then the setup
   checklist there; tax advice before selling outside the UK at volume.
 * [x] Refresh schedule (2026-10-12). **Check real usage on the Schedule card after a full weekend** against the

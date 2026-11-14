@@ -122,4 +122,8 @@ export const api = {
   aiLabBuild: () => request('/admin/ai-lab/staking/build', { method: 'POST' }),
   aiLabDeleteBundle: (id) => request(`/admin/ai-lab/staking/bundles/${id}`, { method: 'DELETE' }),
   aiLabArbs: () => request('/admin/ai-lab/arbs'),
+  // Tonight's bundles
+  tonightSessions: () => request('/tonight/sessions'),
+  tonightBuild: (body) => request('/tonight/bundles', { method: 'POST', body }),
+  tonightRecord: () => request('/tonight/record'),
 }

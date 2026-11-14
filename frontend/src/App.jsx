@@ -13,7 +13,7 @@ import ConsentBanner from './components/ConsentBanner.jsx'
 import Tour from './components/Tour.jsx'
 import Admin from './pages/Admin.jsx'
 import Account from './pages/Account.jsx'
-import AiLab from './pages/AiLab.jsx'
+import Tonight from './pages/Tonight.jsx'
 import { Forgot, Login, Reset, Signup } from './pages/Auth.jsx'
 import usePageMeta from './hooks/usePageMeta.js'
 import { PAGES } from './lib/seo.js'
@@ -45,7 +45,8 @@ export default function App() {
         <Route path="/forgot" element={<Forgot />} />
         <Route path="/reset" element={<Reset />} />
         <Route path="/account" element={<Account />} />
-        <Route path="/ai-lab" element={<AiLab />} />
+        <Route path="/tonight" element={<Tonight />} />
+        <Route path="/ai-lab" element={<Navigate to="/tonight" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <StaticMeta />

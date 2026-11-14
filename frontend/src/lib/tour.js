@@ -57,10 +57,10 @@ const STEPS = {
       text: 'Our picks and match analysis stay free. Membership adds the staking plan: monthly, cancel any time.',
     },
   ],
-  'ai-lab': [
+  tonight: [
     {
-      target: 'ai-lab',
-      text: "The AI's own staking test, built from its surest legs, and an arbitrage scanner over the prices we already pull.",
+      target: 'tonight',
+      text: "Pick the session you're sitting down for, untick anything you won't watch, and up to three bundles appear. Tap Why on any leg for the AI's reason. Every bundle shown lands on the record, hit or miss.",
     },
   ],
 }

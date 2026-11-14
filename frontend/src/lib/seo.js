@@ -55,7 +55,12 @@ export const PAGES = {
   '/signup': { title: `Create an account | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
   '/forgot': { title: `Reset your password | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
   '/reset': { title: `Choose a new password | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
-  '/ai-lab': { title: `AI Lab | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
+  '/tonight': {
+    title: `Tonight's bundles: AI picks for the matches you're watching | ${SITE}`,
+    description:
+      "Tick the matches you're sitting down for and the AI builds up to three bundles from its surest legs on them, at about 3.00, 6.00 or 10.00.",
+    noindex: true, // while it's admins only
+  },
   '/account': { title: `Your account | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
 }
 
