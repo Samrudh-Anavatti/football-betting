@@ -242,6 +242,12 @@ per visit** (sessionStorage); `?tour=1` on any page shows it again. Nothing anim
   own pose once there are more.
 * A bug in the welcome can't take the site down: it's wrapped in an error boundary that just hides it.
 * To show it on every visit instead, drop the `seen` check in `Tour.jsx`.
+* **Parked 2026-11-14: more poses.** Every stop uses the same shot for now. When an image tool is to hand (Grok,
+  with the original as reference), the ask is: portrait ~1:2, him only on a plain stadium-blue background (no
+  screens or text), same jacket/shirt/hair/render; poses: welcome (arms open), pointing down-left (picks,
+  fixtures), pointing up-right (the Staking link), hand on chin (match prices), thumbs up with the ball (staking,
+  membership), at the laptop (AI Lab), plus a square head-and-shoulders portrait for phones. Then one `image` line
+  per stop in `lib/tour.js`.
 
 ## Member accounts (built 2026-11-08)
 
