@@ -292,6 +292,13 @@ to tick, a target, a stake box, the slips, one honesty line, and the record.
   repeatedly, each bundle from legs the earlier ones didn't use, so one leg failing doesn't sink all three. Both of a
   match's legs may be used (the prompt asks for two that don't move together). Since 2026-11-14 the picker also
   swaps one leg for a longer price when the greedy pick stops just short of the band.
+* **Thin nights (international breaks, midweek):** each bundle is tried from the surest legs first; if they can't
+  reach the target, the AI's **suggested bets** (`source='ai'`, 1.50–3.00) join the pool as "longer shots", up to
+  three selections per match and ten legs. The bundle is marked `stretch` ("with longer shots" on the slip, each
+  such leg tagged). A suggested bet on the same selection as a sure leg is the same bet and is dropped.
+* **Tracking:** the record splits by target (Safer / Standard / Big night) and, more usefully, by **leg**: every
+  tip that has appeared in a tonight bundle, counted once, surest legs and longer shots separately, hit rate against
+  the rate the prices implied. Bundles are combinations; the legs are what has to beat the prices.
 * **Deterministic:** a request is keyed by (session, sorted match ids, target) in `session_bundles.key`; the same
   request returns the bundles made before, so refreshing or a second viewer gets the same slips. Different ticks make
   a different request (and may share legs with the first).
