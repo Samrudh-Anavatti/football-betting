@@ -75,8 +75,24 @@ def test_tonight_bundles(client, auth, fake, monkeypatch, night_fixtures):
         other = tonight.build(db, KICKOFF, ids[:3] + [ids[5]], 3.0, user_id=1, now=now)
         assert other and other[0].id not in {b.id for b in made} and all(2.7 <= b.odds <= 3.45 for b in other)
         assert all(leg.tip.fixture_id != ids[5] for b in other for leg in b.legs)
+        assert not any(b.stretch for b in made + other)
         first = made[0]
         first_legs = [leg.tip_id for leg in first.legs]
+
+        # A Big night on two matches: four sure legs make at most 1.45^2 x 1.30^2 = 3.55, so the AI's suggested bets
+        # (longer shots) join in and the bundle is marked as a stretch. A suggested bet on the same selection as a
+        # sure leg is the same bet and isn't used twice.
+        for fid, odds, prob, market, sel in [(ids[0], 1.9, 0.58, "BTTS", "yes"), (ids[1], 1.6, 0.68, "BTTS", "yes"),
+                                             (ids[1], 1.45, 0.75, "1X2", "home")]:
+            db.add(Tip(fixture_id=fid, author_id=1, source="ai", published=False, market=market, selection=sel, odds=odds,
+                       ai_probability=prob))
+        db.commit()
+        big = tonight.build(db, KICKOFF, ids[:2], 10.0, user_id=1, now=now)
+        assert big and big[0].stretch and 9.0 <= big[0].odds <= 11.5
+        srcs = [leg.tip.source for leg in big[0].legs]
+        assert "ai" in srcs and "ai_leg" in srcs
+        sels = [(leg.tip.fixture_id, leg.tip.market, leg.tip.selection) for leg in big[0].legs]
+        assert len(sels) == len(set(sels))
 
     r = client.get(f"{API}/tonight/sessions", headers=auth)
     assert r.status_code == 200 and r.json()["targets"]["standard"] == 6.0 and len(r.json()["sessions"]) == 1
@@ -92,6 +108,8 @@ def test_tonight_bundles(client, auth, fake, monkeypatch, night_fixtures):
     rec = client.get(f"{API}/tonight/record", headers=auth).json()
     assert rec["won"] >= 1 and rec["profit_units"] >= round(first.odds - 1, 2) - 0.01
     assert rec["sessions"][0]["at"] == s["at"]
+    assert rec["by_target"]["standard"]["won"] >= 1 and rec["by_target"]["big"]["bundles"] == 0
+    assert rec["legs"]["sure"]["won"] == len(first_legs) and rec["legs"]["longer"]["settled"] == 0
 
 
 def test_tonight_is_admin_only(client):

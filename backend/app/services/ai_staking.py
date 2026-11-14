@@ -32,7 +32,8 @@ def open_legs(db: Session, now: datetime) -> list[tuple[Tip, dict[str, float]]]:
     return sorted(legs, key=lambda x: (-(x[0].ai_probability or 0), x[0].fixture.kickoff))
 
 
-def pick_legs(legs: list[tuple[Tip, float | None]], target: float, per_match: int = 1) -> list[tuple[Tip, float]] | None:
+def pick_legs(legs: list[tuple[Tip, float | None]], target: float, per_match: int = 1,
+              max_legs: int = MAX_LEGS) -> list[tuple[Tip, float]] | None:
     """The likeliest legs, up to `per_match` from one match, until their combined odds reach the target; a leg that
     would overshoot too far is skipped for a shorter one. If that stops just short, one chosen leg is swapped for the
     likeliest unused leg that lifts the odds into the band. Skips legs whose price has drifted below the band or
@@ -46,7 +47,7 @@ def pick_legs(legs: list[tuple[Tip, float | None]], target: float, per_match: in
         chosen.append((tip, price))
         per[tip.fixture_id] += 1
         odds *= price
-        if odds >= lo or len(chosen) == MAX_LEGS:
+        if odds >= lo or len(chosen) == max_legs:
             break
     if chosen and odds < lo:
         taken = {id(t) for t, _ in chosen}
@@ -64,13 +65,13 @@ def pick_legs(legs: list[tuple[Tip, float | None]], target: float, per_match: in
     return chosen if chosen and odds >= lo else None
 
 
-def pick_bundle(legs: list[tuple[Tip, dict[str, float]]], target: float,
-                per_match: int = 1) -> tuple[str, list[tuple[Tip, float]]] | None:
+def pick_bundle(legs: list[tuple[Tip, dict[str, float]]], target: float, per_match: int = 1,
+                max_legs: int = MAX_LEGS) -> tuple[str, list[tuple[Tip, float]]] | None:
     """A multi is placed at one bookmaker, so build the bundle at each in turn with its own prices, and keep the one
     most likely to land (by the AI's probabilities), then the higher odds. None if no bookmaker reaches the target."""
     best, best_key = None, None
     for bookmaker in sorted({b for _, prices in legs for b in prices}):
-        chosen = pick_legs([(t, prices.get(bookmaker)) for t, prices in legs], target, per_match)
+        chosen = pick_legs([(t, prices.get(bookmaker)) for t, prices in legs], target, per_match, max_legs)
         if chosen is None:
             continue
         key = (math.prod(t.ai_probability or 0 for t, _ in chosen), math.prod(p for _, p in chosen))

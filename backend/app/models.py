@@ -372,6 +372,7 @@ class SessionBundle(Base):
     bookmaker: Mapped[str | None] = mapped_column(String(40))
     status: Mapped[str] = mapped_column(String(8), default="pending")  # pending|won|lost|void
     profit: Mapped[float | None] = mapped_column(Float)  # units, at one unit staked
+    stretch: Mapped[bool] = mapped_column(Boolean, default=False)  # the surest legs fell short: longer shots went in
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))  # who asked for it
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     settled_at: Mapped[datetime | None] = mapped_column(DateTime)

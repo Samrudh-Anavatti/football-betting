@@ -26,9 +26,15 @@ SESSION_GAP = timedelta(hours=2, minutes=30)  # a kick-off this long after a ses
 MAX_BUNDLES = 3
 
 
-def _open_legs(db: Session, now: datetime, until: datetime, fixture_ids: list[int] | None = None) -> list[Tip]:
+SURE = "ai_leg"  # the AI's bundle legs: 1.15–1.60, 70%+ likely
+LONGER = "ai"  # its suggested bets: 1.50–3.00, used only when the sure legs can't reach the target
+STRETCH_MAX_LEGS = 10  # a Big night may run to ten legs when it has to
+
+
+def _open_legs(db: Session, now: datetime, until: datetime, fixture_ids: list[int] | None = None,
+               sources: tuple[str, ...] = (SURE,)) -> list[Tip]:
     q = (select(Tip).join(Fixture)
-         .where(Tip.source == "ai_leg", Tip.status == "pending", Fixture.status == "NS",
+         .where(Tip.source.in_(sources), Tip.status == "pending", Tip.ai_probability.is_not(None), Fixture.status == "NS",
                 Fixture.kickoff > now + LEAD, Fixture.kickoff <= until))
     if fixture_ids is not None:
         q = q.where(Tip.fixture_id.in_(fixture_ids))
@@ -77,24 +83,35 @@ def build(db: Session, session_at: datetime, fixture_ids: list[int], target: flo
           now: datetime | None = None) -> list[SessionBundle]:
     """The bundles for this request: the ones made before if it was asked before, else up to three new ones from
     the legs on these matches (which must be in the session), likeliest first, each from legs the others don't use.
-    Commits. An empty list when the legs can't reach the target."""
+    Each bundle is tried from the surest legs first; when those can't reach the target (a thin night), the AI's
+    suggested bets join the pool as longer shots and the bundle may run to more legs (`stretch`). Commits. An empty
+    list when even that can't reach the target."""
     now = now or datetime.utcnow()
     key = request_key(session_at, fixture_ids, target)
     existing = list(db.scalars(select(SessionBundle).where(SessionBundle.key == key).order_by(SessionBundle.position)))
     if existing:
         return existing
-    legs = _open_legs(db, now, session_at + SESSION_GAP, fixture_ids)
-    legs = [t for t in legs if t.fixture.kickoff >= session_at]
-    pool = sorted(((t, current_prices(db, t)) for t in legs), key=lambda x: (-(x[0].ai_probability or 0), x[0].fixture.kickoff))
+    tips = [t for t in _open_legs(db, now, session_at + SESSION_GAP, fixture_ids, (SURE, LONGER)) if t.fixture.kickoff >= session_at]
+    # A suggested bet that duplicates a sure leg's selection is the same bet: keep the leg.
+    seen: set[tuple] = set()
+    pool = []
+    for t in sorted(tips, key=lambda t: (t.source != SURE, -(t.ai_probability or 0), t.fixture.kickoff)):
+        sel = (t.fixture_id, t.market, t.selection, t.line)
+        if sel not in seen:
+            seen.add(sel)
+            pool.append((t, current_prices(db, t)))
     made = []
     while pool and len(made) < MAX_BUNDLES:
-        found = pick_bundle(pool, target, per_match=2)  # both of a match's legs may go in: the AI picks them not to move together
+        # Both of a match's legs may go in: the AI picks them not to move together.
+        found, stretch = pick_bundle([x for x in pool if x[0].source == SURE], target, per_match=2), False
+        if found is None:
+            found, stretch = pick_bundle(pool, target, per_match=3, max_legs=STRETCH_MAX_LEGS), True
         if found is None:
             break
         bookmaker, chosen = found
         used = {t.id for t, _ in chosen}
         pool = [x for x in pool if x[0].id not in used]
-        made.append(SessionBundle(session_at=session_at, key=key, position=len(made) + 1, target=target,
+        made.append(SessionBundle(session_at=session_at, key=key, position=len(made) + 1, target=target, stretch=stretch,
                                   odds=round(math.prod(p for _, p in chosen), 2), bookmaker=bookmaker, user_id=user_id,
                                   legs=[SessionBundleLeg(tip_id=t.id, odds=p) for t, p in chosen]))
     db.add_all(made)
@@ -124,7 +141,8 @@ def settle(db: Session) -> int:
 def bundle_dict(b: SessionBundle) -> dict:
     return {
         "id": b.id, "position": b.position, "target": b.target, "odds": b.odds, "bookmaker": b.bookmaker,
-        "status": b.status, "profit": b.profit, "session_at": iso(b.session_at), "created_at": iso(b.created_at),
+        "status": b.status, "profit": b.profit, "stretch": bool(b.stretch), "session_at": iso(b.session_at),
+        "created_at": iso(b.created_at),
         "settled_at": iso(b.settled_at),
         "legs": [{"tip_id": leg.tip_id, "odds": leg.odds, "tip": tip_dict(leg.tip)} for leg in b.legs],
     }
@@ -141,9 +159,31 @@ def record(db: Session, limit: int = 12) -> dict:
     recent = [{"at": iso(at), "won": sum(b.status == "won" for b in rows), "bundles": [bundle_dict(b) for b in rows]}
               for at, rows in list(by_session.items())[:limit]]
     won = sum(b.status == "won" for b in settled)
+    by_target = {}
+    for name, t in TARGETS.items():
+        rows = [b for b in settled if b.target == t]
+        by_target[name] = {"target": t, "bundles": len(rows), "won": sum(b.status == "won" for b in rows),
+                           "profit_units": round(sum(b.profit or 0 for b in rows), 2)}
     return {
         "bundles": len(settled), "won": won, "lost": len(settled) - won,
         "profit_units": round(sum(b.profit or 0 for b in settled), 2),
         "pending": db.scalar(select(func.count()).where(SessionBundle.status == "pending")),
+        "by_target": by_target,
+        "legs": leg_record(db),
         "sessions": recent,
     }
+
+
+def leg_record(db: Session) -> dict:
+    """The legs that have appeared in tonight's bundles, each counted once however many bundles it was in: how often
+    the surest legs and the longer shots landed, against what their prices implied. This is the number that matters;
+    bundles are just combinations of it."""
+    out = {}
+    for name, source in (("sure", SURE), ("longer", LONGER)):
+        tips = list(db.scalars(select(Tip).join(SessionBundleLeg, SessionBundleLeg.tip_id == Tip.id)
+                               .where(Tip.source == source, Tip.status.in_(["won", "lost"])).distinct()))
+        n = len(tips)
+        won = sum(t.status == "won" for t in tips)
+        out[name] = {"settled": n, "won": won, "hit_rate": round(won / n, 4) if n else None,
+                     "implied_rate": round(sum(1 / t.odds for t in tips) / n, 4) if n else None}
+    return out
