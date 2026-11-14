@@ -355,6 +355,44 @@ class BundleLeg(Base):
     tip: Mapped[Tip] = relationship(lazy="selectin")
 
 
+class SessionBundle(Base):
+    """Tonight's bundles: a multi of the AI's legs on the matches of one viewing session (kick-offs within a couple of
+    hours of each other), built on request at a chosen target. Flat stakes, so no run or step: the viewer stakes what
+    they like and the record counts each bundle at one unit. `key` identifies the request (session, matches, target),
+    so the same request gets the same bundles back; `position` is the bundle's place in that request's set."""
+
+    __tablename__ = "session_bundles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    session_at: Mapped[datetime] = mapped_column(DateTime, index=True)  # the session's first kick-off
+    key: Mapped[str] = mapped_column(String(40), index=True)
+    position: Mapped[int] = mapped_column(Integer, default=1)
+    target: Mapped[float] = mapped_column(Float)
+    odds: Mapped[float] = mapped_column(Float)
+    bookmaker: Mapped[str | None] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(8), default="pending")  # pending|won|lost|void
+    profit: Mapped[float | None] = mapped_column(Float)  # units, at one unit staked
+    user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))  # who asked for it
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
+    settled_at: Mapped[datetime | None] = mapped_column(DateTime)
+
+    legs: Mapped[list["SessionBundleLeg"]] = relationship(lazy="selectin", cascade="all, delete-orphan",
+                                                          order_by="SessionBundleLeg.id")
+
+
+class SessionBundleLeg(Base):
+    """A leg may sit in several session bundles (different viewers, different match selections), unlike the plans'."""
+
+    __tablename__ = "session_bundle_legs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    bundle_id: Mapped[int] = mapped_column(ForeignKey("session_bundles.id"), index=True)
+    tip_id: Mapped[int] = mapped_column(ForeignKey("tips.id"), index=True)
+    odds: Mapped[float] = mapped_column(Float)
+
+    tip: Mapped[Tip] = relationship(lazy="selectin")
+
+
 class Payment(Base):
     """One paid membership invoice: the record of who paid what, where, for tax (VAT is owed where the customer is).
     Kept when the account is deleted (user_id cleared): financial records must be kept for six years."""

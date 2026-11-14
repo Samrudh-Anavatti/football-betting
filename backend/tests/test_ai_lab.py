@@ -31,6 +31,11 @@ def test_pick_legs():
     legs = [(leg(1, 0.9), 1.6), (leg(2, 0.9), 1.6), (leg(3, 0.9), 1.6), (leg(4, 0.85), 1.6), (leg(5, 0.86), 1.2)]
     assert [t.fixture_id for t, _ in ai_staking.pick_legs(legs, 5.0)] == [1, 2, 3, 5]  # 4.10 x 1.6 > 5.75; x 1.2 = 4.92
     assert ai_staking.pick_legs(legs[:2], 5.0) is None  # not enough yet
+    # Stopping short of the band (1.3^4 = 2.86 for a 3.5 target, 3.15-4.03), it swaps a 1.3 for the 1.5: 3.29.
+    legs = [(leg(i, 0.85), 1.3) for i in range(1, 5)] + [(leg(5, 0.7), 1.5)]
+    assert [p for _, p in ai_staking.pick_legs(legs, 3.5)] == [1.3, 1.3, 1.3, 1.5]
+    # Two legs from one match when allowed.
+    assert len(ai_staking.pick_legs([(leg(1, 0.9), 1.5), (leg(1, 0.85), 1.5), (leg(2, 0.8), 1.5)], 3.3, per_match=2)) == 3
 
 
 def test_pick_bundle_one_bookmaker():

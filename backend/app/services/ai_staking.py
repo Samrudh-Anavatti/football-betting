@@ -5,6 +5,7 @@ has no live bundle, `build_bundle` combines open legs into one at about the plan
 bookmaker (a multi can't mix them), with the plan's exact recovery stake, and the usual settlement settles it. Plain code, no model call: the judgement per match is the AI's.
 """
 import math
+from collections import Counter
 from datetime import datetime, timedelta
 
 from sqlalchemy import func, select
@@ -31,31 +32,45 @@ def open_legs(db: Session, now: datetime) -> list[tuple[Tip, dict[str, float]]]:
     return sorted(legs, key=lambda x: (-(x[0].ai_probability or 0), x[0].fixture.kickoff))
 
 
-def pick_legs(legs: list[tuple[Tip, float | None]], target: float) -> list[tuple[Tip, float]] | None:
-    """The likeliest legs, one per match, until their combined odds reach the target; a leg that would overshoot
-    too far is skipped for a shorter one. Skips legs whose price has drifted below the band or below the AI's own
-    fair price (it would no longer be a leg). None if they can't get near the target."""
+def pick_legs(legs: list[tuple[Tip, float | None]], target: float, per_match: int = 1) -> list[tuple[Tip, float]] | None:
+    """The likeliest legs, up to `per_match` from one match, until their combined odds reach the target; a leg that
+    would overshoot too far is skipped for a shorter one. If that stops just short, one chosen leg is swapped for the
+    likeliest unused leg that lifts the odds into the band. Skips legs whose price has drifted below the band or
+    below the AI's own fair price (it would no longer be a leg). None if they can't get near the target."""
     lo, hi = target * TOLERANCE[0], target * TOLERANCE[1]
-    chosen, matches, odds = [], set(), 1.0
-    for tip, price in legs:
-        if price is None or price < LEG_MIN_ODDS or price * (tip.ai_probability or 0) < 1:
-            continue
-        if tip.fixture_id in matches or odds * price > hi:
+    usable = [(t, p) for t, p in legs if p is not None and p >= LEG_MIN_ODDS and p * (t.ai_probability or 0) >= 1]
+    chosen, per, odds = [], Counter(), 1.0
+    for tip, price in usable:
+        if per[tip.fixture_id] >= per_match or odds * price > hi:
             continue
         chosen.append((tip, price))
-        matches.add(tip.fixture_id)
+        per[tip.fixture_id] += 1
         odds *= price
         if odds >= lo or len(chosen) == MAX_LEGS:
             break
+    if chosen and odds < lo:
+        taken = {id(t) for t, _ in chosen}
+        swap, swap_key = None, None
+        for i, (out, out_price) in reversed(list(enumerate(chosen))):  # the least likely chosen leg goes first
+            for tip, price in usable:
+                if id(tip) in taken or (tip.fixture_id != out.fixture_id and per[tip.fixture_id] >= per_match):
+                    continue
+                if lo <= odds / out_price * price <= hi and (swap_key is None or (tip.ai_probability or 0) > swap_key):
+                    swap, swap_key = (i, tip, price), tip.ai_probability or 0
+        if swap:
+            i, tip, price = swap
+            odds = odds / chosen[i][1] * price
+            chosen[i] = (tip, price)
     return chosen if chosen and odds >= lo else None
 
 
-def pick_bundle(legs: list[tuple[Tip, dict[str, float]]], target: float) -> tuple[str, list[tuple[Tip, float]]] | None:
+def pick_bundle(legs: list[tuple[Tip, dict[str, float]]], target: float,
+                per_match: int = 1) -> tuple[str, list[tuple[Tip, float]]] | None:
     """A multi is placed at one bookmaker, so build the bundle at each in turn with its own prices, and keep the one
     most likely to land (by the AI's probabilities), then the higher odds. None if no bookmaker reaches the target."""
     best, best_key = None, None
     for bookmaker in sorted({b for _, prices in legs for b in prices}):
-        chosen = pick_legs([(t, prices.get(bookmaker)) for t, prices in legs], target)
+        chosen = pick_legs([(t, prices.get(bookmaker)) for t, prices in legs], target, per_match)
         if chosen is None:
             continue
         key = (math.prod(t.ai_probability or 0 for t, _ in chosen), math.prod(p for _, p in chosen))

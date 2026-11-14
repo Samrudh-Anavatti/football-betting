@@ -9,7 +9,8 @@ from sqlalchemy.orm import Session
 from .. import config
 from ..database import get_db
 from ..deps import admin_user
-from ..models import Bet, Bundle, BundleLeg, Fixture, League, ProviderQuota, SyncRun, Tip, User
+from ..models import (Bet, Bundle, BundleLeg, Fixture, League, ProviderQuota, SessionBundle, SessionBundleLeg, SyncRun,
+                      Tip, User)
 from ..serialize import bet_dict, iso, league_dict, run_dict, tip_dict
 from ..services import scheduler, sync
 from .public import LEAGUE_ORDER
@@ -319,10 +320,14 @@ def settle_tip(tip_id: int, body: SettleIn, db: Session = Depends(get_db)):
         tip.status, tip.profit_units, tip.settled_at = "pending", None, None
     else:
         apply_result(tip, body.status, tip.stake_units)
-    # A bundle settled on this pick is decided again from its legs as they now stand.
+    # Bundles settled on this pick (a plan's, or tonight's) are decided again from their legs as they now stand.
+    reopened = []
     if leg := db.scalars(select(BundleLeg).where(BundleLeg.tip_id == tip.id)).first():
-        bundle = db.get(Bundle, leg.bundle_id)
+        reopened.append(db.get(Bundle, leg.bundle_id))
+    reopened += db.scalars(select(SessionBundle).join(SessionBundleLeg).where(SessionBundleLeg.tip_id == tip.id)).unique().all()
+    for bundle in reopened:
         bundle.status, bundle.profit, bundle.settled_at = "pending", None, None
+    if reopened:
         db.flush()
         settle_bundles(db)
     db.commit()

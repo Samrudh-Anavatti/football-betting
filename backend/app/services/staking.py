@@ -71,7 +71,9 @@ def settle_bundles(db: Session) -> int:
             b.status, b.profit = "won", round(b.stake * (odds - 1), 2)
         b.settled_at = datetime.utcnow()
         n += 1
-    return n
+    from .tonight import settle as settle_sessions  # here, not at the top: tonight imports this module's helpers
+
+    return n + settle_sessions(db)
 
 
 def survivable_losses(plan: StakingPlan) -> int:

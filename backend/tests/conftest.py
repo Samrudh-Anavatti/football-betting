@@ -134,12 +134,12 @@ def _wipe():
     """Tests share one database file; start each from no provider data or picks."""
     from app.database import Base, SessionLocal, engine
     from app.models import (AiMessage, AiPrediction, AiThread, Bet, Bundle, BundleLeg, Lineup, MarketBook, MatchContext,
-                            OddsSnapshot, StakingPlan, SyncRun, Tip)
+                            OddsSnapshot, SessionBundle, SessionBundleLeg, StakingPlan, SyncRun, Tip)
 
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
-    for model in (BundleLeg, Bundle, StakingPlan, Bet, Tip, AiMessage, AiPrediction, AiThread, Lineup, MarketBook,
-                  MatchContext, OddsSnapshot, SyncRun):
+    for model in (BundleLeg, Bundle, SessionBundleLeg, SessionBundle, StakingPlan, Bet, Tip, AiMessage, AiPrediction,
+                  AiThread, Lineup, MarketBook, MatchContext, OddsSnapshot, SyncRun):
         db.query(model).delete()
     db.commit()
     db.close()
