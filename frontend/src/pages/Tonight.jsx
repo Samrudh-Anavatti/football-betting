@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import DailyBundle from '../components/DailyBundle.jsx'
 import JoinCard from '../components/JoinCard.jsx'
 import { SubNav } from '../components/Shell.jsx'
 import { Empty, ErrorNote, LeagueBadge, Loading, Price, SectionHead } from '../components/ui.jsx'
@@ -407,10 +408,15 @@ export default function Tonight() {
         <SubNav tabs={BUNDLE_TABS} />
         <h1 className="text-4xl sm:text-5xl leading-none">Tonight's bundles</h1>
         <p className="max-w-prose text-[17px] text-ink-soft leading-relaxed">
-          Sitting down for a few matches? Tick the ones you're watching and the AI builds up to three bundles from its
-          surest calls on them. Something to cheer for in every game.
+          One bundle a day chosen by the AI from every match, free for everyone. Sitting down for a few matches?
+          Tick the ones you're watching and it builds up to three more from its surest calls on them.
         </p>
       </div>
+      <section>
+        <h2 className="text-2xl mb-3">Bundle of the day</h2>
+        <DailyBundle />
+      </section>
+      <h2 className="text-2xl">Build your own for tonight</h2>
       {checking ? <Loading rows={4} /> : <TonightInner canBuild={canBuild} />}
     </div>
   )

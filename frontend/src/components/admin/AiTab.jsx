@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
 import { api } from '../../lib/api.js'
@@ -90,6 +91,83 @@ function Scores({ scores }) {
   )
 }
 
+// Each AI provider's month against its budget, and the calls made for the bundle of the day. The figures are our
+// own count from the tokens each call used, not the provider's balance.
+function Meter({ name, s, note }) {
+  const share = Math.min(1, s.spent_usd / Math.max(s.limit_usd, 0.01))
+  return (
+    <div className="space-y-1.5">
+      <div className="flex flex-wrap items-end gap-x-3">
+        <p>
+          <span className="num text-3xl font-bold">{usd(s.left_usd)}</span>
+          <span className="text-ink-soft"> left of {usd(s.limit_usd)}</span>
+        </p>
+        <span className="text-sm text-ink-soft sm:ml-auto">
+          {name}: {s.model}
+          {!s.configured && ', not connected'}
+        </span>
+      </div>
+      <div className="h-2.5 rounded-full bg-ink/10 overflow-hidden" role="meter" aria-valuenow={s.spent_usd} aria-valuemin={0} aria-valuemax={s.limit_usd} aria-label={`${name} budget used`}>
+        <div className={`h-full ${share > 0.9 ? 'bg-red' : share > 0.7 ? 'bg-amber' : 'bg-pitch'}`} style={{ width: `${share * 100}%` }} />
+      </div>
+      <p className="text-sm text-ink-soft">{usd(s.spent_usd)} spent this month. {note}</p>
+    </div>
+  )
+}
+
+function DailySpend() {
+  const { data, error, reload } = useApi(() => api.dailyAdmin(), [])
+  const [busy, setBusy] = useState(false)
+  const [message, setMessage] = useState(null)
+  if (error) return <ErrorNote error={error} />
+  if (!data) return null
+  const build = async () => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      await api.dailyBuild()
+      setMessage("Asked for today's bundle; it takes a minute or two. Reload to see the call below.")
+    } catch (e) {
+      setMessage(e.message)
+    }
+    setBusy(false)
+    reload?.()
+  }
+  return (
+    <section className="panel px-5 py-4 space-y-4">
+      <div className="flex flex-wrap items-center gap-3">
+        <h2 className="text-xl">AI budgets this month</h2>
+        <button type="button" onClick={build} disabled={busy} className="btn-ghost ml-auto text-sm">Build today's bundle now</button>
+      </div>
+      {message && <p className="text-sm text-ink-soft">{message}</p>}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <Meter name="Claude" s={data.spend.claude} note="Picks the bundle of the day. Limit: CLAUDE_MONTHLY_BUDGET_USD; key: ANTHROPIC_API_KEY." />
+        <Meter name="Luna" s={data.spend.luna} note="Match reports, and the bundle of the day when Claude can't. Limit: AI_MONTHLY_BUDGET_USD." />
+      </div>
+      {data.calls.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="text-left text-ink-soft">
+              <tr><th className="py-1 pr-3 font-medium">Day</th><th className="pr-3 font-medium">Model</th><th className="pr-3 font-medium">Outcome</th><th className="pr-3 font-medium text-right">Tokens in / out</th><th className="font-medium text-right">Cost</th></tr>
+            </thead>
+            <tbody className="divide-y divide-ink/10">
+              {data.calls.map((c) => (
+                <tr key={c.id} title={c.note || ''}>
+                  <td className="py-1.5 pr-3 num">{c.day}</td>
+                  <td className="pr-3">{c.model || c.provider}</td>
+                  <td className="pr-3">{c.outcome}{c.note ? `: ${c.note}` : ''}</td>
+                  <td className="pr-3 num text-right">{c.input_tokens.toLocaleString()} / {c.output_tokens.toLocaleString()}</td>
+                  <td className="num text-right">{usd(c.cost_usd)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+}
+
 export default function AiTab() {
   const { data, loading, error } = useApi(() => api.aiSummary(), [])
   if (loading && !data) return <Loading />
@@ -98,6 +176,7 @@ export default function AiTab() {
 
   return (
     <div className="space-y-6">
+      <DailySpend />
       <section className="panel px-5 py-4 space-y-2">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-1">
           <p>

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import DailyBundle from '../components/DailyBundle.jsx'
 import FeaturedMatch from '../components/FeaturedMatch.jsx'
 import FixtureList from '../components/FixtureList.jsx'
 import { JoinButtons, LockIcon } from '../components/JoinCard.jsx'
@@ -207,6 +208,11 @@ export default function Home() {
           </div>
           <FeaturedMatch data={featured.data} />
         </div>
+      </section>
+
+      <section data-tour="daily">
+        <SectionHead title="Bundle of the day" />
+        <DailyBundle />
       </section>
 
       <section data-tour="tonight">

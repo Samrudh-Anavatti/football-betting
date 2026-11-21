@@ -207,6 +207,41 @@ admin views; only what the public API returns for display changed.
   unchanged.
 * **Never present windowed numbers as all-time:** any new place that shows these figures must say the window.
 
+## Bundle of the day (built 2026-11-21)
+
+One accumulator a day at about 6.00, chosen by a model that reads every leg on the day's matches together, shown
+to everyone (no account needed) on the home page and at the top of `/tonight`. It is the site's free headline pick;
+sessions, targets, ticking matches and a custom stake stay behind the account.
+
+* **Pipeline** (`backend/app/services/daily.py`): Luna still analyses each match and leaves legs (`ai_leg`, `ai`
+  tips). From 08:00 UTC the schedule's AI tick asks for the day's bundle once (`daily.due`, retried each half hour
+  while legs are thin or a call failed, at most 4 calls a day, nothing new after 18:00). The model gets every open
+  leg kicking off before 05:00 UTC next day with Luna's summary, key factors, data gaps, reasoning and each
+  bookmaker's price (`daily.brief`), and returns a bookmaker, 3 to 8 leg ids with a plain-words reason each, and a
+  summary, or `no_bundle` with a sentence why (shown to visitors; final for the day).
+* **Checked in code** (`daily.check`): legs must be candidates, all priced at the one bookmaker, at most 2 per
+  match, odds within 85–125% of the target. A bad answer gets one more go with the reason it was refused.
+* **Who is asked** (`backend/app/ai/reviewer.py`, prompt `ai/prompts/daily_v1.md`): **Claude** (`CLAUDE_MODEL`,
+  default `claude-opus-5-5`, effort `CLAUDE_EFFORT`) when `ANTHROPIC_API_KEY` is set and this month's Claude spend is
+  under `CLAUDE_MONTHLY_BUDGET_USD` (default 100); otherwise, or on an error, **Luna** on her own budget. Every call
+  is an `ai_calls` row (provider, model, outcome, tokens, cost).
+* **Staking run:** plan `source="daily"` in `staking_plans` (base 6, target 6.00), bundles in `bundles` with `day`,
+  `model`, `summary` and a `reason` per leg. Stake = `staking.stake_for`; **after 6 misses in a row the run is
+  written off** and the next starts at the base stake (`daily.run_state`, `MAX_MISSES`). One live bundle at a time.
+  Settles with the other bundles. The site shows the stake as a multiple of the visitor's usual stake (£10 for
+  visitors; accounts set their own, kept in the browser).
+* **API** (`routers/daily.py`): `GET /daily` (public): latest bundle, where the run stands, this run's earlier days,
+  one line on the run before. `GET /daily/admin`: both providers' month against their budgets and the last 20
+  calls. `POST /daily/build`: make today's now (admin).
+* **Admin → AI** has the two budget meters, the calls table and the build button. The figures are our own count
+  from token usage, not Anthropic's balance.
+* **Frontend:** `components/DailyBundle.jsx` (home section `data-tour="daily"`, and the top of `/tonight`).
+* **Changed with it:** the AI Lab ladder no longer builds bundles by itself (it competed for the same legs); its
+  Build button in Admin → AI Lab still works.
+* **To turn Claude on:** create an API key at console.anthropic.com and set it on the App Service:
+  `az webapp config appsettings set -g rg-football-betting -n <app name> --settings ANTHROPIC_API_KEY=<key>`.
+  Until then Luna makes the bundle.
+
 ## Staking plan (built 2026-11-01)
 
 Ivo's method: his picks combined into one bet ("bundle") at about 6.00, and after a loss the next stake is raised so
@@ -498,6 +533,9 @@ the settings above.
 * Locally, `python -m app.demo` loads fake data. Never run it against production.
 
 ## Next steps
+
+* [x] Bundle of the day (2026-11-21), see there. **Next:** Sam to set `ANTHROPIC_API_KEY`; watch a week of
+  bundles and Claude's cost per day before changing the target or the 6-miss reset.
 
 * [x] Site restructured around a free account (2026-11-21), see "Site structure and access levels". **Next:** a
   payment provider, then move the chosen features to `"member"` in `access.py` and rewrite the Membership page.

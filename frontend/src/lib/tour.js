@@ -21,6 +21,10 @@ const STEPS = {
       text: "Today's picks. Each goes up before kick-off with the price we took and the thinking behind it. Open any match for the odds board and the AI's read on it.",
     },
     {
+      target: 'daily',
+      text: "The bundle of the day: one bet a day, chosen by the AI from every match, with the reason for each leg and what to stake. It's free to see, every day.",
+    },
+    {
       target: 'tonight',
       text: "Watching a few games? Tonight's bundles turns the AI's surest calls on them into two or three bets to cheer for. Our staking plan and the arbitrage finder sit alongside.",
     },

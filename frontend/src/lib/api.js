@@ -125,6 +125,10 @@ export const api = {
   aiLabDeleteBundle: (id) => request(`/admin/ai-lab/staking/bundles/${id}`, { method: 'DELETE' }),
   aiLabArbs: () => request('/admin/ai-lab/arbs'),
   arbitrage: () => request('/arbitrage'),
+  // The bundle of the day (public) and the AI spend behind it (admins)
+  daily: () => request('/daily'),
+  dailyAdmin: () => request('/daily/admin'),
+  dailyBuild: () => request('/daily/build', { method: 'POST' }),
   // Tonight's bundles
   tonightSessions: () => request('/tonight/sessions'),
   tonightBuild: (body) => request('/tonight/bundles', { method: 'POST', body }),
