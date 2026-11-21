@@ -33,8 +33,6 @@ const SAMPLE = {
       ],
     },
   ],
-  recent: [],
-  stats: { days: 7, closed: 14, genuine: 9, median_minutes: 55, average_profit: 0.017 },
 }
 
 function Live() {

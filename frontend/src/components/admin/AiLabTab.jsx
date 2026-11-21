@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
 import { api } from '../../lib/api.js'
-import { ago, dayLabel, kickoffTime, money, odds, pct, pickLabel, shortDate, signed, teamify } from '../../lib/format.js'
+import { ago, dayLabel, kickoffTime, money, odds, pct, pickLabel, signed, teamify } from '../../lib/format.js'
 import { matchPath } from '../../lib/seo.js'
 import { BundleHistory, BundleSlip, Ladder, Stat } from '../../pages/Staking.jsx'
 import { ErrorNote, Freshness, LeagueBadge, Loading, Price, SectionHead } from '../ui.jsx'
@@ -245,11 +245,11 @@ function ArbCard({ a, total }) {
   )
 }
 
-// The arbitrage list. Also the public Arbitrage page (pages/Arbitrage.jsx), which passes its own `data`: the
+// The arbitrage list: what is open now and a stake calculator, no history. Also the public Arbitrage page (pages/Arbitrage.jsx), which passes its own `data`: the
 // real list for an account, a made-up one for the preview.
 export function ArbitrageView({ data }) {
   const [total, setTotal] = useState(100)
-  const { live, recent, stats, scanned_at: scannedAt } = data
+  const { live, scanned_at: scannedAt } = data
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
@@ -285,33 +285,6 @@ export function ArbitrageView({ data }) {
         )}
       </section>
 
-      <section>
-        <SectionHead title={`Last ${stats.days} days`} count={stats.closed || null} />
-        <p className="text-sm text-ink-soft mb-3">
-          {stats.genuine} of {stats.closed} looked genuine
-          {stats.median_minutes != null && <>, visible for a median of {stats.median_minutes} min</>}
-          {stats.average_profit != null && <>, averaging {pct(stats.average_profit, 2)} at best</>}.
-        </p>
-        {recent.length > 0 && (
-          <ol className="panel divide-y divide-ink/5 text-sm">
-            {recent.map((a) => (
-              <li key={a.id} className="px-4 py-2 flex items-center gap-3">
-                <span className="w-16 shrink-0 text-ink-soft num hidden sm:block">{shortDate(a.first_seen)}</span>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-semibold">
-                    {a.market}
-                    {a.line != null && ` ${a.line}`}
-                    {a.suspect && <span className="ml-2 text-xs text-amber-dark">likely a bad price</span>}
-                  </p>
-                  <p className="truncate text-ink-soft">{a.fixture.home.name} v {a.fixture.away.name}</p>
-                </div>
-                <span className="num shrink-0 text-ink-soft">{a.legs.map((l) => odds(l.price)).join(' / ')}</span>
-                <span className="num w-16 text-right font-semibold shrink-0">{pct(a.best_profit, 2)}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
     </div>
   )
 }
