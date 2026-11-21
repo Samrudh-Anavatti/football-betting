@@ -272,6 +272,9 @@ def members_overview(db: Session) -> dict:
                               .order_by(User.member_since.desc())))
     payments = list(db.scalars(select(Payment).order_by(Payment.paid_at.desc())))
     year_ago = now - timedelta(days=365)
+    # Everyone who has signed up (an email and a password is all sign-up asks for), newest first.
+    accounts = list(db.scalars(select(User).where(User.is_admin.is_(False), User.email.is_not(None))
+                               .order_by(User.created_at.desc(), User.id.desc())))
     by_country: dict[tuple[str, str], dict] = {}
     for p in payments:
         if p.paid_at < year_ago:
@@ -285,6 +288,9 @@ def members_overview(db: Session) -> dict:
         row["card_elsewhere"] += bool(p.card_country and p.billing_country and p.card_country != p.billing_country)
     return {
         "open": ready(),
+        "signups": [{"id": u.id, "email": u.email, "created_at": iso(u.created_at), "member": is_member(u, now)}
+                    for u in accounts],
+        "signups_week": sum(bool(u.created_at and u.created_at >= now - timedelta(days=7)) for u in accounts),
         "active": sum(is_member(u, now) for u in members),
         "members": [{
             "id": u.id, "email": u.email, **membership_dict(u), "billing_country": u.billing_country,

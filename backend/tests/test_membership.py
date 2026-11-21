@@ -139,6 +139,9 @@ def test_join_pay_renew_and_lapse(client, auth, stripe_fake):
     overview = client.get(f"{API}/admin/members", headers=auth).json()
     row = next(r for r in overview["members"] if r["email"] == "joiner@example.com")
     assert (row["billing_country"], row["card_country"]) == ("DE", "FR")
+    # Every sign-up is listed, paying or not, with when they joined.
+    joined = next(r for r in overview["signups"] if r["email"] == "joiner@example.com")
+    assert joined["created_at"] and overview["signups_week"] >= 1 and all(r["email"] for r in overview["signups"])
     assert {"country": "DE", "currency": "GBP", "payments": 2, "amount": 798, "tax": 0, "card_elsewhere": 0} in overview["by_country"]
     csv = client.get(f"{API}/admin/members/payments.csv", headers=auth)
     assert csv.status_code == 200 and "in_first,3.99,0.00,GBP,DE,DE" in csv.text
