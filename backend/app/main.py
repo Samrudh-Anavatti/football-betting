@@ -5,7 +5,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from .database import Base, SessionLocal, add_missing_columns, drop_arb_history, engine
+from .database import Base, SessionLocal, add_missing_columns, engine
 from .routers import admin, ai, ai_lab, arbitrage, auth, daily, membership, public, staking, tonight
 from .seed import sync_users
 from .services import daily as daily_bundle, scheduler
@@ -44,7 +44,6 @@ app.include_router(membership.router, prefix="/api/v1")
 def on_startup():
     Base.metadata.create_all(bind=engine)
     add_missing_columns()
-    drop_arb_history()
     sync_users()
     db = SessionLocal()
     try:

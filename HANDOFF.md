@@ -470,8 +470,8 @@ The ladder here is the *test* (do the AI's legs beat their prices?); what people
 * **No history (2026-11-21, Sam: "holding the arbitrage history is completely useless").** A sighting is a row
   only while it is open: `scan()` deletes it when a later pull no longer shows it, or at kick-off. The page and the
   tab show the open ones with a stake calculator, nothing else (`overview()` returns `scanned_at` and `live`). The
-  closed rows kept before that were deleted and the `gone_at` column dropped by a one-off at start-up
-  (`database.drop_arb_history`, removed again once it had run).
+  closed rows kept before that were deleted and the `gone_at` column dropped on 2026-11-21 by a one-off at
+  start-up, since removed from the code.
 * Sightings under 1% (`arbitrage.MIN_PROFIT`) are still tracked while open but left off the list (the page was
   too crowded). The "Prices … ago" on each is when API-Football last updated its copy, not when we pulled, so extra
   pulls wouldn't freshen it (Sam: leave as is).

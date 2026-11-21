@@ -81,17 +81,3 @@ def get_db():
         yield db
     finally:
         db.close()
-
-
-def drop_arb_history() -> None:
-    """One-off (2026-11-21): closed arbitrage sightings are no longer kept, so delete the ones stored before that and
-    drop the column that marked them. Does nothing once the column is gone, or on a database made without it."""
-    from sqlalchemy import inspect, text
-
-    insp = inspect(engine)
-    if not insp.has_table("arb_sightings") or "gone_at" not in {c["name"] for c in insp.get_columns("arb_sightings")}:
-        return
-    with engine.begin() as conn:
-        conn.execute(text("DELETE FROM arb_sightings WHERE gone_at IS NOT NULL"))
-        conn.execute(text("DROP INDEX IF EXISTS ix_arb_sightings_gone_at"))  # SQLite won't drop an indexed column
-        conn.execute(text("ALTER TABLE arb_sightings DROP COLUMN gone_at"))
