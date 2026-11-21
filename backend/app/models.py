@@ -450,8 +450,8 @@ class StripeEvent(Base):
 
 class ArbSighting(Base):
     """An arbitrage seen in our prices (AI Lab): the best prices across bookmakers for every outcome of one market
-    add up to less than 100%, so backing them all in proportion locks in `profit`. Kept from first sight until a
-    price pull no longer shows it (`gone_at`), to learn how often real ones appear and how long they last."""
+    add up to less than 100%, so backing them all in proportion locks in `profit`. A row only while it is open: it
+    is deleted when a price pull no longer shows it or the match kicks off (no history is kept)."""
 
     __tablename__ = "arb_sightings"
 
@@ -468,7 +468,6 @@ class ArbSighting(Base):
     first_seen: Mapped[datetime] = mapped_column(DateTime)
     last_seen: Mapped[datetime] = mapped_column(DateTime)
     prices_at: Mapped[datetime | None] = mapped_column(DateTime)  # when API-Football last updated the prices
-    gone_at: Mapped[datetime | None] = mapped_column(DateTime, index=True)
 
     fixture: Mapped[Fixture] = relationship(lazy="selectin")
 

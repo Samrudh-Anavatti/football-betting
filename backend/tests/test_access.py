@@ -68,5 +68,5 @@ def test_accounts_get_the_staking_plan_and_arbitrage(client):
     h = signup(client, "tools@example.com")
     assert client.get(f"{API}/staking", headers=h).status_code == 200
     r = client.get(f"{API}/arbitrage", headers=h)
-    assert r.status_code == 200 and set(r.json()) == {"scanned_at", "live", "recent", "stats"}
+    assert r.status_code == 200 and set(r.json()) == {"scanned_at", "live"}
     assert client.get(f"{API}/admin/ai-lab/arbs", headers=h).status_code == 403  # the lab itself stays the team's

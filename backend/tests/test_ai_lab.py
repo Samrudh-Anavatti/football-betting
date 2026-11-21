@@ -158,23 +158,29 @@ def test_arb_sightings(client, auth, fake):
     live = client.get(f"{API}/admin/ai-lab/arbs", headers=auth).json()["live"]
     assert [(a["fixture"]["id"], a["market"], a["line"]) for a in live] == [(1001, "Goals Over/Under", 2.5)]
 
-    # The next pull no longer shows it: closed at that pull.
+    # The next pull no longer shows it: the sighting is deleted, not kept as history.
     with SessionLocal() as db:
         db.merge(MarketBook(fixture_id=1001, pulled_at=t0 + timedelta(minutes=59), provider_updated_at=t0,
                             bookmakers_json=json.dumps([book(8, "Bet365", 1.9, 1.9), book(4, "Pinnacle", 1.9, 1.9)])))
         db.commit()
         arbitrage.scan(db, t0 + timedelta(hours=1))
     r = client.get(f"{API}/admin/ai-lab/arbs", headers=auth).json()
-    assert r["live"] == [] and r["recent"][0]["gone_at"] is not None
+    assert set(r) == {"scanned_at", "live"} and r["live"] == []
+    with SessionLocal() as db:
+        assert db.scalars(select(ArbSighting)).all() == []
 
-    # One under 1% (1/2.01 + 1/2.01 = 0.995) is recorded but left off the list.
+    # One under 1% (1/2.01 + 1/2.01 = 0.995) is tracked but left off the list.
     with SessionLocal() as db:
         db.merge(MarketBook(fixture_id=1001, pulled_at=t0 + timedelta(minutes=119), provider_updated_at=t0,
                             bookmakers_json=json.dumps([book(8, "Bet365", 2.01, 1.75), book(4, "Pinnacle", 1.80, 2.01)])))
         db.commit()
         arbitrage.scan(db, t0 + timedelta(hours=2))
-        assert db.scalar(select(ArbSighting).where(ArbSighting.gone_at.is_(None))).profit < arbitrage.MIN_PROFIT
+        assert db.scalar(select(ArbSighting)).profit < arbitrage.MIN_PROFIT
     assert client.get(f"{API}/admin/ai-lab/arbs", headers=auth).json()["live"] == []
+    # Kick-off ends whatever is still open.
+    with SessionLocal() as db:
+        arbitrage.scan(db, KICKOFF + timedelta(minutes=1))
+        assert db.scalars(select(ArbSighting)).all() == []
     with SessionLocal() as db:
         db.execute(delete(ArbSighting))
         db.delete(db.get(MarketBook, 1001))
