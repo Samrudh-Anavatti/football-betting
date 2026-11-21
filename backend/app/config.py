@@ -47,8 +47,9 @@ ODDS_MARKETS = ["h2h", "totals"]
 
 # Main price source: API-Football's /odds (every market it carries), kept for
 # these bookmakers only. Ids from /odds/bookmakers. Default: Bet365, William
-# Hill, Betfair, BetVictor, Pinnacle (the sharp reference for fair prices).
-ODDS_BOOKMAKERS = [int(x) for x in os.getenv("ODDS_BOOKMAKERS", "8,7,3,36,4").split(",") if x.strip()]
+# Hill, Betfair, BetVictor, Betano: the five in the feed that take UK customers
+# (see HANDOFF.md, "Bookmakers"). The App Service has its own ODDS_BOOKMAKERS setting.
+ODDS_BOOKMAKERS = [int(x) for x in os.getenv("ODDS_BOOKMAKERS", "8,7,3,36,32").split(",") if x.strip()]
 
 # ── AI analysis (GPT-5.6 Luna on Microsoft Foundry) ──
 # FOUNDRY_RESOURCE is the resource name (foundry-football-sa), not the URL.

@@ -1,12 +1,13 @@
 // A bookmaker's name as a link to its football pages, wherever a price, pick or bundle names one. These are the
 // bookmakers' own front doors, not the match or the bet: that needs each bookmaker's own id for the match, which
 // our price feed doesn't carry (see HANDOFF.md, "Bookmaker links"). An affiliate code, once we have one, goes on
-// the address here. Pinnacle has no link: it doesn't take customers from the UK, where most visitors are.
+// the address here. A name not in the table (an old pick priced at Pinnacle, say) shows as plain text.
 const SITES = {
   bet365: 'https://www.bet365.com/',
   williamhill: 'https://sports.williamhill.com/betting/en-gb/football',
   betfair: 'https://www.betfair.com/sport/football',
   betvictor: 'https://www.betvictor.com/en-gb/sports',
+  betano: 'https://www.betano.co.uk/en-gb/sport/football',
 }
 
 export function bookmakerUrl(name) {

@@ -58,7 +58,7 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 | `CORS_ORIGINS` | — | `https://football-predictions.org,https://www.football-predictions.org,http://localhost:5173` |
 | `DATABASE_URL` | — (SQLite in `DATA_DIR`) | `postgresql+psycopg://fbadmin:<pw>@pg-football-betting-sa.postgres.database.azure.com:5432/football?sslmode=require`. The only place the DB password lives. |
 | `DATA_DIR` | /home/data | Where SQLite lives when `DATABASE_URL` is unset (local, tests; the production fallback until 2026-11-07). |
-| `ODDS_BOOKMAKERS` | 8,7,3,36,4 | API-Football bookmaker ids kept on the board: Bet365, William Hill, Betfair, BetVictor, Pinnacle. Ids from `/odds/bookmakers`. Swap when the affiliate deals are decided. |
+| `ODDS_BOOKMAKERS` | 8,7,3,36,32 | API-Football bookmaker ids kept on the board: Bet365, William Hill, Betfair, BetVictor, Betano (see "Bookmakers"). Set on the App Service as well as in `config.py`. Ids from `/odds/bookmakers`. |
 | `FOUNDRY_RESOURCE` / `FOUNDRY_API_KEY` | — | The Foundry resource the AI runs on. Key: `az cognitiveservices account keys list -g rg-football-betting -n foundry-football-sa`. |
 | `AI_MODEL` | gpt-5.6-luna | A Foundry deployment name that speaks the Responses API (e.g. `gpt-5.6-terra` after deploying it). Add its price to `AI_PRICES` in `config.py`. |
 | `AI_EFFORT` | high | Reasoning effort per call (low / medium / high). |
@@ -243,11 +243,25 @@ sessions, targets, ticking matches and a custom stake stay behind the account.
   `az webapp config appsettings set -g rg-football-betting -n <app name> --settings ANTHROPIC_API_KEY=<key>`.
   Until then Luna makes the bundle.
 
+## Bookmakers (changed 2026-11-21)
+
+**Bet365, William Hill, Betfair, BetVictor, Betano** (`ODDS_BOOKMAKERS` 8,7,3,36,32). Betano replaced Pinnacle,
+which left Great Britain in 2014 and dropped its licence application in 2018: UK visitors couldn't bet the prices
+(or most of the arbitrage list, which leaned on Pinnacle).
+
+Measured 2026-11-21: `/odds/bookmakers` names 36 bookmakers but only ten actually price our matches. Markets on a
+Premier League match: Bet365 104, Marathonbet 54, Betano 54, 1xBet 40, William Hill 33, Pinnacle 19, Betfair 17,
+BetVictor 14, SBO 11, Dafabet 1 (Serie A and the Süper Lig the same; League One had only 1xBet and Dafabet that
+day). Of the ten, only our five take UK customers (Betano launched in the UK in 2024, betano.co.uk). **Paddy Power,
+Ladbrokes, Unibet, Betway, 888 and Sky Bet are not in the feed's data**, so adding one needs another price source.
+Losing Pinnacle also loses the sharpest price from the fair-price consensus; old picks and bundles priced there keep
+its name.
+
 ## Bookmaker links (2026-11-21)
 
 Wherever a price, pick, bundle or arbitrage leg names a bookmaker, the name links to that bookmaker's football pages
-(`frontend/src/components/BookLink.jsx`, one table of addresses; new tab, `nofollow`). Pinnacle has no link (it
-doesn't take UK customers; unverified, Sam to confirm).
+(`frontend/src/components/BookLink.jsx`, one table of addresses; new tab, `nofollow`). A bookmaker not in the table
+(old picks priced at Pinnacle) shows as plain text.
 
 * **Not match or bet-slip links.** Every bookmaker's URL needs its own id for the match, and API-Football's odds
   carry no link or bookmaker-side id; building them ourselves would mean scraping five betting sites. The Odds API
