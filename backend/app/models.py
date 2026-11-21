@@ -315,7 +315,7 @@ class StakingPlan(Base):
     __tablename__ = "staking_plans"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    source: Mapped[str] = mapped_column(String(8), default="ivo", unique=True)  # ivo | ai
+    source: Mapped[str] = mapped_column(String(8), default="ivo", unique=True)  # ivo | ai | daily
     base_stake: Mapped[float] = mapped_column(Float, default=6.0)
     target_odds: Mapped[float] = mapped_column(Float, default=6.0)
     bank: Mapped[float] = mapped_column(Float, default=150.0)
@@ -339,6 +339,10 @@ class Bundle(Base):
     profit: Mapped[float | None] = mapped_column(Float)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     settled_at: Mapped[datetime | None] = mapped_column(DateTime)
+    # The bundle of the day only (plan "daily"): the day it is for, who chose it, and why.
+    day: Mapped[str | None] = mapped_column(String(10), index=True)  # "2026-11-22" (UTC)
+    model: Mapped[str | None] = mapped_column(String(40))
+    summary: Mapped[str | None] = mapped_column(Text)
 
     legs: Mapped[list["BundleLeg"]] = relationship(lazy="selectin", cascade="all, delete-orphan",
                                                    order_by="BundleLeg.id")
@@ -351,8 +355,28 @@ class BundleLeg(Base):
     bundle_id: Mapped[int] = mapped_column(ForeignKey("bundles.id"), index=True)
     tip_id: Mapped[int] = mapped_column(ForeignKey("tips.id"), unique=True)  # a pick goes in one bundle at most
     odds: Mapped[float] = mapped_column(Float)  # the pick's odds when bundled
+    reason: Mapped[str | None] = mapped_column(Text)  # the bundle of the day: why this leg is in
 
     tip: Mapped[Tip] = relationship(lazy="selectin")
+
+
+class AiCall(Base):
+    """One model call that isn't part of a match thread (the bundle of the day): what it used and cost, so each
+    provider's month can be added up. `provider` is "claude" (Anthropic) or "foundry" (Luna)."""
+
+    __tablename__ = "ai_calls"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    provider: Mapped[str] = mapped_column(String(10), index=True)
+    model: Mapped[str] = mapped_column(String(40))
+    purpose: Mapped[str] = mapped_column(String(20))  # daily_bundle
+    day: Mapped[str | None] = mapped_column(String(10), index=True)
+    outcome: Mapped[str] = mapped_column(String(12))  # bundle | no_bundle | invalid | error
+    note: Mapped[str | None] = mapped_column(Text)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0)
+    cost_usd: Mapped[float] = mapped_column(Float, default=0.0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
 
 
 class SessionBundle(Base):

@@ -44,7 +44,7 @@ from ..database import SessionLocal
 from ..models import AiThread, Fixture, League, MarketBook, MatchContext, ProviderQuota, Setting, SyncRun, User
 from ..providers.base import ProviderError
 from ..serialize import run_dict
-from . import ai_staking, arbitrage, sync
+from . import arbitrage, daily, sync
 from .settlement import FINISHED, VOIDED
 
 log = logging.getLogger(__name__)
@@ -84,6 +84,7 @@ JOBS = [
     Job("context_light", "Match-day research", "Main leagues: hourly from 8 h before, injuries and prediction"),
     Job("lineups", "Line-ups", "Main leagues: every 10 min from 75 min before until they're out"),
     Job("analysis", "AI analysis", "Main leagues: when a match comes within 7 days, and again 6 h before"),
+    Job("daily_bundle", "Bundle of the day", "Once a day from 08:00 UTC: Claude picks it from the day's legs (Luna if Claude can't)"),
 ]
 
 
@@ -339,9 +340,10 @@ def ai_tick(db: Session, now: datetime | None = None) -> None:
 
     now = now or datetime.utcnow()
     db.expire_all()
-    # Plain code, no model or API calls: the AI Lab's bundles and the arbitrage scan.
-    ai_staking.build_bundle(db, now)
-    arbitrage.scan(db, now)
+    arbitrage.scan(db, now)  # plain code, no model or API calls
+    # The bundle of the day: one call a day, tried again each half hour while it's due (legs still thin, an error).
+    if daily.due(db, now) and _attempt_ok(("daily",), now, timedelta(minutes=30)):
+        _run(db, "daily_bundle", daily.day_of(now), 1, daily.job, provider="claude")
     if not ai_client.configured():
         return
     if service.month_spend(db) >= config.AI_MONTHLY_BUDGET_USD * config.AI_AUTO_BUDGET_SHARE:

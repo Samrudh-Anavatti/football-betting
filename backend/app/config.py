@@ -66,6 +66,18 @@ AI_PRICES = {
     "gpt-5.6-terra": (2.00, 12.00, 0.20),
 }
 
+# ── The bundle of the day (Claude on Anthropic's API; Luna does it when Claude can't) ──
+# Dormant until ANTHROPIC_API_KEY is set: Luna then builds the day's bundle on her own budget.
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "").strip()
+CLAUDE_MODEL = os.getenv("CLAUDE_MODEL", "claude-opus-5-5")
+CLAUDE_EFFORT = os.getenv("CLAUDE_EFFORT", "high")
+CLAUDE_MONTHLY_BUDGET_USD = float(os.getenv("CLAUDE_MONTHLY_BUDGET_USD", "100"))
+# USD per million tokens: input, output, cache read, cache write.
+CLAUDE_PRICES = {
+    "claude-opus-5-5": (4.00, 20.00, 0.20, 5.00),
+    "claude-sonnet-5-5": (2.00, 10.00, 0.10, 2.50),
+}
+
 
 @dataclass(frozen=True)
 class LeagueDef:

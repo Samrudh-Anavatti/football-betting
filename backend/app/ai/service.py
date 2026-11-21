@@ -27,7 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from .. import config
-from ..models import AiMessage, AiPrediction, AiThread, BundleLeg, Fixture, Tip, User
+from ..models import AiCall, AiMessage, AiPrediction, AiThread, BundleLeg, Fixture, Tip, User
 from ..services.markets import market_probs, parse_value, to_code
 from ..services.board import match_board
 from .bundle import build_bundle, find_selection, serialise
@@ -153,9 +153,12 @@ class AiError(Exception):
 
 
 def month_spend(db: Session) -> float:
+    """Luna's month: the match threads plus her other calls (the bundle of the day when she stands in for Claude)."""
     start = datetime.utcnow().replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-    return round(db.scalar(select(func.coalesce(func.sum(AiMessage.cost_usd), 0.0))
-                           .where(AiMessage.created_at >= start)) or 0.0, 4)
+    threads = db.scalar(select(func.coalesce(func.sum(AiMessage.cost_usd), 0.0)).where(AiMessage.created_at >= start))
+    calls = db.scalar(select(func.coalesce(func.sum(AiCall.cost_usd), 0.0))
+                      .where(AiCall.provider == "foundry", AiCall.created_at >= start))
+    return round((threads or 0.0) + (calls or 0.0), 4)
 
 
 def estimate_cost(bundle_text: str) -> float:

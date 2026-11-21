@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from .database import Base, SessionLocal, add_missing_columns, engine
-from .routers import admin, ai, ai_lab, arbitrage, auth, membership, public, staking, tonight
+from .routers import admin, ai, ai_lab, arbitrage, auth, daily, membership, public, staking, tonight
 from .seed import sync_users
 from .services import scheduler
 from .services.settlement import settle_pending
@@ -36,6 +36,7 @@ app.include_router(staking.router, prefix="/api/v1")
 app.include_router(ai_lab.router, prefix="/api/v1")
 app.include_router(tonight.router, prefix="/api/v1")
 app.include_router(arbitrage.router, prefix="/api/v1")
+app.include_router(daily.router, prefix="/api/v1")
 app.include_router(membership.router, prefix="/api/v1")
 
 
