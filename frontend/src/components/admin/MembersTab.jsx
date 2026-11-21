@@ -41,10 +41,38 @@ export default function MembersTab() {
       )}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
         <div className="panel px-4 py-3">
-          <p className="text-sm text-ink-soft">Members now</p>
+          <p className="text-sm text-ink-soft">Accounts</p>
+          <p className="num text-3xl font-semibold">{data.signups.length}</p>
+        </div>
+        <div className="panel px-4 py-3">
+          <p className="text-sm text-ink-soft">Joined in the last 7 days</p>
+          <p className="num text-3xl font-semibold">{data.signups_week}</p>
+        </div>
+        <div className="panel px-4 py-3">
+          <p className="text-sm text-ink-soft">Paying members now</p>
           <p className="num text-3xl font-semibold">{data.active}</p>
         </div>
       </div>
+
+      <section>
+        <SectionHead title="Sign-ups" count={data.signups.length || null} />
+        {data.signups.length ? (
+          <ol className="panel divide-y divide-ink/5 text-sm">
+            {data.signups.map((u) => (
+              <li key={u.id} className="px-4 py-2.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+                <span className="font-semibold min-w-0 truncate flex-1 select-all">{u.email}</span>
+                {u.member && <span className="text-pitch font-semibold">Paying</span>}
+                <span className="num text-ink-soft">
+                  {u.created_at ? new Date(u.created_at).toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : 'date not recorded'}
+                </span>
+              </li>
+            ))}
+          </ol>
+        ) : (
+          <Empty title="No sign-ups yet" />
+        )}
+        <p className="mt-2 text-sm text-ink-soft">Sign-up asks only for an email and a password, so the email and the time are all we hold.</p>
+      </section>
 
       <section>
         <SectionHead title="Payments by country, last 12 months">
@@ -84,7 +112,7 @@ export default function MembersTab() {
       </section>
 
       <section>
-        <SectionHead title="Members" count={data.members.length || null} />
+        <SectionHead title="Paying members" count={data.members.length || null} />
         {data.members.length ? (
           <ol className="panel divide-y divide-ink/5 text-sm">
             {data.members.map((m) => (
