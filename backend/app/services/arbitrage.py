@@ -20,7 +20,8 @@ from ..serialize import fixture_dict, iso
 from .markets import build_markets
 
 SUSPECT_ABOVE = 0.10  # a "profit" this big is almost always a wrong or stale price
-SCAN_KEY = "arb_scanned_at"
+MIN_PROFIT = 0.01  # smaller ones aren't worth the trip to two bookmakers; recorded, but left off the lists
+SCAN_KEY ="arb_scanned_at"
 TS_FMT = "%Y-%m-%dT%H:%M:%S.%f"
 
 
@@ -93,8 +94,10 @@ def sighting_dict(s: ArbSighting) -> dict:
 
 def overview(db: Session, days: int = 7) -> dict:
     now = datetime.utcnow()
-    live = list(db.scalars(select(ArbSighting).where(ArbSighting.gone_at.is_(None)).order_by(ArbSighting.profit.desc())))
-    recent = list(db.scalars(select(ArbSighting).where(ArbSighting.gone_at >= now - timedelta(days=days))
+    live = list(db.scalars(select(ArbSighting).where(ArbSighting.gone_at.is_(None), ArbSighting.profit >= MIN_PROFIT)
+                           .order_by(ArbSighting.profit.desc())))
+    recent = list(db.scalars(select(ArbSighting).where(ArbSighting.gone_at >= now - timedelta(days=days),
+                                                       ArbSighting.best_profit >= MIN_PROFIT)
                              .order_by(ArbSighting.gone_at.desc()).limit(100)))
     genuine = [s for s in recent if not s.suspect]
     row = db.get(Setting, SCAN_KEY)

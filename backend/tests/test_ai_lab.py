@@ -166,6 +166,15 @@ def test_arb_sightings(client, auth, fake):
         arbitrage.scan(db, t0 + timedelta(hours=1))
     r = client.get(f"{API}/admin/ai-lab/arbs", headers=auth).json()
     assert r["live"] == [] and r["recent"][0]["gone_at"] is not None
+
+    # One under 1% (1/2.01 + 1/2.01 = 0.995) is recorded but left off the list.
+    with SessionLocal() as db:
+        db.merge(MarketBook(fixture_id=1001, pulled_at=t0 + timedelta(minutes=119), provider_updated_at=t0,
+                            bookmakers_json=json.dumps([book(8, "Bet365", 2.01, 1.75), book(4, "Pinnacle", 1.80, 2.01)])))
+        db.commit()
+        arbitrage.scan(db, t0 + timedelta(hours=2))
+        assert db.scalar(select(ArbSighting).where(ArbSighting.gone_at.is_(None))).profit < arbitrage.MIN_PROFIT
+    assert client.get(f"{API}/admin/ai-lab/arbs", headers=auth).json()["live"] == []
     with SessionLocal() as db:
         db.execute(delete(ArbSighting))
         db.delete(db.get(MarketBook, 1001))

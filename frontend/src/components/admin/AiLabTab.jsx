@@ -255,7 +255,7 @@ export function ArbitrageView({ data }) {
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_20rem] items-start">
         <div className="space-y-3 text-[15px] max-w-prose">
           <p>
-            Markets where the best prices across our five bookmakers add up to under 100%: back every outcome in these
+            Markets where the best prices across our five bookmakers add up to under 100%, for a profit of at least 1%: back every outcome in these
             proportions and the return is the same whatever happens.
           </p>
           <p className="text-sm text-ink-soft">

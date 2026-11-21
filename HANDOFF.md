@@ -406,6 +406,9 @@ The ladder here is the *test* (do the AI's legs beat their prices?); what people
   arb, profit 1/sum − 1, stake shares (1/price)/sum. **Suspect** if over 10% or all at one bookmaker (bad price).
 * A sighting stays open until a later pull no longer shows it (`gone_at`) or kick-off. The tab shows open ones with
   a stake calculator and the last 7 days (how many looked genuine, median minutes visible, average best profit).
+* Sightings under 1% (`arbitrage.MIN_PROFIT`) are still recorded but left off both lists (2026-11-21: the page was
+  too crowded). The "Prices … ago" on each is when API-Football last updated its copy, not when we pulled, so extra
+  pulls wouldn't freshen it (Sam: leave as is).
 * Prices are API-Football's copies, refreshed hourly (5–15 min near kick-off), so check at the bookmaker first.
 
 ## Moving the backend (new plan, region or host)
