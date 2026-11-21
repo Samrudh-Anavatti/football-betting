@@ -50,7 +50,8 @@ def test_first_tick_syncs_everything_then_rests(db, fake):
 
     # An hour later the sweep runs again, but an unchanged book adds no history.
     scheduler.data_tick(db, datetime.utcnow() + timedelta(minutes=61))
-    assert _kinds(db, mark) == ["markets"]
+    # (Run in the hour before 06:00 or 18:00 UTC, that hour also crosses a fixtures slot.)
+    assert [k for k in _kinds(db, mark) if k != "fixtures"] == ["markets"]
     assert db.scalar(select(func.count(OddsSnapshot.id))) == snapshots
 
 
