@@ -9,7 +9,7 @@ from itertools import count
 
 import pytest
 
-from app import config
+from app import access, config
 from app.database import SessionLocal
 from app.models import Payment, User
 from app.services import billing
@@ -19,6 +19,12 @@ from .test_auth import signup
 API = "/api/v1"
 SECRET = "whsec_test"
 _ids = count(1)
+
+
+@pytest.fixture(autouse=True)
+def staking_for_members(monkeypatch):
+    """These tests are about the paywall, so put the staking plan behind it (it's on free accounts until it opens)."""
+    monkeypatch.setitem(access.FEATURES, "staking", "member")
 
 
 @pytest.fixture()

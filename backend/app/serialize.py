@@ -56,6 +56,13 @@ def tip_dict(t: Tip, with_fixture: bool = True) -> dict:
     return d
 
 
+def leg_tip_dict(t: Tip) -> dict:
+    """A pick as a bundle leg, for pages people outside the team see: no name of who made it."""
+    d = tip_dict(t)
+    del d["author"]
+    return d
+
+
 def bet_dict(b: Bet) -> dict:
     return {
         "id": b.id, "user": b.user.display_name, "user_id": b.user_id, "tip_id": b.tip_id,

@@ -5,11 +5,13 @@ from types import SimpleNamespace as NS
 import pytest
 from sqlalchemy import delete, select
 
+from app import access
 from app.database import SessionLocal
 from app.models import Fixture, SessionBundle, SessionBundleLeg, Tip
 from app.services import tonight
 
 from .conftest import KICKOFF, af_fixture
+from .test_auth import signup
 
 API = "/api/v1"
 
@@ -101,6 +103,17 @@ def test_tonight_bundles(client, auth, fake, monkeypatch, night_fixtures):
     assert r.status_code == 200 and [b["id"] for b in r.json()["bundles"]] == [b.id for b in made]
     assert client.post(f"{API}/tonight/bundles", headers=auth,
                        json={"session_at": s["at"], "fixture_ids": ids[:5], "target": 4.0}).status_code == 422
+    # The day's default request is the whole session at the standard target; with custom requests for members only,
+    # an account gets that request's first bundle and nothing else.
+    sess = client.get(f"{API}/tonight/sessions").json()
+    assert sess["default"] == {"session_at": s["at"], "fixture_ids": [m["id"] for m in s["matches"]], "target": 6.0}
+    monkeypatch.setitem(access.FEATURES, "tonight_custom", "member")
+    h = signup(client, "viewer@example.com")
+    r = client.post(f"{API}/tonight/bundles", headers=h, json=sess["default"])
+    assert r.status_code == 200 and [b["id"] for b in r.json()["bundles"]] == [made[0].id]
+    assert "author" not in r.json()["bundles"][0]["legs"][0]["tip"]  # no names outside the team
+    assert client.post(f"{API}/tonight/bundles", headers=h,
+                       json={**sess["default"], "target": 3.0}).status_code == 403
 
     # Settlement: the first bundle's legs all win; a lost leg elsewhere loses its bundles. One unit each on the record.
     for tid in first_legs:
@@ -112,5 +125,16 @@ def test_tonight_bundles(client, auth, fake, monkeypatch, night_fixtures):
     assert rec["legs"]["sure"]["won"] == len(first_legs) and rec["legs"]["longer"]["settled"] == 0
 
 
-def test_tonight_is_admin_only(client):
-    assert client.get(f"{API}/tonight/sessions").status_code == 401
+def test_tonight_access(client, monkeypatch):
+    # The sessions and the record are the shop window; building bundles needs an account.
+    assert client.get(f"{API}/tonight/sessions").json()["custom"] is False
+    assert client.get(f"{API}/tonight/record").status_code == 200
+    body = {"session_at": KICKOFF.isoformat() + "Z", "fixture_ids": [1], "target": 6.0}
+    assert client.post(f"{API}/tonight/bundles", json=body).status_code == 401
+    h = signup(client, "tonight@example.com")
+    assert client.get(f"{API}/tonight/sessions", headers=h).json()["custom"] is True
+    assert client.post(f"{API}/tonight/bundles", headers=h, json=body).json() == {"bundles": []}
+    # Once custom requests are for members, an account only gets the day's default request.
+    monkeypatch.setitem(access.FEATURES, "tonight_custom", "member")
+    assert client.get(f"{API}/tonight/sessions", headers=h).json()["custom"] is False
+    assert client.post(f"{API}/tonight/bundles", headers=h, json=body).status_code == 403

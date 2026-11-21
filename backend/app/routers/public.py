@@ -6,8 +6,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import access
 from ..database import get_db
-from ..models import AiPrediction, Fixture, League, Lineup, MatchContext, Tip
+from ..deps import optional_user
+from ..models import AiPrediction, Fixture, League, Lineup, MatchContext, Tip, User
 from ..serialize import fixture_dict, iso, league_dict, tip_dict
 from ..services.board import best_1x2, latest_snapshots, match_board
 from ..services.settlement import FINISHED
@@ -22,6 +24,28 @@ def public_tip(t: Tip, with_fixture: bool = True) -> dict:
     d = tip_dict(t, with_fixture)
     del d["author"]
     return d
+
+
+FREE_PICKS = 3  # open picks a visitor sees in full
+
+
+def free_tip_ids(db: Session, now: datetime) -> set[int]:
+    """The open picks anyone may see: the most confident few among matches still to kick off, soonest first on a
+    tie. The same few for everyone, and it only changes as matches start or picks are added."""
+    rows = db.scalars(select(Tip).join(Fixture).where(Tip.published.is_(True), Tip.source == "ivo", Tip.status == "pending",
+                                                      Fixture.kickoff > now))
+    ranked = sorted(rows, key=lambda t: (-(t.confidence or 0), t.fixture.kickoff, t.id))
+    return {t.id for t in ranked[:FREE_PICKS]}
+
+
+def tip_gate(db: Session, user: User | None):
+    """A test for "is this pick hidden from this viewer?". Only picks on matches that haven't kicked off are ever
+    hidden: once the match starts the pick is on the record for everyone."""
+    if access.can(user, "all_picks"):
+        return lambda t: False
+    now = datetime.utcnow()
+    free = free_tip_ids(db, now)
+    return lambda t: t.status == "pending" and t.fixture.kickoff > now and t.id not in free
 
 
 # Main leagues first (UEFA competitions after the countries), then supplementary by country.
@@ -70,21 +94,23 @@ def _standing_rows(fx: Fixture) -> list:
 
 
 @router.get("/matches/{fixture_id}")
-def match(fixture_id: int, db: Session = Depends(get_db)):
+def match(fixture_id: int, db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
     """Everything we know about one match: the same bundle Ivo and the AI read."""
     fx = db.get(Fixture, fixture_id)
     if fx is None:
         raise HTTPException(404, "Match not found")
     rows = latest_snapshots(db, [fx.id]).get(fx.id, [])
     board = match_board(db, fx.id)
+    tips = list(db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.published.is_(True))))
+    locked = tip_gate(db, user)
     return {
         "fixture": fixture_dict(fx, best_1x2(rows)),
         "odds": {**board, "pulled_at": iso(board["pulled_at"])},
         "context": context_dict(db.get(MatchContext, fixture_id)),
         "standings": {"synced_at": iso(fx.league.standings_synced_at), "rows": _standing_rows(fx)},
-        "tips": [public_tip(t, with_fixture=False) for t in
-                 db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.published.is_(True)))],
-        "ai": ai_dict(latest_prediction(db, fx)),
+        "tips": [public_tip(t, with_fixture=False) for t in tips if not locked(t)],
+        "locked_tips": sum(1 for t in tips if locked(t)),  # picks an account would see
+        "ai": ai_dict(latest_prediction(db, fx), fx, user),
         "pitch": pitch_dict(db, fx),
     }
 
@@ -96,9 +122,11 @@ def match_meta(fixture_id: int, db: Session = Depends(get_db)):
     if fx is None:
         raise HTTPException(404, "Match not found")
     tips = db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.published.is_(True)))
+    locked = tip_gate(db, None)  # search engines and link previews are visitors
     return {
         "fixture": fixture_dict(fx),
-        "tips": [{"market": t.market, "selection": t.selection, "line": t.line, "odds": t.odds} for t in tips],
+        "tips": [{"market": t.market, "selection": t.selection, "line": t.line, "odds": t.odds} for t in tips
+                 if not locked(t)],
         "has_ai": latest_prediction(db, fx) is not None,
     }
 
@@ -135,15 +163,20 @@ def latest_prediction(db: Session, fx: Fixture) -> AiPrediction | None:
                      .order_by(AiPrediction.id.desc()).limit(1))
 
 
-def ai_dict(pred: AiPrediction | None) -> dict | None:
+def ai_dict(pred: AiPrediction | None, fx: Fixture, user: User | None) -> dict | None:
     """Public view of an analysis: the read, probabilities and suggested bets. Read-only:
-    nobody outside can start one, and the AI's tracked tips stay private."""
+    nobody outside can start one, and the AI's tracked tips stay private. Until kick-off the suggested bets are
+    for accounts (`ai_bets`): a visitor gets the read and probabilities, and how many bets are waiting."""
     if pred is None:
         return None
     analysis = json.loads(pred.analysis_json)
     analysis.pop("bundle_legs", None)  # the AI staking test's legs are admin-only
+    bets_locked = 0
+    if not access.can(user, "ai_bets") and fx.kickoff > datetime.utcnow():
+        bets_locked = len(analysis.get("suggested_bets") or [])
+        analysis["suggested_bets"] = []
     return {"id": pred.id, "created_at": iso(pred.created_at), "model": pred.model,
-            "analysis": analysis,
+            "analysis": analysis, "bets_locked": bets_locked,
             "market_probs": json.loads(pred.market_probs_json) if pred.market_probs_json else None, "tips": []}
 
 
@@ -162,7 +195,7 @@ def sitemap(db: Session = Depends(get_db)):
 
 
 @router.get("/featured")
-def featured(db: Session = Depends(get_db)):
+def featured(db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
     """One upcoming match with an AI analysis, for the home page's preview card."""
     now = datetime.utcnow()
     rows = list(db.scalars(
@@ -177,7 +210,7 @@ def featured(db: Session = Depends(get_db)):
     if fx.kickoff > rows[0].kickoff + timedelta(hours=36):
         fx = rows[0]  # don't feature Sunday's big game on a Tuesday when something kicks off sooner
     snaps = latest_snapshots(db, [fx.id]).get(fx.id, [])
-    return {"fixture": fixture_dict(fx, best_1x2(snaps)), "ai": ai_dict(latest_prediction(db, fx))}
+    return {"fixture": fixture_dict(fx, best_1x2(snaps)), "ai": ai_dict(latest_prediction(db, fx), fx, user)}
 
 
 def context_dict(ctx: MatchContext | None) -> dict:
@@ -201,7 +234,9 @@ def context_dict(ctx: MatchContext | None) -> dict:
 
 @router.get("/tips")
 def tips(status: str = Query("open", pattern="^(open|settled|all)$"), limit: int = Query(50, ge=1, le=1000),
-         db: Session = Depends(get_db)):
+         db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
+    """Our picks. A visitor gets every settled pick but only the free few of the open ones; `/tips/locked` says
+    which matches the rest are on."""
     q = select(Tip).join(Fixture).where(Tip.published.is_(True), Tip.source == "ivo")
     if status == "open":
         q = q.where(Tip.status == "pending").order_by(Fixture.kickoff)
@@ -209,7 +244,18 @@ def tips(status: str = Query("open", pattern="^(open|settled|all)$"), limit: int
         q = q.where(Tip.status != "pending").order_by(Fixture.kickoff.desc())
     else:
         q = q.order_by(Fixture.kickoff.desc())
-    return [public_tip(t) for t in db.scalars(q.limit(limit))]
+    locked = tip_gate(db, user)
+    return [public_tip(t) for t in db.scalars(q.limit(limit)) if not locked(t)]
+
+
+@router.get("/tips/locked")
+def locked_tips(db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
+    """The open picks this viewer can't see yet, as the match and kick-off only (never the selection or price),
+    for the "join to see these" cards. Empty for anyone who sees them all."""
+    locked = tip_gate(db, user)
+    q = (select(Tip).join(Fixture).where(Tip.published.is_(True), Tip.source == "ivo", Tip.status == "pending")
+         .order_by(Fixture.kickoff))
+    return [{"id": t.id, "fixture": fixture_dict(t.fixture)} for t in db.scalars(q) if locked(t)]
 
 
 @router.get("/record")

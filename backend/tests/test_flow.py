@@ -19,7 +19,7 @@ def test_members_cant_use_admin_routes(client):
         db.commit()
         h = {"Authorization": f"Bearer {make_token(u.id)}"}
     assert client.get(f"{API}/auth/me", headers=h).json()["is_admin"] is False
-    for path in ("/admin/integrations", "/admin/tips", "/staking"):
+    for path in ("/admin/integrations", "/admin/tips", "/admin/ai-lab/arbs"):
         assert client.get(f"{API}{path}", headers=h).status_code == 403
 
 

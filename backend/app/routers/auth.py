@@ -10,7 +10,7 @@ from pydantic import AfterValidator, BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from .. import config
+from .. import access, config
 from ..database import get_db
 from ..deps import current_user
 from ..models import User
@@ -27,7 +27,7 @@ LOGIN_LIMIT = (10, 15 * 60)  # failed attempts per IP
 
 def me_dict(u: User) -> dict:
     return {"id": u.id, "username": u.username, "display_name": u.display_name, "email": u.email,
-            "is_admin": u.is_admin, "membership": billing.membership_dict(u)}
+            "is_admin": u.is_admin, "membership": billing.membership_dict(u), "access": access.access_dict(u)}
 
 
 def _signed_in(u: User) -> dict:

@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from ..models import Fixture, SessionBundle, SessionBundleLeg, Tip
-from ..serialize import fixture_dict, iso, tip_dict
+from ..serialize import fixture_dict, iso, leg_tip_dict
 from .ai_staking import pick_bundle
 from .stats import current_prices
 
@@ -72,6 +72,17 @@ def sessions(db: Session, now: datetime | None = None) -> list[dict]:
             "legs": sum(counts[fx.id] for fx in group),
         })
     return out
+
+
+def default_request(db: Session, now: datetime | None = None) -> dict | None:
+    """The day's free request: the biggest session on the first day that has one (the earliest on a tie), every
+    match in it, at the standard target. None when there's no session."""
+    offered = sessions(db, now)
+    if not offered:
+        return None
+    first_day = offered[0]["at"][:10]
+    s = max((x for x in offered if x["at"][:10] == first_day), key=lambda x: len(x["matches"]))
+    return {"session_at": s["at"], "fixture_ids": [m["id"] for m in s["matches"]], "target": TARGETS["standard"]}
 
 
 def request_key(session_at: datetime, fixture_ids: list[int], target: float) -> str:
@@ -144,7 +155,7 @@ def bundle_dict(b: SessionBundle) -> dict:
         "status": b.status, "profit": b.profit, "stretch": bool(b.stretch), "session_at": iso(b.session_at),
         "created_at": iso(b.created_at),
         "settled_at": iso(b.settled_at),
-        "legs": [{"tip_id": leg.tip_id, "odds": leg.odds, "tip": tip_dict(leg.tip)} for leg in b.legs],
+        "legs": [{"tip_id": leg.tip_id, "odds": leg.odds, "tip": leg_tip_dict(leg.tip)} for leg in b.legs],
     }
 
 

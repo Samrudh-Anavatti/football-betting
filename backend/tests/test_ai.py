@@ -186,7 +186,11 @@ def test_public_sees_the_latest_analysis(client, auth, fake, monkeypatch):
     client.post(f"{API}/admin/matches/1001/ai", headers=auth)
 
     ai = client.get(f"{API}/matches/1001").json()["ai"]  # no login
-    assert ai["analysis"]["probabilities"]["home_win"] == 0.7 and ai["analysis"]["suggested_bets"]
+    # A visitor gets the read and probabilities; the suggested bets wait for an account until kick-off.
+    assert ai["analysis"]["probabilities"]["home_win"] == 0.7
+    assert ai["analysis"]["suggested_bets"] == [] and ai["bets_locked"] >= 1
+    signed_in = client.get(f"{API}/matches/1001", headers=auth).json()["ai"]
+    assert len(signed_in["analysis"]["suggested_bets"]) == ai["bets_locked"] and signed_in["bets_locked"] == 0
     assert "bundle_legs" not in ai["analysis"]  # the staking test's legs are admin-only
     assert ai["market_probs"]["result"]["home"] > 0.5
     f = client.get(f"{API}/featured").json()

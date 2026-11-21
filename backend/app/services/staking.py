@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Bundle, StakingPlan
-from ..serialize import iso, tip_dict
+from ..serialize import iso, leg_tip_dict
 
 
 def get_plan(db: Session, source: str = "ivo") -> StakingPlan:
@@ -92,7 +92,7 @@ def bundle_dict(b: Bundle) -> dict:
         "id": b.id, "run": b.run, "step": b.step, "odds": b.odds, "bookmaker": b.bookmaker, "stake": b.stake, "status": b.status,
         "profit": b.profit, "returns": round(b.stake * b.odds, 2), "created_at": iso(b.created_at),
         "settled_at": iso(b.settled_at),
-        "legs": [{"tip_id": leg.tip_id, "odds": leg.odds, "tip": tip_dict(leg.tip)} for leg in b.legs],
+        "legs": [{"tip_id": leg.tip_id, "odds": leg.odds, "tip": leg_tip_dict(leg.tip)} for leg in b.legs],
     }
 
 

@@ -1,4 +1,5 @@
-"""The staking plan and Ivo's bundle builder. Members can read it; only admins change it."""
+"""The staking plan and Ivo's bundle builder. Reading it needs the `staking` feature (see `access.FEATURES`);
+only admins change it."""
 import math
 from datetime import datetime
 
@@ -8,14 +9,14 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..deps import admin_user, member_user
+from ..deps import admin_user, require
 from ..models import Bundle, BundleLeg, Tip
 from ..services.staking import bundle_dict, get_plan, plan_bundles, plan_state, run_state, stake_for
 
 router = APIRouter(prefix="/staking", tags=["staking"])
 
 
-@router.get("", dependencies=[Depends(member_user)])
+@router.get("", dependencies=[Depends(require("staking"))])
 def state(db: Session = Depends(get_db)):
     return plan_state(db)
 
