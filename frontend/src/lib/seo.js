@@ -25,13 +25,13 @@ export const PAGES = {
     description: 'Recent football results across 40+ leagues, with our picks and the AI analysis for each match.',
   },
   '/history': {
-    title: `Our record: every settled pick | ${SITE}`,
-    description: 'Every pick we have made, won or lost, with the price taken and the profit or loss. Nothing deleted.',
+    title: `Our record: the last two weeks of picks | ${SITE}`,
+    description: 'Our picks from the last two weeks, won or lost, with the price taken and the profit or loss.',
   },
   '/staking': {
     title: `Staking plan: our picks in bundles at about 6.00 | ${SITE}`,
     description:
-      "Our picks combined into bets at around 6.00, with stakes that win back every loss. Every bundle and result on the record.",
+      "Our picks combined into bets at around 6.00, with each stake worked out so a win pays the run back. Follow the live bundle and the current run.",
   },
   '/membership': {
     title: `Membership | ${SITE}`,

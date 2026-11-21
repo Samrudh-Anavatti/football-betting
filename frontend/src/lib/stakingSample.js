@@ -39,12 +39,6 @@ export const SAMPLE_PLAN = {
   ], 0),
   history: [
     bundle(4, 1, 'lost', 6.05, 6, past('lost'), 3),
-    bundle(3, 2, 'won', 5.98, 7.22, past('won'), 6),
-    bundle(3, 1, 'lost', 6.1, 6, past('lost'), 9),
-    bundle(2, 1, 'won', 6.02, 6, past('won'), 12),
-    bundle(1, 3, 'won', 6.12, 8.52, past('won'), 15),
-    bundle(1, 2, 'lost', 5.9, 7.2, past('lost'), 18),
-    bundle(1, 1, 'lost', 6.0, 6, past('lost'), 21),
   ],
-  stats: { bundles: 7, won: 3, lost: 4, runs_completed: 3, profit: 84, bank_now: 234, longest_losing_streak: 2 },
+  previous_run: { number: 3, bundles: 2, profit: 30, ended_at: day(-5) },
 }

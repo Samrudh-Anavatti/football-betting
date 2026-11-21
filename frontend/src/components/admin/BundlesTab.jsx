@@ -140,7 +140,7 @@ function Builder({ state, tips, onCreated }) {
 }
 
 export default function BundlesTab() {
-  const state = useApi(() => api.staking(), [])
+  const state = useApi(() => api.stakingFull(), [])
   const tips = useApi(() => api.adminTips(), [])
   if ((state.loading && !state.data) || (tips.loading && !tips.data)) return <Loading />
   if (state.error || tips.error) return <ErrorNote error={state.error || tips.error} />

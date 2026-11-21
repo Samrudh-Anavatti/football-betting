@@ -11,24 +11,26 @@ const RESULT = {
   void: ['V', 'bg-ink/10 text-ink-soft'],
 }
 
-// Every settled pick, newest first: one line each, no reasoning or detail.
+// The record is a rolling window (the API's `days`, 14): four figures and the picks settled in it, newest first,
+// one line each. Older picks stay on their match pages.
 export default function History() {
-  const tips = useApi(() => api.tips('settled', 1000), [])
+  const tips = useApi(() => api.tips('settled', 500), [])
   const record = useApi(() => api.record(), [])
   const r = record.data
+  const span = r ? `last ${r.days} days` : 'last two weeks'
 
   return (
     <section data-tour="history" className="space-y-6">
       <div>
         <h1 className="text-4xl sm:text-5xl leading-none">Our record</h1>
         <p className="mt-3 max-w-prose text-[17px] text-ink-soft leading-relaxed">
-          Every pick we've made, won or lost, at the price we took. Nothing is ever deleted. The bundles keep their
-          own records: <Link to="/tonight" className="link">tonight's AI bundles</Link> and{' '}
+          Our picks from the {span}, won or lost, at the price we took. Older picks stay on their match pages. The
+          bundles keep their own records: <Link to="/tonight" className="link">tonight's AI bundles</Link> and{' '}
           <Link to="/staking" className="link">our staking plan</Link>.
         </p>
       </div>
-      {r && r.tips > 0 && (
-        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {r && r.won + r.lost > 0 && (
+        <dl aria-label={`Our picks, ${span}`} className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           {[
             ['Profit, in units', signed(r.profit_units)],
             ['Won / lost', `${r.won}–${r.lost}`],
@@ -42,13 +44,13 @@ export default function History() {
           ))}
         </dl>
       )}
-      <SectionHead title="Past picks" count={tips.data?.length || null} />
+      <SectionHead title={`Settled in the ${span}`} count={tips.data?.length || null} />
       {tips.loading ? (
         <Loading rows={8} />
       ) : tips.error ? (
         <ErrorNote error={tips.error} />
       ) : tips.data.length === 0 ? (
-        <Empty title="No settled picks yet">Picks appear here once their match is over.</Empty>
+        <Empty title={`No picks settled in the ${span}`}>Picks appear here once their match is over.</Empty>
       ) : (
         <ol className="panel divide-y divide-ink/5">
           {tips.data.map((t) => {

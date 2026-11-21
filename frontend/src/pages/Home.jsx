@@ -37,9 +37,10 @@ function PitchLines() {
   )
 }
 
-// The record: the headline figure plus a row of supporting numbers, linking to every pick behind it.
+// The record over its rolling window (the API's `days`): the headline figure plus a row of supporting numbers,
+// linking to the picks behind it.
 function Ledger({ record }) {
-  if (!record || record.tips === 0) return null
+  if (!record || record.won + record.lost === 0) return null
   const profit = record.profit_units * UNIT
   const items = [
     [`Every £${EXAMPLE_STAKE} staked returned`, record.roi == null ? '–' : pounds(EXAMPLE_STAKE * (1 + record.roi), 2)],
@@ -55,8 +56,8 @@ function Ledger({ record }) {
           {pounds(profit, 2)}
         </p>
         <p className="text-sm text-white/60 pb-0.5">
-          our picks so far, at £{UNIT} a unit.{' '}
-          <Link to="/history" className="underline underline-offset-4 hover:text-white">See every one</Link>
+          our picks over the last {record.days} days, at £{UNIT} a unit.{' '}
+          <Link to="/history" className="underline underline-offset-4 hover:text-white">See each one</Link>
         </p>
       </div>
       <dl className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-y-4 border-t border-white/15 pt-4">
@@ -115,7 +116,7 @@ function TonightCard({ sessions, record }) {
         </Link>
         {r?.bundles > 0 && (
           <span className="text-sm text-ink-soft">
-            <span className="num font-semibold text-ink">{r.won}</span> of <span className="num">{r.bundles}</span> bundles landed so far
+            <span className="num font-semibold text-ink">{r.won}</span> of <span className="num">{r.bundles}</span> bundles landed in the last {r.days} days
           </span>
         )}
       </div>

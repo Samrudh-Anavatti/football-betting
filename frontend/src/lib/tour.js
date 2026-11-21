@@ -14,7 +14,7 @@ const STEPS = {
   home: [
     {
       target: 'record',
-      text: "Welcome, I'm Mr Predictions. Start here: our record. Every pick we've made, settled against the final score, with the profit so far. Nothing gets hidden.",
+      text: "Welcome, I'm Mr Predictions. Start here: our record. Our picks from the last two weeks, settled against the final score, with the profit they made. The losers count too.",
     },
     {
       target: 'picks',
@@ -45,7 +45,7 @@ const STEPS = {
   history: [
     {
       target: 'history',
-      text: "Our full record, newest first. Every settled pick, won or lost, with the price we took. Nothing's ever deleted.",
+      text: "Our record for the last two weeks, newest first. Every pick settled in that time, won or lost, with the price we took.",
     },
   ],
   staking: [

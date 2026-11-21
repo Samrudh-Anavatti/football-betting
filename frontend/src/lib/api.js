@@ -112,7 +112,8 @@ export const api = {
   setBankroll: (starting_bankroll) => request('/admin/accounts/me', { method: 'PUT', body: { starting_bankroll } }),
 
   // staking plan
-  staking: () => request('/staking'),
+  staking: () => request('/staking'), // the current run only
+  stakingFull: () => request('/staking/full'), // admins: every bundle
   updateStakingPlan: (body) => request('/staking/plan', { method: 'PUT', body }),
   createBundle: (body) => request('/staking/bundles', { method: 'POST', body }),
   deleteBundle: (id) => request(`/staking/bundles/${id}`, { method: 'DELETE' }),

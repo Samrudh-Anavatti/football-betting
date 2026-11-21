@@ -182,6 +182,31 @@ signing up, a three-stop "you're in" tour of the header runs once (`queueWelcome
 closed, unlinked and now `noindex`); rewrite it when the paywall's contents are chosen. Local testing: `.claude/
 launch.json` has two previews, the frontend on live data and on a local backend (`python -m app.demo`).
 
+## The record is a rolling 14 days (2026-11-21)
+
+Two months in, the all-time record had become heavy to read, so what the public pages call "the record" is now a
+short window. **Nothing is deleted:** every pick and bundle stays in the database, on its match page and in the
+admin views; only what the public API returns for display changed.
+
+* **One constant:** `RECORD_DAYS = 14` in `backend/app/services/stats.py` (`record_since()` gives the start of the
+  window). Change it there and every page follows; the API returns it as `days` and the pages print it, so no page
+  has the number written into its labels (Mr Predictions and the search-engine descriptions say "two weeks").
+* **Picks:** `GET /record` and `GET /tips?status=settled` cover matches that kicked off in the last 14 days. The
+  Record page (`pages/History.jsx`) is four figures (profit in units, won / lost, strike rate, average odds) and one
+  list, both labelled "last 14 days". The home page's ledger uses the same figures ("our picks over the last 14
+  days"), as does its "bundles landed in the last 14 days" line.
+* **Tonight's bundles:** `GET /tonight/record` covers sessions from the last 14 days: bundles shown, landed, profit
+  at the flat stake and the sessions with their bundles. The split by target and the "legs themselves" panel were
+  removed from the API and the page (the code went too). Admin → AI Lab still has its own leg record (every
+  `ai_leg` tip, all time: `ai_staking.leg_record`), but nothing shows Tonight's bundles by target any more; that
+  would be one query on `session_bundles.target` if it is wanted back.
+* **Staking plan:** `GET /staking` (`staking.public_state`) gives the current run only: the live bundle, the
+  bundles settled since the last win, and `previous_run` (number, bundles, profit, when it finished) for one line
+  under the list. No all-time stats on the page. The run, step and next stake are still worked out from every
+  bundle. `GET /staking/full` (admins) is the old full state; Admin → Bundles uses it, and Admin → AI Lab is
+  unchanged.
+* **Never present windowed numbers as all-time:** any new place that shows these figures must say the window.
+
 ## Staking plan (built 2026-11-01)
 
 Ivo's method: his picks combined into one bet ("bundle") at about 6.00, and after a loss the next stake is raised so
@@ -201,9 +226,10 @@ starts a new run at the base stake.
   one settles. Picks in a bundle can't be deleted (delete the bundle first; only live bundles can be deleted).
 * **Admin → Bundles:** tick open picks (two from one match aren't allowed), see the combined odds and exact stake,
   create. Plan settings below it.
-* **`/staking` page** (nav "Staking"): the live bundle as a slip (or "Next bundle coming soon"), stats, a "your
+* **`/staking` page** (nav "Staking"): the live bundle as a slip (or "Next bundle coming soon"), the current run's figures, a "your
   starting stake" box that scales every amount (stored in the browser), the loss ladder up to where the bank runs out,
-  and every settled bundle. The chance of emptying the bank is shown once Ivo has 20+ settled picks to estimate from.
+  and the bundles settled in the current run (see "The record is a rolling 14 days"). The chance of emptying the
+  bank is shown when the last 14 days hold 20+ settled picks to estimate from.
 * **Access (since 2026-11-21): anyone signed in** (see "Site structure and access levels"). Signed-out visitors get the page blurred over made-up data (`lib/stakingSample.js`) with
   a "Join free" card; the real plan is never sent to them (a blur only hides what the browser has).
   Next piece: payments. **Decided 2026-11-07: Stripe directly** (Checkout + Customer Portal + webhook), not Buy Me a
@@ -342,9 +368,9 @@ to tick, a target, a stake box, the slips, one honesty line, and the record.
   reach the target, the AI's **suggested bets** (`source='ai'`, 1.50–3.00) join the pool as "longer shots", up to
   three selections per match and ten legs. The bundle is marked `stretch` ("with longer shots" on the slip, each
   such leg tagged). A suggested bet on the same selection as a sure leg is the same bet and is dropped.
-* **Tracking:** the record splits by target (Safer / Standard / Big night) and, more usefully, by **leg**: every
-  tip that has appeared in a tonight bundle, counted once, surest legs and longer shots separately, hit rate against
-  the rate the prices implied. Bundles are combinations; the legs are what has to beat the prices.
+* **Tracking:** the public record is the last 14 days: bundles shown, landed, profit at a flat stake, and the
+  sessions with their bundles (see "The record is a rolling 14 days"). Bundles are combinations; whether the legs
+  beat their prices is the AI Lab's leg record.
 * **Deterministic:** a request is keyed by (session, sorted match ids, target) in `session_bundles.key`; the same
   request returns the bundles made before, so refreshing or a second viewer gets the same slips. Different ticks make
   a different request (and may share legs with the first).
@@ -352,7 +378,8 @@ to tick, a target, a stake box, the slips, one honesty line, and the record.
 * **Data:** `session_bundles` (session_at, key, position, target, odds, bookmaker, status, profit in units at one
   unit staked, user_id of whoever asked) and `session_bundle_legs` (a leg may sit in many; unlike `bundle_legs`).
   Settled with every other bundle (`staking.settle_bundles` → `tonight.settle`); hand-settling a pick re-decides
-  them too. The record (`/tonight/record`) counts every bundle ever shown once, at one unit each, grouped by session.
+  them too. The record (`/tonight/record`) counts every bundle shown in the last 14 days once, at one unit each, grouped by
+  session.
 * **The plan (agreed 2026-11-14):** visitors are steered to Tonight's bundles (home page, Mr Predictions); **one
   bundle a day free** to anyone signed in (the default request of the biggest session), more bundles, custom ticks and
   the other targets for members behind the paywall. To open it up: swap `admin_user` in `routers/tonight.py` for that

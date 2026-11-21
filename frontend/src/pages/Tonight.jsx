@@ -7,7 +7,7 @@ import { useApi } from '../hooks/useApi.js'
 import { useCan } from '../lib/access.js'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
-import { dayLabel, kickoffTime, money, odds, pct, pickLabel, shortDate } from '../lib/format.js'
+import { dayLabel, kickoffTime, money, odds, pickLabel, shortDate } from '../lib/format.js'
 import { matchPath } from '../lib/seo.js'
 import { BUNDLE_TABS, ResultMark, Stat } from './Staking.jsx'
 
@@ -205,55 +205,18 @@ function Record({ record, stake }) {
   if (!record.bundles)
     return (
       <p className="text-sm text-ink-soft">
-        Nothing settled yet{record.pending ? ` (${record.pending} bundle${record.pending === 1 ? '' : 's'} waiting on results)` : ''}.
-        Every bundle shown here lands on this record, hit or miss.
+        Nothing settled in the last {record.days} days{record.pending ? ` (${record.pending} bundle${record.pending === 1 ? '' : 's'} waiting on results)` : ''}.
+        Every bundle shown here is settled, hit or miss.
       </p>
     )
   const profit = record.profit_units * stake
-  const legs = record.legs || {}
-  const legLine = (r, what) =>
-    r?.settled ? (
-      <p>
-        {what}: landed <span className="num font-semibold">{r.won}</span> of <span className="num">{r.settled}</span> (
-        <span className="num font-semibold">{pct(r.hit_rate, 0)}</span>; the prices implied{' '}
-        <span className="num">{pct(r.implied_rate, 0)}</span>).
-      </p>
-    ) : null
   return (
     <div className="space-y-4">
-      <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
+      <div className="grid gap-3 grid-cols-1 sm:grid-cols-3">
         <Stat label="Bundles shown" value={record.bundles} />
         <Stat label="Landed" value={`${record.won} of ${record.bundles}`} />
         <Stat label={`At ${money(stake)} each`} value={`${profit > 0 ? '+' : profit < 0 ? '−' : ''}${money(Math.abs(profit))}`}
           tone={profit > 0 ? 'text-pitch' : profit < 0 ? 'text-red' : ''} />
-        <Stat label="Waiting on results" value={record.pending} />
-      </div>
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 items-start">
-        <ol className="panel divide-y divide-ink/5 text-sm">
-          {TARGETS.map((t) => {
-            const r = record.by_target?.[t.key]
-            if (!r) return null
-            const p = r.profit_units * stake
-            return (
-              <li key={t.key} className="px-4 py-2 flex items-center gap-3">
-                <span className="font-semibold">{t.label}</span>
-                <span className="num text-ink-soft">about {odds(t.odds)}</span>
-                <span className="ml-auto num">{r.bundles ? `${r.won} of ${r.bundles} landed` : 'none settled'}</span>
-                {r.bundles > 0 && (
-                  <span className={`num w-20 text-right font-semibold ${p > 0 ? 'text-pitch' : p < 0 ? 'text-red' : 'text-ink-soft'}`}>
-                    {p > 0 ? '+' : p < 0 ? '−' : ''}{money(Math.abs(p))}
-                  </span>
-                )}
-              </li>
-            )
-          })}
-        </ol>
-        <div className="panel p-4 text-sm space-y-1.5">
-          <p className="text-ink-soft">The legs themselves, each counted once. This is what has to beat the prices.</p>
-          {legLine(legs.sure, 'Surest legs')}
-          {legLine(legs.longer, 'Longer shots')}
-          {!legs.sure?.settled && !legs.longer?.settled && <p className="text-ink-soft">None settled yet.</p>}
-        </div>
       </div>
       <ol className="panel divide-y divide-ink/5 text-sm">
         {record.sessions.map((s) => (
@@ -427,7 +390,7 @@ function TonightInner({ canBuild }) {
       )}
 
       <section>
-        <SectionHead title="On the record" />
+        <SectionHead title={record.data ? `The last ${record.data.days} days` : 'The record'} />
         <ErrorNote error={record.error} />
         <Record record={record.data} stake={stake} />
       </section>

@@ -160,8 +160,8 @@ export function BundleHistory({ history, scale = 1 }) {
   )
 }
 
-function PlanView({ data, hitRate }) {
-  const { plan, run, current, history, stats } = data
+function PlanView({ data, hitRate, days }) {
+  const { plan, run, current, history, previous_run: last } = data
   const [stake, setStake] = useState(() => {
     try {
       return Number(localStorage.getItem(STAKE_KEY)) || plan.base_stake
@@ -178,7 +178,7 @@ function PlanView({ data, hitRate }) {
     }
   }
   const scale = stake > 0 ? stake / plan.base_stake : 1
-  const legs = history.length ? history.reduce((n, b) => n + b.legs.length, 0) / history.length : 3
+  const legs = current ? current.legs.length : 3
   const winChance = hitRate == null ? null : bundleWinChance(hitRate, legs)
   const wipeout = winChance == null ? null : streakChance(winChance, plan.survivable_losses + 1)
 
@@ -225,10 +225,10 @@ function PlanView({ data, hitRate }) {
       </div>
 
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
-        <Stat label="Profit" value={money(stats.profit * scale)} tone={stats.profit > 0 ? 'text-pitch' : stats.profit < 0 ? 'text-red' : ''} />
-        <Stat label="Runs won" value={stats.runs_completed} />
-        <Stat label="Bundles won / lost" value={`${stats.won}–${stats.lost}`} />
-        <Stat label="Longest losing run" value={stats.longest_losing_streak} />
+        <Stat label="Run" value={run.number} />
+        <Stat label="Bet in this run" value={current ? current.step : run.step} />
+        <Stat label="Lost so far this run" value={money(run.losses * scale)} tone={run.losses > 0 ? 'text-red' : ''} />
+        <Stat label={current ? 'This bet returns' : 'Next stake'} value={money((current ? current.returns : run.next_stake) * scale)} />
       </div>
 
       <section>
@@ -246,7 +246,7 @@ function PlanView({ data, hitRate }) {
             </p>
             {winChance != null && (
               <p>
-                Our picks have landed {pct(hitRate, 0)} of the time. At that rate a {Math.round(legs)}-pick bundle
+                Over the last {days} days our picks have landed {pct(hitRate, 0)} of the time. At that rate a {Math.round(legs)}-pick bundle
                 wins about {pct(winChance, 0)} of the time, and {plan.survivable_losses + 1} losses in a row, enough to
                 empty the bank, happens in about {pct(wipeout, 1)} of runs.
               </p>
@@ -261,18 +261,27 @@ function PlanView({ data, hitRate }) {
       </section>
 
       <section>
-        <SectionHead title="Every bundle" count={history.length || null} />
+        <SectionHead title="This run" count={history.length || null} />
         {history.length === 0 ? (
-          <p className="text-ink-soft">Settled bundles appear here.</p>
+          <p className="text-ink-soft">No bundle has settled in this run yet. A win ends the run and starts the next.</p>
         ) : (
           <BundleHistory history={history} scale={scale} />
+        )}
+        {last && (
+          <p className="mt-3 text-sm text-ink-soft">
+            Before it, run {last.number} finished on {shortDate(last.ended_at)} after {last.bundles} bundle
+            {last.bundles === 1 ? '' : 's'},{' '}
+            <span className="num font-semibold text-ink">{money(Math.abs(last.profit) * scale)}</span>{' '}
+            {last.profit < 0 ? 'down' : 'up'}.
+          </p>
         )}
       </section>
     </div>
   )
 }
 
-// The odds of a wipeout are only worth showing once there are enough settled picks to estimate a hit rate from.
+// The odds of a wipeout are only worth showing when the record's window has enough settled picks to estimate a hit
+// rate from.
 const MIN_PICKS = 20
 
 function Members() {
@@ -282,7 +291,7 @@ function Members() {
   if (plan.error) return <ErrorNote error={plan.error} />
   const r = record.data
   const hitRate = r && r.won + r.lost >= MIN_PICKS ? r.strike_rate : null
-  return <PlanView data={plan.data} hitRate={hitRate} />
+  return <PlanView data={plan.data} hitRate={hitRate} days={r?.days} />
 }
 
 // Without the `staking` feature: the page's shape under a blur, filled with made-up data (lib/stakingSample.js),
@@ -291,7 +300,7 @@ function Preview() {
   return (
     <div className="relative">
       <div aria-hidden inert="" data-nosnippet="" className="pointer-events-none select-none blur-[6px] opacity-60">
-        <PlanView data={SAMPLE_PLAN} hitRate={0.66} />
+        <PlanView data={SAMPLE_PLAN} hitRate={0.66} days={14} />
       </div>
       <div className="absolute inset-x-0 top-10 sm:top-24 flex justify-center px-2">
         <JoinCard title="Our staking plan" className="max-w-md mx-auto">
