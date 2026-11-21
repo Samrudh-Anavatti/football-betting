@@ -17,7 +17,7 @@ from sqlalchemy.orm import Session
 from ..models import Fixture, SessionBundle, SessionBundleLeg, Tip
 from ..serialize import fixture_dict, iso, leg_tip_dict
 from .ai_staking import pick_bundle
-from .stats import current_prices
+from .stats import RECORD_DAYS, current_prices, record_since
 
 TARGETS = {"safer": 3.0, "standard": 6.0, "big": 10.0}
 HORIZON = timedelta(days=3)  # sessions this far ahead are offered
@@ -159,42 +159,23 @@ def bundle_dict(b: SessionBundle) -> dict:
     }
 
 
-def record(db: Session, limit: int = 12) -> dict:
-    """How the bundles have done: totals at one unit each, and the last few sessions with their settled bundles.
-    Every bundle ever shown counts once, including ones built for different match selections of the same session."""
-    settled = list(db.scalars(select(SessionBundle).where(SessionBundle.status.in_(["won", "lost"]))
+def record(db: Session) -> dict:
+    """How the bundles have done over the last `RECORD_DAYS` days: totals at one unit each, and those sessions with
+    their settled bundles, newest first. Every bundle shown counts once, including ones built for different match
+    selections of the same session."""
+    since = record_since()
+    settled = list(db.scalars(select(SessionBundle)
+                              .where(SessionBundle.status.in_(["won", "lost"]), SessionBundle.session_at >= since)
                               .order_by(SessionBundle.session_at.desc(), SessionBundle.id)))
     by_session: dict[datetime, list[SessionBundle]] = {}
     for b in settled:
         by_session.setdefault(b.session_at, []).append(b)
-    recent = [{"at": iso(at), "won": sum(b.status == "won" for b in rows), "bundles": [bundle_dict(b) for b in rows]}
-              for at, rows in list(by_session.items())[:limit]]
     won = sum(b.status == "won" for b in settled)
-    by_target = {}
-    for name, t in TARGETS.items():
-        rows = [b for b in settled if b.target == t]
-        by_target[name] = {"target": t, "bundles": len(rows), "won": sum(b.status == "won" for b in rows),
-                           "profit_units": round(sum(b.profit or 0 for b in rows), 2)}
     return {
+        "days": RECORD_DAYS,
         "bundles": len(settled), "won": won, "lost": len(settled) - won,
         "profit_units": round(sum(b.profit or 0 for b in settled), 2),
         "pending": db.scalar(select(func.count()).where(SessionBundle.status == "pending")),
-        "by_target": by_target,
-        "legs": leg_record(db),
-        "sessions": recent,
+        "sessions": [{"at": iso(at), "won": sum(b.status == "won" for b in rows), "bundles": [bundle_dict(b) for b in rows]}
+                     for at, rows in by_session.items()],
     }
-
-
-def leg_record(db: Session) -> dict:
-    """The legs that have appeared in tonight's bundles, each counted once however many bundles it was in: how often
-    the surest legs and the longer shots landed, against what their prices implied. This is the number that matters;
-    bundles are just combinations of it."""
-    out = {}
-    for name, source in (("sure", SURE), ("longer", LONGER)):
-        tips = list(db.scalars(select(Tip).join(SessionBundleLeg, SessionBundleLeg.tip_id == Tip.id)
-                               .where(Tip.source == source, Tip.status.in_(["won", "lost"])).distinct()))
-        n = len(tips)
-        won = sum(t.status == "won" for t in tips)
-        out[name] = {"settled": n, "won": won, "hit_rate": round(won / n, 4) if n else None,
-                     "implied_rate": round(sum(1 / t.odds for t in tips) / n, 4) if n else None}
-    return out

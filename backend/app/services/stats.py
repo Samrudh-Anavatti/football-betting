@@ -1,12 +1,22 @@
 """Track record (tips) and virtual bankrolls (bets)."""
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Bet, Fixture, MarketBook, OddsSnapshot, Tip, User
 from .markets import book_prices
+
+# What the public pages call "the record" is a rolling window this many days long: the picks record and list, the
+# home page's figures and the Tonight's bundles record. Nothing is deleted; older results stay in the database, on
+# their match pages and in the admin views.
+RECORD_DAYS = 14
+
+
+def record_since(now: datetime | None = None) -> datetime:
+    """The start of the record window."""
+    return (now or datetime.utcnow()) - timedelta(days=RECORD_DAYS)
 
 
 def closing_price(db: Session, tip: Tip) -> float | None:

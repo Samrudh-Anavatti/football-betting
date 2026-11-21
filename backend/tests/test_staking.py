@@ -37,7 +37,7 @@ def test_staking_plan(client, auth, fake):
     settle(city, "lost")
     s = client.get(f"{API}/staking", headers=auth).json()
     assert s["current"] is None and s["history"][0]["status"] == "lost" and s["history"][0]["profit"] == -6.0
-    assert s["run"] == {"number": 1, "step": 2, "losses": 6.0, "next_stake": 7.2}
+    assert s["run"] == {"number": 1, "step": 2, "losses": 6.0, "next_stake": 7.2} and s["previous_run"] is None
 
     goals = pick(1002, "OU", "over", 2.5, 2.5)
     b = bundle(over, goals).json()
@@ -46,14 +46,20 @@ def test_staking_plan(client, auth, fake):
     # A void leg counts at 1.00; putting it back to pending reopens the bundle until it's decided again.
     settle(over, "won")
     settle(goals, "void")
-    assert client.get(f"{API}/staking", headers=auth).json()["history"][0]["profit"] == round(13.09 * 0.5, 2)
+    assert client.get(f"{API}/staking/full", headers=auth).json()["history"][0]["profit"] == round(13.09 * 0.5, 2)
     settle(goals, "pending")
     assert client.get(f"{API}/staking", headers=auth).json()["current"]["id"] == b["id"]
     settle(goals, "won")
     s = client.get(f"{API}/staking", headers=auth).json()
     assert s["run"] == {"number": 2, "step": 1, "losses": 0.0, "next_stake": 6.0}
-    assert s["stats"] == {"bundles": 2, "won": 1, "lost": 1, "runs_completed": 1, "profit": 30.0, "bank_now": 180.0,
-                          "longest_losing_streak": 1}
+    # The page gets the current run only (nothing settled in it yet) and one line on the run that just finished;
+    # the full history and all-time stats are the admin's.
+    assert s["history"] == [] and "stats" not in s
+    assert s["previous_run"]["number"] == 1 and s["previous_run"]["bundles"] == 2 and s["previous_run"]["profit"] == 30.0
+    full = client.get(f"{API}/staking/full", headers=auth).json()
+    assert [b["status"] for b in full["history"]] == ["won", "lost"]
+    assert full["stats"] == {"bundles": 2, "won": 1, "lost": 1, "runs_completed": 1, "profit": 30.0, "bank_now": 180.0,
+                             "longest_losing_streak": 1}
 
     r = client.put(f"{API}/staking/plan", headers=auth, json={"base_stake": 3, "target_odds": 6, "bank": 150})
     assert r.json()["run"]["next_stake"] == 3.0 and r.json()["plan"]["survivable_losses"] == 13

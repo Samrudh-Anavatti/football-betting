@@ -121,8 +121,14 @@ def test_tonight_bundles(client, auth, fake, monkeypatch, night_fixtures):
     rec = client.get(f"{API}/tonight/record", headers=auth).json()
     assert rec["won"] >= 1 and rec["profit_units"] >= round(first.odds - 1, 2) - 0.01
     assert rec["sessions"][0]["at"] == s["at"]
-    assert rec["by_target"]["standard"]["won"] >= 1 and rec["by_target"]["big"]["bundles"] == 0
-    assert rec["legs"]["sure"]["won"] == len(first_legs) and rec["legs"]["longer"]["settled"] == 0
+    assert rec["days"] == 14 and "by_target" not in rec and "legs" not in rec
+    # The record is a rolling window: a session older than that drops off it (the bundles stay in the database).
+    with SessionLocal() as db:
+        for b in db.scalars(select(SessionBundle).where(SessionBundle.session_at == KICKOFF)):
+            b.session_at = KICKOFF - timedelta(days=20)
+        db.commit()
+    old = client.get(f"{API}/tonight/record").json()
+    assert old["bundles"] == 0 and old["sessions"] == [] and old["profit_units"] == 0
 
 
 def test_tonight_access(client, monkeypatch):

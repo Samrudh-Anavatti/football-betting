@@ -71,7 +71,20 @@ def test_full_flow(client, auth, fake):
     client.post(f"{API}/admin/sync/fixtures", json={"league_ids": [39], "include_standings": False}, headers=auth)
 
     rec = client.get(f"{API}/record").json()
-    assert rec["won"] == 1 and rec["profit_units"] == 1.2 and rec["roi"] == 0.6
+    assert rec["won"] == 1 and rec["profit_units"] == 1.2 and rec["roi"] == 0.6 and rec["days"] == 14
+    assert len(client.get(f"{API}/tips?status=settled").json()) == 1
+    # The record is a rolling window by kick-off: a match older than that drops off it and off the settled list.
+    from datetime import timedelta
+
+    from app.database import SessionLocal
+    from app.models import Fixture
+    with SessionLocal() as db:
+        db.get(Fixture, 1001).kickoff = KICKOFF - timedelta(days=20)
+        db.commit()
+    assert client.get(f"{API}/record").json()["won"] == 0 and client.get(f"{API}/tips?status=settled").json() == []
+    with SessionLocal() as db:
+        db.get(Fixture, 1001).kickoff = KICKOFF
+        db.commit()
     acc = client.get(f"{API}/admin/accounts", headers=auth).json()["accounts"]
     ivo = next(a for a in acc if a["username"] == "ivo")
     assert ivo["profit"] == 30 and ivo["balance"] == 1030

@@ -13,7 +13,7 @@ from ..models import AiPrediction, Fixture, League, Lineup, MatchContext, Tip, U
 from ..serialize import fixture_dict, iso, league_dict, tip_dict
 from ..services.board import best_1x2, latest_snapshots, match_board
 from ..services.settlement import FINISHED
-from ..services.stats import tip_record
+from ..services.stats import RECORD_DAYS, record_since, tip_record
 from ..services.transfermarkt import team_url
 
 router = APIRouter(tags=["public"])
@@ -235,13 +235,13 @@ def context_dict(ctx: MatchContext | None) -> dict:
 @router.get("/tips")
 def tips(status: str = Query("open", pattern="^(open|settled|all)$"), limit: int = Query(50, ge=1, le=1000),
          db: Session = Depends(get_db), user: User | None = Depends(optional_user)):
-    """Our picks. A visitor gets every settled pick but only the free few of the open ones; `/tips/locked` says
-    which matches the rest are on."""
+    """Our picks. A visitor gets the settled picks but only the free few of the open ones; `/tips/locked` says
+    which matches the rest are on. `settled` is the record's list: matches from the last `RECORD_DAYS` days."""
     q = select(Tip).join(Fixture).where(Tip.published.is_(True), Tip.source == "ivo")
     if status == "open":
         q = q.where(Tip.status == "pending").order_by(Fixture.kickoff)
     elif status == "settled":
-        q = q.where(Tip.status != "pending").order_by(Fixture.kickoff.desc())
+        q = q.where(Tip.status != "pending", Fixture.kickoff >= record_since()).order_by(Fixture.kickoff.desc())
     else:
         q = q.order_by(Fixture.kickoff.desc())
     locked = tip_gate(db, user)
@@ -260,4 +260,6 @@ def locked_tips(db: Session = Depends(get_db), user: User | None = Depends(optio
 
 @router.get("/record")
 def record(db: Session = Depends(get_db)):
-    return tip_record(db, list(db.scalars(select(Tip).where(Tip.published.is_(True), Tip.source == "ivo"))))
+    """Our picks' record over the last `RECORD_DAYS` days (by kick-off), and `days` so pages can say so."""
+    q = select(Tip).join(Fixture).where(Tip.published.is_(True), Tip.source == "ivo", Fixture.kickoff >= record_since())
+    return {**tip_record(db, list(db.scalars(q))), "days": RECORD_DAYS}

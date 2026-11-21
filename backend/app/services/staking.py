@@ -123,3 +123,29 @@ def plan_state(db: Session, source: str = "ivo") -> dict:
             "profit": profit, "bank_now": round(plan.bank + profit, 2), "longest_losing_streak": longest,
         },
     }
+
+
+def split_runs(settled: list[Bundle]) -> list[list[Bundle]]:
+    """Settled bundles, oldest first, split into runs: a win ends one. The last list is the current run (empty
+    straight after a win)."""
+    runs: list[list[Bundle]] = [[]]
+    for b in settled:
+        runs[-1].append(b)
+        if b.status == "won":
+            runs.append([])
+    return runs
+
+
+def public_state(db: Session) -> dict:
+    """The plan as the /staking page shows it: the live bundle, the current run only (its settled bundles, the ones
+    since the last win) and one line on the run that finished before it. The run and its next stake are still worked
+    out from every bundle; `plan_state` is the full history, for the admin pages."""
+    state = plan_state(db)
+    runs = split_runs([b for b in plan_bundles(db, get_plan(db)) if b.status != "pending"])
+    last = runs[-2] if len(runs) > 1 else None
+    del state["stats"]
+    state["history"] = [bundle_dict(b) for b in reversed(runs[-1])]
+    state["previous_run"] = last and {"number": len(runs) - 1, "bundles": len(last),
+                                      "profit": round(sum(b.profit or 0 for b in last), 2),
+                                      "ended_at": iso(last[-1].settled_at)}
+    return state
