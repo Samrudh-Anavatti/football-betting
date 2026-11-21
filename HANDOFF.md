@@ -249,6 +249,9 @@ sessions, targets, ticking matches and a custom stake stay behind the account.
 which left Great Britain in 2014 and dropped its licence application in 2018: UK visitors couldn't bet the prices
 (or most of the arbitrage list, which leaned on Pinnacle).
 
+Changing `ODDS_BOOKMAKERS` takes effect at each match's next price pull (hourly sweep): `ingest_market_items`
+stores a board again when its set of bookmakers differs, even if API-Football hasn't re-priced it.
+
 Measured 2026-11-21: `/odds/bookmakers` names 36 bookmakers but only ten actually price our matches. Markets on a
 Premier League match: Bet365 104, Marathonbet 54, Betano 54, 1xBet 40, William Hill 33, Pinnacle 19, Betfair 17,
 BetVictor 14, SBO 11, Dafabet 1 (Serie A and the Süper Lig the same; League One had only 1xBet and Dafabet that
