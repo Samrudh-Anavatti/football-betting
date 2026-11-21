@@ -97,3 +97,39 @@ def test_fair_price_needs_a_complete_book():
     assert all(s["fair"] for s in sels) and abs(sum(s["prob"] for s in sels) - 1) < 0.01
     assert mk[92]["layout"] == "list" and mk[92]["category"] == "players"
     assert all(s["fair"] is None for s in mk[92]["groups"][0]["selections"])  # not mutually exclusive
+
+
+def test_board_is_stored_again_when_the_bookmakers_change(client, monkeypatch):
+    """Same prices from API-Football, but a different set of our bookmakers: the stored board follows the set."""
+    import json
+    from datetime import datetime, timedelta
+
+    from app import config
+    from app.database import SessionLocal
+    from app.models import Fixture, League, MarketBook, OddsSnapshot, Team
+    from app.services import sync
+
+    now, fid = datetime(2026, 1, 1, 12), 990001
+    bets = [{"id": 1, "name": "Match Winner", "values": [{"value": "Home", "odd": "2.00"}]}]
+    item = {"fixture": {"id": fid}, "update": "2026-01-01T10:00:00+00:00", "bookmakers": [
+        {"id": 8, "name": "Bet365", "bets": bets}, {"id": 4, "name": "Pinnacle", "bets": bets},
+        {"id": 32, "name": "Betano", "bets": bets}]}
+    names = lambda db: db.flush() or [b["name"] for b in json.loads(db.get(MarketBook, fid).bookmakers_json)]
+    with SessionLocal() as db:
+        lg = db.scalars(__import__("sqlalchemy").select(League)).first()
+        db.add_all([Team(id=fid, name="Home"), Team(id=fid + 1, name="Away")])
+        db.add(Fixture(id=fid, league_id=lg.id, season=lg.season, kickoff=now + timedelta(days=1), status="NS",
+                       home_team_id=fid, away_team_id=fid + 1))
+        db.flush()
+        try:
+            monkeypatch.setattr(config, "ODDS_BOOKMAKERS", [8, 4])
+            sync.ingest_market_items(db, [item], now)
+            assert names(db) == ["Bet365", "Pinnacle"]
+            monkeypatch.setattr(config, "ODDS_BOOKMAKERS", [8, 32])
+            sync.ingest_market_items(db, [item], now + timedelta(hours=1))
+            assert names(db) == ["Bet365", "Betano"]
+            rows = db.query(OddsSnapshot).filter_by(fixture_id=fid).count()
+            sync.ingest_market_items(db, [item], now + timedelta(hours=2))  # nothing changed: no new history
+            assert db.query(OddsSnapshot).filter_by(fixture_id=fid).count() == rows
+        finally:
+            db.rollback()

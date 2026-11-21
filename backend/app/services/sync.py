@@ -405,9 +405,10 @@ def ingest_market_items(db: Session, items: list[dict], pulled_at: datetime) -> 
         fx.odds_synced_at = pulled_at
         n += 1
         old = db.get(MarketBook, fx.id)
-        if old is not None and updated is not None and old.provider_updated_at == updated:
+        if (old is not None and updated is not None and old.provider_updated_at == updated
+                and {b["id"] for b in json.loads(old.bookmakers_json)} == {b["id"] for b in books}):
             old.pulled_at = pulled_at  # unchanged since the last pull: no new history rows
-            continue
+            continue  # (a different set of bookmakers, after ODDS_BOOKMAKERS changes, is stored again)
         db.merge(MarketBook(
             fixture_id=fx.id, provider="api_football", pulled_at=pulled_at, provider_updated_at=updated,
             bookmakers_json=json.dumps(books, separators=(",", ":")),

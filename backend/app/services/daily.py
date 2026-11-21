@@ -75,16 +75,6 @@ def stake_for(plan, losses: float, odds: float) -> float:
     return round(plan.base_stake + losses / (odds - 1), 2)
 
 
-def fix_first_stakes(db: Session) -> None:
-    """One-off for the bundle made on 2026-11-21 under the first stake rule (7.08 for a first bet): a run's first
-    bet is the base stake. Remove with the next backend change."""
-    plan = get_plan(db, SOURCE)
-    for b in plan_bundles(db, plan):
-        if b.step == 1 and b.status == "pending":
-            b.stake = plan.base_stake
-    db.commit()
-
-
 # ── Spend ────────────────────────────────────────────────────────────────────
 
 
