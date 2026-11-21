@@ -6,9 +6,10 @@ given all of the day's legs with Luna's reasoning and each bookmaker's prices an
 isn't one today. Luna does the same job when Claude can't (no key, its month's budget spent, an error). The answer is
 checked here before anything is stored: real legs, one bookmaker, odds near the target.
 
-The stake follows the staking plan's recovery rule (see `staking.stake_for`), with one difference: after MAX_MISSES
-misses in a row the run is written off and the next one starts at the base stake, so the stake visitors are shown
-never climbs far.
+The stake is the usual stake plus enough to win back what the run has lost: base + losses ÷ (odds − 1). So the
+first bet of a run is exactly the usual stake whatever the bundle's odds, and a win always returns the run's losses
+plus what a usual-stake win would have made. After MAX_MISSES misses in a row the run is written off and the next
+one starts at the usual stake, so the stake visitors are shown never climbs far.
 """
 import json
 import math
@@ -24,7 +25,7 @@ from ..ai import reviewer
 from ..ai.service import month_spend
 from ..models import AiCall, AiPrediction, Bundle, BundleLeg, Fixture, Tip
 from ..serialize import iso, leg_tip_dict
-from .staking import get_plan, plan_bundles, stake_for
+from .staking import get_plan, plan_bundles
 from .stats import current_prices
 
 SOURCE = "daily"
@@ -68,6 +69,20 @@ def run_state(rows: list[Bundle]) -> dict:
             if step > MAX_MISSES:
                 run, step, losses = run + 1, 1, 0.0
     return {"number": run, "step": step, "losses": round(losses, 2)}
+
+
+def stake_for(plan, losses: float, odds: float) -> float:
+    return round(plan.base_stake + losses / (odds - 1), 2)
+
+
+def fix_first_stakes(db: Session) -> None:
+    """One-off for the bundle made on 2026-11-21 under the first stake rule (7.08 for a first bet): a run's first
+    bet is the base stake. Remove with the next backend change."""
+    plan = get_plan(db, SOURCE)
+    for b in plan_bundles(db, plan):
+        if b.step == 1 and b.status == "pending":
+            b.stake = plan.base_stake
+    db.commit()
 
 
 # ── Spend ────────────────────────────────────────────────────────────────────

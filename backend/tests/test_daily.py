@@ -77,7 +77,7 @@ def test_daily_bundle(client, auth, legs, monkeypatch):
     s = client.get(f"{API}/daily").json()  # no sign-in needed
     b = s["bundle"]
     assert b["bookmaker"] == "William Hill" and b["odds"] == round(1.45 ** 5, 2) and b["by_claude"]
-    assert b["stake"] == round(30 / (b["odds"] - 1), 2) and (b["run"], b["step"]) == (1, 1)
+    assert b["stake"] == 6.0 and b["multiplier"] == 1.0 and (b["run"], b["step"]) == (1, 1)  # a first bet is the usual stake
     assert b["summary"] == "Five home sides." and b["legs"][0]["reason"] == "At home and in form"
     assert "author" not in b["legs"][0]["tip"]
 
@@ -85,7 +85,7 @@ def test_daily_bundle(client, auth, legs, monkeypatch):
     assert client.post(f"{API}/admin/tips/{legs[0]}/settle", headers=auth, json={"status": "lost"}).status_code == 200
     s = client.get(f"{API}/daily").json()
     assert s["bundle"]["status"] == "lost" and s["run"]["misses"] == 1 and s["this_run"][0]["id"] == b["id"]
-    assert s["run"]["next_stake"] == round((b["stake"] + 30) / 5, 2)
+    assert s["run"]["next_stake"] == 7.2 and s["run"]["next_multiplier"] == 1.2  # 6 + the 6 lost ÷ (6.00 − 1)
 
     admin = client.get(f"{API}/daily/admin", headers=auth).json()
     assert admin["spend"]["claude"]["left_usd"] == 99.87 and len(admin["calls"]) == 2

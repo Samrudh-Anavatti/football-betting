@@ -34,7 +34,7 @@ function publishTime(hourUtc) {
 function runLine(bundle, maxMisses) {
   if (bundle.step === 1) return 'First bet of a new run, so it is your usual stake.'
   const misses = bundle.step - 1
-  return `${misses === 1 ? 'The last bundle' : `The last ${misses} bundles`} missed, so this one is ${bundle.multiplier.toFixed(2)}× your usual stake: a win pays the run back with the profit on top. After ${maxMisses} misses in a row the run starts again at your usual stake.`
+  return `${misses === 1 ? 'The last bundle' : `The last ${misses} bundles`} missed, so this one is ${bundle.multiplier.toFixed(2)}× your usual stake: enough that a win pays the run back and still makes a usual win. After ${maxMisses} misses in a row the run starts again at your usual stake.`
 }
 
 export default function DailyBundle({ className = '' }) {

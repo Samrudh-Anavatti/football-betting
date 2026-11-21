@@ -226,7 +226,8 @@ sessions, targets, ticking matches and a custom stake stay behind the account.
   under `CLAUDE_MONTHLY_BUDGET_USD` (default 100); otherwise, or on an error, **Luna** on her own budget. Every call
   is an `ai_calls` row (provider, model, outcome, tokens, cost).
 * **Staking run:** plan `source="daily"` in `staking_plans` (base 6, target 6.00), bundles in `bundles` with `day`,
-  `model`, `summary` and a `reason` per leg. Stake = `staking.stake_for`; **after 6 misses in a row the run is
+  `model`, `summary` and a `reason` per leg. Stake = usual stake + the run's losses ÷ (odds − 1)
+  (`daily.stake_for`: a run's first bet is exactly the usual stake); **after 6 misses in a row the run is
   written off** and the next starts at the base stake (`daily.run_state`, `MAX_MISSES`). One live bundle at a time.
   Settles with the other bundles. The site shows the stake as a multiple of the visitor's usual stake (£10 for
   visitors; accounts set their own, kept in the browser).

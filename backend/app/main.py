@@ -8,7 +8,7 @@ from fastapi.middleware.gzip import GZipMiddleware
 from .database import Base, SessionLocal, add_missing_columns, engine
 from .routers import admin, ai, ai_lab, arbitrage, auth, daily, membership, public, staking, tonight
 from .seed import sync_users
-from .services import scheduler
+from .services import daily as daily_bundle, scheduler
 from .services.settlement import settle_pending
 from .services.sync import ensure_leagues, fail_interrupted_runs
 
@@ -50,6 +50,7 @@ def on_startup():
         ensure_leagues(db)
         fail_interrupted_runs(db)
         settle_pending(db)
+        daily_bundle.fix_first_stakes(db)
     finally:
         db.close()
     scheduler.start()
