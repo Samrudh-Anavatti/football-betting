@@ -3,7 +3,7 @@
 > **No secrets in here** (the repo is public). Passwords and API keys live only in
 > Azure App Service settings.
 
-_Last updated: 2026-11-14 (**Tonight's bundles** at `/tonight`, admins only while tested: the AI's legs built into
+_Last updated: 2026-11-21 (**Site restructured around a free account**: new home page and nav, a sign-up flow, and Tonight's bundles, the staking plan, arbitrage, every pick and the AI's suggested bets opened to anyone signed in; see "Site structure and access levels", which supersedes the "admins only" / "members only" notes further down. 2026-11-14: **Tonight's bundles** at `/tonight`, admins only while tested: the AI's legs built into
 up to three bundles for the matches someone is about to watch, flat stakes, on the record; the long-term plan is one
 free a day, more for members. The AI Lab's ladder and arbitrage moved to Admin → AI Lab. See "Tonight's bundles".
 2026-11-13: **Mr Predictions' welcome**. 2026-11-11: **Membership through Stripe built, switched off** until Ivo's business has a Stripe
@@ -136,6 +136,52 @@ so the app used hash URLs (`/#/match/123`), and Google ignores everything after 
   `CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… npx wrangler@4.151.3 pages deploy dist --project-name football-predictions --branch main`
   from `frontend/`.
 
+## Site structure and access levels (2026-11-21)
+
+The site is organised by what a visitor is after, and a **free account** stands in for the paywall until a payment
+provider is chosen.
+
+**Three levels** (`backend/app/access.py`): a *visitor* (not signed in), an *account* (signed up, free) and a
+*member* (paying, or an admin). `FEATURES` there says which level each gated feature needs; today every one is
+`"account"`. **Putting a feature behind the paywall later = changing its line to `"member"`**, nothing else: the API
+enforces it (`deps.require("<feature>")`, 401 for a visitor, 403 for an account), `/auth/me` reports it as `access`,
+and the frontend's lock cards switch from "Join free" to "See membership" by themselves (`lib/access.js` `useCan`,
+`components/JoinCard.jsx`).
+
+| Feature | Visitor | Account |
+|---|---|---|
+| `all_picks` | the 3 most confident open picks (`public.FREE_PICKS`); `/tips/locked` gives only the matches of the rest | every open pick |
+| `ai_bets` | the AI's read and probabilities; `bets_locked` says how many bets wait | the suggested bets |
+| `tonight` / `tonight_custom` | sessions and the record (public) | bundles; without `tonight_custom`, only the day's default request and its first bundle (`tonight.default_request`) |
+| `staking` | blurred sample | the plan |
+| `arbitrage` | blurred sample | the list (`GET /arbitrage`, the same scan as Admin → AI Lab) |
+
+* A pick is only ever hidden **until its match kicks off**; after that it is on the record for everyone. Settled
+  picks, the record, fixtures, results, prices and research are public, as before.
+* Match titles for search engines (`/matches/{id}/meta`) only mention picks a visitor can see.
+* **No names:** bundle legs use `serialize.leg_tip_dict` (no `author`), since the staking plan and Tonight are no
+  longer team-only.
+
+**Nav** (`components/Shell.jsx`): Today (`/`), Matches (`/fixtures` + `/results`, tabs), Bundles (`/tonight` +
+`/staking`, tabs), Arbitrage (`/arbitrage`, "Arbs" on phones), Record (`/history`), then Sign in + an amber **Join
+free** (or Account / Admin). Old addresses are unchanged, so nothing indexed moved.
+
+**Home** (`pages/Home.jsx`): headline + Join free, the record, a Tonight card (next session, link to the bundles)
+with the staking plan and arbitrage beside it, today's picks (most confident first; visitors get a "N more picks"
+lock card), the last three results on our picks, and the next day's fixtures.
+
+**Sign-up** (`/signup`, `pages/Auth.jsx`): lists what an account opens (`ACCOUNT_PERKS` in `lib/access.js`); every
+lock card links to it with `?next=<the page they were on>`, so joining lands them back there, unlocked. `/account`
+lists what the account includes; its Membership card stays hidden until membership is on sale.
+
+**Mr Predictions** (`lib/tour.js`): for a visitor the home tour is the route in (record → today's picks → Tonight
+→ the Join button), and on locked pages a second stop points at the lock card (`data-tour="locked"`). Right after
+signing up, a three-stop "you're in" tour of the header runs once (`queueWelcome` / `pendingWelcome`).
+
+**Still to decide / do:** the Membership page's copy still describes the staking plan as the paid feature (it is
+closed, unlinked and now `noindex`); rewrite it when the paywall's contents are chosen. Local testing: `.claude/
+launch.json` has two previews, the frontend on live data and on a local backend (`python -m app.demo`).
+
 ## Staking plan (built 2026-11-01)
 
 Ivo's method: his picks combined into one bet ("bundle") at about 6.00, and after a loss the next stake is raised so
@@ -158,8 +204,8 @@ starts a new run at the base stake.
 * **`/staking` page** (nav "Staking"): the live bundle as a slip (or "Next bundle coming soon"), stats, a "your
   starting stake" box that scales every amount (stored in the browser), the loss ladder up to where the bank runs out,
   and every settled bundle. The chance of emptying the bank is shown once Ivo has 20+ settled picks to estimate from.
-* **Paywall: not built yet.** Signed-out visitors get the page blurred over made-up data (`lib/stakingSample.js`) with
-  a "Members only, coming soon" card; the real plan is never sent to them (a blur only hides what the browser has).
+* **Access (since 2026-11-21): anyone signed in** (see "Site structure and access levels"). Signed-out visitors get the page blurred over made-up data (`lib/stakingSample.js`) with
+  a "Join free" card; the real plan is never sent to them (a blur only hides what the browser has).
   Next piece: payments. **Decided 2026-11-07: Stripe directly** (Checkout + Customer Portal + webhook), not Buy Me a
   Coffee memberships: BMC pays out through Stripe anyway (same policy risk), costs ~5% more, and only gives us an email
   to match. Stripe bans "sports forecasting or odds-making with a monetary prize" (contests), not paid tips, but reviews
@@ -261,7 +307,7 @@ per visit** (sessionStorage); `?tour=1` on any page shows it again. Nothing anim
 * **Members** sign up at `/signup` with email + password (8–72 chars) + an 18+ tick, and sign in at `/login` with
   their email (admins use their username there). Email is stored lower-cased and unique; it isn't verified, which is
   safe because resets only ever go to the address on the account. Members get a random `username` (`m…`), unused.
-  **`/signup` isn't linked anywhere until the paywall** (members get nothing yet); it's `noindex`.
+  `/signup` is linked from the header and every lock card since 2026-11-21 (it's still `noindex`).
 * **Reset:** `/forgot` always gives the same answer (doesn't reveal who has an account) and emails a link
   `/reset#token=…` (a fragment, so the token never reaches a server or analytics; the page strips it from the address
   bar). Only the token's SHA-256 is stored; single use, 60 min (`RESET_MINUTES`).
@@ -275,7 +321,7 @@ per visit** (sessionStorage); `?tour=1` on any page shows it again. Nothing anim
 * **Support** is the business WhatsApp (`lib/support.js`, wa.me link): in the footer, on `/account` and on `/forgot`.
 * **Email:** `services/email.py` calls ACS's REST API (`/emails:send`, HMAC-signed) with httpx, no Azure SDK.
 
-## Tonight's bundles (built 2026-11-14, admins only while tested)
+## Tonight's bundles (built 2026-11-14; open to accounts since 2026-11-21)
 
 The public face of the AI staking, for a casual viewer: someone sitting down to watch a few matches who wants two
 or three bundles to cheer for, dinner money if they land, not a bankroll plan. Nav "Tonight" (admins only for now),
@@ -423,6 +469,9 @@ the settings above.
 
 ## Next steps
 
+* [x] Site restructured around a free account (2026-11-21), see "Site structure and access levels". **Next:** a
+  payment provider, then move the chosen features to `"member"` in `access.py` and rewrite the Membership page.
+
 * [x] Both API keys added as app settings; balances show in Admin → Data.
 * [x] API-Football Pro for a one-month trial (from 2026-10-03). **Review with Ivo around 2026-11-03**: keep Pro only if he uses the Pro-only data (injuries, line-ups, team stats, extra markets), otherwise drop to football-data.org + our own stored history.
 * [x] Prices for every market from API-Football (2026-10-07). **This makes Pro load-bearing**: dropping it takes the board back to match result and totals from The Odds API.
@@ -441,8 +490,8 @@ the settings above.
 * [ ] Price-movement chart from odds history; closing-line value per pick. (The schedule now captures a closing
   book 5–10 min before every kick-off, so the data for this is there.)
 * [x] Staking plan (2026-11-01), see "Staking plan".
-* [x] Tonight's bundles (2026-11-14), see there. **Next:** test it over a real weekend behind the admin flag, then
-  the free-one-a-day rule and the public nav; Claude Opus on the legs when Sam's API credit lands (~2026-11-17).
+* [x] Tonight's bundles (2026-11-14), opened to accounts 2026-11-21 (the one-a-day rule is built and waits on
+  `tonight_custom` moving to `"member"`); Claude Opus on the legs when Sam's API credit lands (~2026-11-17).
 * [x] Paywall built (2026-11-11), see "Membership". **Next:** Ivo's business details + Stripe account, then the setup
   checklist there; tax advice before selling outside the UK at volume.
 * [x] Refresh schedule (2026-10-12). **Check real usage on the Schedule card after a full weekend** against the

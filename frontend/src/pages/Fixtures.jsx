@@ -1,11 +1,16 @@
 import { useState } from 'react'
 import FixtureList from '../components/FixtureList.jsx'
 import LeagueFilter from '../components/LeagueFilter.jsx'
+import { SubNav } from '../components/Shell.jsx'
 import { Empty, ErrorNote, Loading } from '../components/ui.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { api } from '../lib/api.js'
 
 const RANGES = [3, 7, 14]
+const MATCH_TABS = [
+  ['/fixtures', 'Fixtures'],
+  ['/results', 'Results'],
+]
 const TIERS = [
   ['main', 'Top leagues'],
   ['more', 'More leagues'],
@@ -55,6 +60,7 @@ export default function Fixtures({ results = false }) {
 
   return (
     <div className="space-y-5">
+      <SubNav tabs={MATCH_TABS} />
       <div data-tour="fixtures" className="flex flex-wrap items-end gap-3">
         <h1 className="text-4xl sm:text-5xl leading-none">{results ? 'Results' : 'Fixtures'}</h1>
         <div className="ml-auto segmented" role="group" aria-label="Date range">

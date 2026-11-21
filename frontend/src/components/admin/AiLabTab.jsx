@@ -245,11 +245,10 @@ function ArbCard({ a, total }) {
   )
 }
 
-function Arbitrage() {
-  const { data, error, loading } = useApi(() => api.aiLabArbs(), [])
+// The arbitrage list. Also the public Arbitrage page (pages/Arbitrage.jsx), which passes its own `data`: the
+// real list for an account, a made-up one for the preview.
+export function ArbitrageView({ data }) {
   const [total, setTotal] = useState(100)
-  if (loading && !data) return <Loading rows={4} />
-  if (error) return <ErrorNote error={error} />
   const { live, recent, stats, scanned_at: scannedAt } = data
   return (
     <div className="space-y-8">
@@ -257,8 +256,7 @@ function Arbitrage() {
         <div className="space-y-3 text-[15px] max-w-prose">
           <p>
             Markets where the best prices across our five bookmakers add up to under 100%: back every outcome in these
-            proportions and the return is the same whatever happens. Found in the prices we already pull, so no extra
-            cost.
+            proportions and the return is the same whatever happens.
           </p>
           <p className="text-sm text-ink-soft">
             Our prices can be up to an hour old (minutes near kick-off), so check each one at the bookmaker before
@@ -316,6 +314,13 @@ function Arbitrage() {
       </section>
     </div>
   )
+}
+
+function Arbitrage() {
+  const { data, error, loading } = useApi(() => api.aiLabArbs(), [])
+  if (loading && !data) return <Loading rows={4} />
+  if (error) return <ErrorNote error={error} />
+  return <ArbitrageView data={data} />
 }
 
 const TABS = [

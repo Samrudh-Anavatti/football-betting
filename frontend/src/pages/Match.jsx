@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom'
 import AiPanel, { PublicAi } from '../components/AiPanel.jsx'
+import JoinCard from '../components/JoinCard.jsx'
 import MarketBoard from '../components/MarketBoard.jsx'
 import PickForm from '../components/PickForm.jsx'
 import PitchCard from '../components/PitchCard.jsx'
@@ -242,8 +243,10 @@ function TeamStats({ fx, home, away }) {
 
 export default function Match() {
   const id = matchIdFrom(useParams().slug)
-  const admin = useAuth().user?.is_admin
-  const { data, loading, error, reload } = useApi(() => api.match(id), [id])
+  const { user } = useAuth()
+  const admin = user?.is_admin
+  // Re-read when someone signs in or out: an account gets more of the match than a visitor.
+  const { data, loading, error, reload } = useApi(() => api.match(id), [id, user?.id])
   const [pick, setPick] = useState(null)
   const [saved, setSaved] = useState(null)
   // Only once this address's match has loaded (moving between matches, the last one's data lingers a moment).
@@ -280,6 +283,11 @@ export default function Match() {
             ))}
           </div>
         </section>
+      )}
+      {data.locked_tips > 0 && (
+        <JoinCard row title={`Our team has ${data.locked_tips === 1 ? 'a pick' : `${data.locked_tips} picks`} on this match`}>
+          The selection, the price we took and the thinking behind it. Free with an account.
+        </JoinCard>
       )}
       {!admin && <PublicAi ai={data.ai} fx={fx} board={data.odds} />}
 

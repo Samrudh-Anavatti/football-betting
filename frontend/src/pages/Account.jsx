@@ -3,7 +3,7 @@ import { Link, Navigate, useSearchParams } from 'react-router-dom'
 import { ErrorNote, Loading } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
-import { fullDate } from '../lib/membership.js'
+import { fullDate, useMembershipInfo } from '../lib/membership.js'
 import { WHATSAPP_URL } from '../lib/support.js'
 import { Field } from './Auth.jsx'
 
@@ -73,8 +73,36 @@ function useJoined() {
   return waiting
 }
 
+// What the account opens, as doors to each: the first thing a new account sees here.
+const INCLUDED = [
+  ['/tonight', "Tonight's bundles", "The AI's bundles for the matches you're watching"],
+  ['/staking', 'Staking plan', 'Our picks bundled at about 6.00, stakes worked out'],
+  ['/arbitrage', 'Arbitrage', 'Prices that add up to a profit'],
+  ['/', "Today's picks", "Every open pick, and the AI's suggested bets on each match"],
+]
+
+function IncludedCard() {
+  return (
+    <section className="panel p-6 space-y-4">
+      <h2 className="text-2xl">Your account includes</h2>
+      <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {INCLUDED.map(([to, name, text]) => (
+          <li key={to}>
+            <Link to={to} className="block h-full rounded-lg bg-ink/[0.04] px-4 py-3 transition hover:bg-amber-light">
+              <span className="font-display font-bold">{name}</span>
+              <span className="block text-sm text-ink-soft">{text}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+// Only shown once membership is on sale, or to someone who has (or had) one.
 function MembershipCard() {
   const { user } = useAuth()
+  const info = useMembershipInfo()
   const waiting = useJoined()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
@@ -97,6 +125,7 @@ function MembershipCard() {
     line = `Cancelled: you keep access until ${fullDate(m.paid_until)}, and won't be charged again.`
   else if (m.member) line = `Member since ${fullDate(m.member_since)}. Renews on ${fullDate(m.paid_until)}.`
   else if (m.status === 'canceled' || m.paid_until) line = 'Your membership has ended.'
+  if (!info?.open && !line && !m.can_manage) return null
   return (
     <section className="panel p-6 space-y-4">
       <h2 className="text-2xl">Membership</h2>
@@ -160,6 +189,7 @@ export default function Account() {
         </div>
         <button type="button" className="sm:ml-auto btn-ghost" onClick={logout}>Sign out</button>
       </div>
+      <IncludedCard />
       <MembershipCard />
       <ChangePassword />
       <p className="text-sm text-ink-soft">

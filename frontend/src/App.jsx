@@ -12,6 +12,7 @@ import Staking from './pages/Staking.jsx'
 import ConsentBanner from './components/ConsentBanner.jsx'
 import Tour from './components/Tour.jsx'
 import Admin from './pages/Admin.jsx'
+import Arbitrage from './pages/Arbitrage.jsx'
 import Account from './pages/Account.jsx'
 import Tonight from './pages/Tonight.jsx'
 import { Forgot, Login, Reset, Signup } from './pages/Auth.jsx'
@@ -46,6 +47,7 @@ export default function App() {
         <Route path="/reset" element={<Reset />} />
         <Route path="/account" element={<Account />} />
         <Route path="/tonight" element={<Tonight />} />
+        <Route path="/arbitrage" element={<Arbitrage />} />
         <Route path="/ai-lab" element={<Navigate to="/tonight" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

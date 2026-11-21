@@ -1,12 +1,15 @@
 import { useEffect, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { Link } from 'react-router-dom'
+import JoinCard from '../components/JoinCard.jsx'
+import { SubNav } from '../components/Shell.jsx'
 import { Empty, ErrorNote, LeagueBadge, Loading, Price, SectionHead } from '../components/ui.jsx'
 import { useApi } from '../hooks/useApi.js'
+import { useCan } from '../lib/access.js'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
 import { dayLabel, kickoffTime, money, odds, pct, pickLabel, shortDate } from '../lib/format.js'
 import { matchPath } from '../lib/seo.js'
-import { ResultMark, Stat } from './Staking.jsx'
+import { BUNDLE_TABS, ResultMark, Stat } from './Staking.jsx'
 
 // Tonight's bundles: for someone sitting down to watch a few matches. They pick the session, tick the matches they're
 // watching and a target, and the AI's surest legs on those matches become up to three bundles, each at one bookmaker.
@@ -59,21 +62,24 @@ function SessionPicker({ sessions, value, onChange }) {
   )
 }
 
-function MatchPicker({ session, picked, onToggle, onAll }) {
+// `fixed`: the matches can't be unticked (a visitor looking, or an account limited to the day's default bundle).
+function MatchPicker({ session, picked, onToggle, onAll, fixed }) {
   const all = picked.size === session.matches.length
   return (
     <div className="panel">
       <div className="px-4 pt-3 pb-2 flex items-center gap-3">
-        <p className="font-display font-bold">Watching</p>
-        <button type="button" className="ml-auto text-sm text-ink-soft underline underline-offset-4 hover:text-ink" onClick={() => onAll(!all)}>
-          {all ? 'None' : 'All'}
-        </button>
+        <p className="font-display font-bold">{fixed ? 'In this session' : 'Watching'}</p>
+        {!fixed && (
+          <button type="button" className="ml-auto text-sm text-ink-soft underline underline-offset-4 hover:text-ink" onClick={() => onAll(!all)}>
+            {all ? 'None' : 'All'}
+          </button>
+        )}
       </div>
       <ul className="divide-y divide-ink/5">
         {session.matches.map((m) => (
           <li key={m.id}>
             <label className="flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-ink/[0.03]">
-              <input type="checkbox" className="h-4 w-4 accent-ink" checked={picked.has(m.id)} onChange={() => onToggle(m.id)} />
+              {!fixed && <input type="checkbox" className="h-4 w-4 accent-ink" checked={picked.has(m.id)} onChange={() => onToggle(m.id)} />}
               <LeagueBadge league={m.league} />
               <span className="min-w-0 flex-1 truncate text-[15px]">
                 {m.home.name} v {m.away.name}
@@ -87,7 +93,7 @@ function MatchPicker({ session, picked, onToggle, onAll }) {
   )
 }
 
-function Controls({ target, onTarget, stake, onStake }) {
+function Controls({ target, onTarget, stake, onStake, fixed }) {
   return (
     <div className="panel p-4 space-y-4">
       <div>
@@ -98,6 +104,7 @@ function Controls({ target, onTarget, stake, onStake }) {
               key={t.key}
               type="button"
               aria-pressed={t.odds === target}
+              disabled={fixed && t.odds !== target}
               onClick={() => onTarget(t.odds)}
               className={`segment flex-1 ${t.odds === target ? 'segment-on' : ''}`}
             >
@@ -273,8 +280,12 @@ function Record({ record, stake }) {
   )
 }
 
-function TonightInner() {
-  const sessions = useApi(() => api.tonightSessions(), [])
+// `canBuild`: has the `tonight` feature. Without it (a visitor) the sessions and matches still show, with the way in
+// where the slips would be. `sessions.data.custom` false means only the day's default request is answered (see
+// backend/app/routers/tonight.py), so the session, matches and target are fixed to it.
+function TonightInner({ canBuild }) {
+  const { user } = useAuth()
+  const sessions = useApi(() => api.tonightSessions(), [user?.id])
   const record = useApi(() => api.tonightRecord(), [])
   const [sessionAt, setSessionAt] = useState(null)
   const [picked, setPicked] = useState(new Set())
@@ -285,7 +296,9 @@ function TonightInner() {
   const [error, setError] = useState(null)
   const [dirty, setDirty] = useState(false)
 
-  const list = sessions.data?.sessions || []
+  const fixedTo = canBuild && sessions.data && !sessions.data.custom ? sessions.data.default : null
+  const all = sessions.data?.sessions || []
+  const list = fixedTo ? all.filter((s) => s.at === fixedTo.session_at) : all
   const session = list.find((s) => s.at === sessionAt) || list[0] || null
 
   // A new session starts with every match ticked; the first set of bundles is built straight away.
@@ -294,10 +307,10 @@ function TonightInner() {
     setPicked(new Set(session.matches.map((m) => m.id)))
     setBundles(null)
     setDirty(true)
-  }, [session?.at]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [session?.at, canBuild]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!session || !dirty || building) return undefined
+    if (!session || !dirty || building || !canBuild) return undefined
     if (!picked.size) {
       setBundles([])
       setDirty(false)
@@ -360,11 +373,22 @@ function TonightInner() {
           <SessionPicker sessions={list} value={session.at} onChange={setSessionAt} />
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[22rem_minmax(0,1fr)] items-start">
             <div className="space-y-4">
-              <MatchPicker session={session} picked={picked} onToggle={toggle} onAll={pickAll} />
-              <Controls target={target} onTarget={changeTarget} stake={stake} onStake={changeStake} />
+              <MatchPicker session={session} picked={picked} onToggle={toggle} onAll={pickAll} fixed={!canBuild || !!fixedTo} />
+              {canBuild && <Controls target={target} onTarget={changeTarget} stake={stake} onStake={changeStake} fixed={!!fixedTo} />}
+              {fixedTo && (
+                <p className="text-sm text-ink-soft">
+                  Today's free bundle is for the day's biggest session. Choosing your own matches and targets comes
+                  with <Link to="/membership" className="link">membership</Link>.
+                </p>
+              )}
             </div>
             <div className="space-y-4">
-              {bundles === null || dirty ? (
+              {!canBuild ? (
+                <JoinCard title="Your bundles for these matches">
+                  The AI has {session.legs} calls it rates across {session.matches.length} matches here. Join free and it
+                  builds them into up to three bundles, at about 3.00, 6.00 or 10.00, each with its reasons.
+                </JoinCard>
+              ) : bundles === null || dirty ? (
                 <div className="panel px-5 py-8 text-center space-y-3">
                   {building ? (
                     <Loading label="Building" rows={3} />
@@ -412,20 +436,19 @@ function TonightInner() {
 }
 
 export default function Tonight() {
-  const { user, checking } = useAuth()
-  if (checking) return <Loading />
-  if (!user) return <Navigate to="/login?next=/tonight" replace />
-  if (!user.is_admin) return <Navigate to="/" replace /> // admins only while it's tested
+  const { checking } = useAuth()
+  const canBuild = useCan('tonight')
   return (
     <div className="space-y-6">
-      <div data-tour="tonight">
+      <div data-tour="tonight" className="space-y-4">
+        <SubNav tabs={BUNDLE_TABS} />
         <h1 className="text-4xl sm:text-5xl leading-none">Tonight's bundles</h1>
-        <p className="mt-3 max-w-prose text-[17px] text-ink-soft leading-relaxed">
+        <p className="max-w-prose text-[17px] text-ink-soft leading-relaxed">
           Sitting down for a few matches? Tick the ones you're watching and the AI builds up to three bundles from its
-          surest legs on them. Something to cheer for in every game.
+          surest calls on them. Something to cheer for in every game.
         </p>
       </div>
-      <TonightInner />
+      {checking ? <Loading rows={4} /> : <TonightInner canBuild={canBuild} />}
     </div>
   )
 }

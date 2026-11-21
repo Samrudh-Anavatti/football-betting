@@ -1,7 +1,7 @@
 import { Component, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation } from 'react-router-dom'
-import { FACE, PORTRAIT, stepsFor, tourKey } from '../lib/tour.js'
+import { FACE, PORTRAIT, clearWelcome, pendingWelcome, stepsFor, tourKey } from '../lib/tour.js'
 
 // Mr Predictions' welcome. The page dims, one part of it stays lit, and he points at it from a card with a short
 // line. A click anywhere (or Enter) moves to the next stop; Escape or Skip ends it. Once per page per visit
@@ -198,11 +198,15 @@ function TourInner() {
   const [run, setRun] = useState(null) // { key, steps, i }
 
   useEffect(() => {
-    const key = tourKey(pathname)
-    const steps = stepsFor(pathname)
+    // Not on the forms themselves: the header's Join button would otherwise light up on the page it leads to.
+    if (['/signup', '/login', '/forgot', '/reset'].includes(pathname)) return undefined
+    // Just joined: the short tour of what the account opened comes first, and this page's own waits for next time.
+    const joined = pendingWelcome()
+    const key = joined ? 'joined' : tourKey(pathname)
+    const steps = joined || stepsFor(pathname)
     const force = new URLSearchParams(search).get('tour') === '1'
     setRun(null)
-    if (!steps.length || (seen(key) && !force)) return undefined
+    if (!steps.length || (seen(key) && !force && !joined)) return undefined
     // The page's data lands after the route does: wait for the first stop to exist (up to 5 s, then start with
     // whatever stops there are, or none).
     let tries = 0
@@ -236,7 +240,8 @@ function TourInner() {
 
   if (!run) return null
   const end = () => {
-    markSeen(run.key)
+    if (run.key === 'joined') clearWelcome()
+    else markSeen(run.key)
     setRun(null)
   }
   // Stops whose anchor isn't on the page (no open picks, say) are passed over.

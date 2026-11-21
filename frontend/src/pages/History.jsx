@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom'
 import { Empty, ErrorNote, Loading, SectionHead } from '../components/ui.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { api } from '../lib/api.js'
-import { odds, pickLabel, shortDate, signed } from '../lib/format.js'
+import { odds, pct, pickLabel, shortDate, signed } from '../lib/format.js'
 import { matchPath } from '../lib/seo.js'
 
 const RESULT = {
@@ -14,9 +14,34 @@ const RESULT = {
 // Every settled pick, newest first: one line each, no reasoning or detail.
 export default function History() {
   const tips = useApi(() => api.tips('settled', 1000), [])
+  const record = useApi(() => api.record(), [])
+  const r = record.data
 
   return (
-    <section data-tour="history">
+    <section data-tour="history" className="space-y-6">
+      <div>
+        <h1 className="text-4xl sm:text-5xl leading-none">Our record</h1>
+        <p className="mt-3 max-w-prose text-[17px] text-ink-soft leading-relaxed">
+          Every pick we've made, won or lost, at the price we took. Nothing is ever deleted. The bundles keep their
+          own records: <Link to="/tonight" className="link">tonight's AI bundles</Link> and{' '}
+          <Link to="/staking" className="link">our staking plan</Link>.
+        </p>
+      </div>
+      {r && r.tips > 0 && (
+        <dl className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {[
+            ['Profit, in units', signed(r.profit_units)],
+            ['Won / lost', `${r.won}–${r.lost}`],
+            ['Strike rate', pct(r.strike_rate, 0)],
+            ['Average odds', r.avg_odds ?? '–'],
+          ].map(([k, v]) => (
+            <div key={k} className="panel px-4 py-3 flex flex-col-reverse">
+              <dt className="text-sm text-ink-soft">{k}</dt>
+              <dd className="num text-2xl sm:text-3xl font-semibold">{v}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
       <SectionHead title="Past picks" count={tips.data?.length || null} />
       {tips.loading ? (
         <Loading rows={8} />

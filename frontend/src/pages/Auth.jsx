@@ -1,22 +1,27 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { ErrorNote, Loading } from '../components/ui.jsx'
+import { ACCOUNT_PERKS } from '../lib/access.js'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
+import { queueWelcome } from '../lib/tour.js'
 import { WHATSAPP_URL } from '../lib/support.js'
 
-// Where to go once signed in: ?next= if it's one of our pages, else Admin or Account.
+// Where to go once signed in: ?next= if it's one of our pages (the page they were on when they chose to join),
+// else Admin for the team and tonight's bundles for everyone else.
 function useDone() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   return (user) => {
     const next = params.get('next')
-    navigate(next?.startsWith('/') && !next.startsWith('//') ? next : user.is_admin ? '/admin' : '/account', { replace: true })
+    const ours = next?.startsWith('/') && !next.startsWith('//') && !['/login', '/signup'].includes(next)
+    navigate(ours ? next : user.is_admin ? '/admin' : '/tonight', { replace: true })
   }
 }
 
 // A form card that tracks busy/error around one async submit.
-function AuthForm({ title, onSubmit, submit, busyLabel, children, footer }) {
+// `flush`: no margins of its own, for sitting in a layout (the sign-up page).
+function AuthForm({ title, onSubmit, submit, busyLabel, children, footer, flush = false }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const handle = async (e) => {
@@ -31,7 +36,7 @@ function AuthForm({ title, onSubmit, submit, busyLabel, children, footer }) {
     }
   }
   return (
-    <div className="max-w-sm mx-auto mt-10 space-y-4">
+    <div className={flush ? 'space-y-4' : 'max-w-sm mx-auto mt-10 space-y-4'}>
       <form onSubmit={handle} className="panel p-6 space-y-4">
         <h1 className="text-3xl">{title}</h1>
         {children}
@@ -76,7 +81,7 @@ export function Login() {
             <Link to="/forgot" className={linkCls}>Forgot your password?</Link>
           </p>
           <p>
-            New here? <Link to={`/signup${search}`} className={linkCls}>Create an account</Link>
+            New here? <Link to={`/signup${search}`} className={linkCls}>Join free</Link>
           </p>
         </>
       }
@@ -97,26 +102,49 @@ export function Signup() {
   if (checking) return <Loading />
   if (user) return <Navigate to={user.is_admin ? '/admin' : '/account'} replace />
   return (
-    <AuthForm
-      title="Create an account"
-      submit="Create account"
-      busyLabel="Creating…"
-      onSubmit={async () => done(signIn(await api.signup({ email, password, adult })))}
-      footer={
-        <p>
-          Already have one? <Link to={`/login${search}`} className={linkCls}>Sign in</Link>
+    <div className="mx-auto mt-4 sm:mt-8 grid max-w-4xl grid-cols-1 items-start gap-x-12 gap-y-6 md:grid-cols-[minmax(0,1fr)_24rem]">
+      <div>
+        <h1 className="text-4xl sm:text-5xl leading-none">Join free</h1>
+        <p className="mt-3 text-[17px] text-ink-soft leading-relaxed max-w-prose">
+          An email and a password. No card, and nothing to cancel. An account opens up:
         </p>
-      }
-    >
-      <Field label="Email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-      <Field label="Password (8+ characters)" type="password" autoComplete="new-password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
-      <label className="flex items-start gap-2 text-sm">
-        <input type="checkbox" className="mt-1" checked={adult} onChange={(e) => setAdult(e.target.checked)} required />
-        <span>
-          I'm 18 or over, and I've read the <Link to="/privacy" className={linkCls}>privacy notice</Link>.
-        </span>
-      </label>
-    </AuthForm>
+        <ul className="mt-5 space-y-3.5">
+          {ACCOUNT_PERKS.map(([name, text]) => (
+            <li key={name} className="flex gap-3">
+              <span aria-hidden className="mt-1.5 h-2.5 w-2.5 shrink-0 rotate-[10deg] rounded-[2px] bg-amber" />
+              <p className="leading-snug">
+                <span className="font-display font-bold">{name}.</span> <span className="text-ink-soft">{text}</span>
+              </p>
+            </li>
+          ))}
+        </ul>
+      </div>
+      <AuthForm
+        title="Create your account"
+        submit="Join free"
+        busyLabel="Creating…"
+        flush
+        onSubmit={async () => {
+          const u = signIn(await api.signup({ email, password, adult }))
+          queueWelcome()
+          done(u)
+        }}
+        footer={
+          <p>
+            Already have one? <Link to={`/login${search}`} className={linkCls}>Sign in</Link>
+          </p>
+        }
+      >
+        <Field label="Email" type="email" autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+        <Field label="Password (8+ characters)" type="password" autoComplete="new-password" minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} />
+        <label className="flex items-start gap-2 text-sm">
+          <input type="checkbox" className="mt-1" checked={adult} onChange={(e) => setAdult(e.target.checked)} required />
+          <span>
+            I'm 18 or over, and I've read the <Link to="/privacy" className={linkCls}>privacy notice</Link>.
+          </span>
+        </label>
+      </AuthForm>
+    </div>
   )
 }
 

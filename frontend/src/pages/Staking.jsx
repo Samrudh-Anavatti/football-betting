@@ -1,12 +1,13 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
+import JoinCard from '../components/JoinCard.jsx'
+import { SubNav } from '../components/Shell.jsx'
 import { ErrorNote, LeagueBadge, Loading, Price, SectionHead } from '../components/ui.jsx'
 import { useApi } from '../hooks/useApi.js'
+import { useCan } from '../lib/access.js'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
-import { formatPrice } from '../lib/business.js'
 import { dayLabel, kickoffTime, money, odds, pct, pickLabel, shortDate } from '../lib/format.js'
-import { useMembershipInfo } from '../lib/membership.js'
 import { matchPath } from '../lib/seo.js'
 import { bundleWinChance, ladder, streakChance } from '../lib/staking.js'
 import { SAMPLE_PLAN } from '../lib/stakingSample.js'
@@ -284,47 +285,44 @@ function Members() {
   return <PlanView data={plan.data} hitRate={hitRate} />
 }
 
-// Non-members see the page's shape under a blur, filled with made-up data (lib/stakingSample.js).
+// Without the `staking` feature: the page's shape under a blur, filled with made-up data (lib/stakingSample.js),
+// and the way in. The real plan is never sent to them (a blur only hides what the browser has).
 function Preview() {
-  const info = useMembershipInfo()
   return (
     <div className="relative">
       <div aria-hidden inert="" data-nosnippet="" className="pointer-events-none select-none blur-[6px] opacity-60">
         <PlanView data={SAMPLE_PLAN} hitRate={0.66} />
       </div>
-      <div className="absolute inset-x-0 top-10 sm:top-24 flex justify-center">
-        <div className="panel shadow-lift max-w-md mx-auto p-6 text-center">
-          <span className="inline-grid h-11 w-11 place-items-center rounded-full bg-ink text-amber" aria-hidden>
-            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-              <rect x="5" y="11" width="14" height="9" rx="2" />
-              <path d="M8 11V8a4 4 0 0 1 8 0v3" />
-            </svg>
-          </span>
-          <p className="mt-3 text-sm font-semibold uppercase tracking-wider text-amber-dark">
-            {info?.open ? 'Members only' : 'Members only, coming soon'}
-          </p>
-          <h2 className="mt-1 text-2xl">Our staking plan</h2>
-          <p className="mt-2 text-ink-soft">
-            Our picks combined into bets at around 6.00, with stakes that win back every loss. Follow each bundle live,
-            scaled to your own stake, with every result on the record.
-          </p>
-          {info?.open && (
-            <Link to="/membership" className="btn-primary mt-4">
-              Join for {formatPrice(info.price)} a month
-            </Link>
-          )}
-        </div>
+      <div className="absolute inset-x-0 top-10 sm:top-24 flex justify-center px-2">
+        <JoinCard title="Our staking plan" className="max-w-md mx-auto">
+          Our picks combined into bets at around 6.00, each stake worked out for you. Follow the live bundle, scaled
+          to your own stake, with every result on the record.
+        </JoinCard>
       </div>
     </div>
   )
 }
 
+// The two kinds of bundle share a section of the site: the AI's for tonight, and our own staking plan.
+export const BUNDLE_TABS = [
+  ['/tonight', "Tonight's AI bundles"],
+  ['/staking', 'Our staking plan'],
+]
+
 export default function Staking() {
-  const { user, checking } = useAuth()
+  const { checking } = useAuth()
+  const can = useCan('staking')
   return (
-    <section data-tour="staking" className="space-y-6">
-      <SectionHead title="Staking plan" />
-      {checking ? <Loading rows={4} /> : user?.is_admin || user?.membership?.member ? <Members /> : <Preview />}
+    <section className="space-y-6">
+      <div data-tour="staking" className="space-y-4">
+        <SubNav tabs={BUNDLE_TABS} />
+        <h1 className="text-4xl sm:text-5xl leading-none">Our staking plan</h1>
+        <p className="max-w-prose text-[17px] text-ink-soft leading-relaxed">
+          Our own picks combined into one bet at about 6.00. After a loss the next stake rises just enough that a win
+          pays the run back and still makes the profit.
+        </p>
+      </div>
+      {checking ? <Loading rows={4} /> : can ? <Members /> : <Preview />}
     </section>
   )
 }

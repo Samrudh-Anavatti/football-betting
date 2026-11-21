@@ -1,3 +1,4 @@
+import JoinCard from './JoinCard.jsx'
 import { Fragment, useEffect, useState } from 'react'
 import { useApi } from '../hooks/useApi.js'
 import { useRun } from '../hooks/useRun.js'
@@ -68,11 +69,14 @@ function findOnBoard(board, marketId, value) {
 function Prediction({ pred, fx, board, tips, onPick }) {
   const a = pred.analysis
   const tracked = tips.filter((t) => pred.tips.includes(t.id))
+  // A visitor is told how many bets the AI suggests but not what they are (the API holds them back until kick-off).
+  const locked = pred.bets_locked || 0
+  const bets = a.suggested_bets.length + locked
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <span className={`rounded px-2 py-0.5 text-sm font-semibold ${a.no_bet ? 'bg-ink/10' : 'bg-pitch text-white'}`}>
-          {a.no_bet ? 'No bet' : `${a.suggested_bets.length} suggested bet${a.suggested_bets.length === 1 ? '' : 's'}`}
+          {a.no_bet ? 'No bet' : `${bets} suggested bet${bets === 1 ? '' : 's'}`}
         </span>
         <span className="text-sm text-ink-soft">Analysis #{pred.id}, {ago(pred.created_at)}</span>
       </div>
@@ -108,6 +112,11 @@ function Prediction({ pred, fx, board, tips, onPick }) {
         </tbody>
       </table>
 
+      {locked > 0 && (
+        <JoinCard row title={`The AI suggests ${locked === 1 ? 'a bet' : `${locked} bets`} on this match`}>
+          The selection, the price to take, the stake and how confident it is. Free with an account.
+        </JoinCard>
+      )}
       {a.suggested_bets.length > 0 && (
         <div className="space-y-2">
           <h4 className="font-display text-lg font-semibold">Suggested bets</h4>

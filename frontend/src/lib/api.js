@@ -60,6 +60,7 @@ export const api = {
   fixtures: (params = {}) => request(`/fixtures${qs(params)}`),
   match: (id) => request(`/matches/${id}`),
   tips: (status = 'open', limit) => request(`/tips${qs({ status, limit })}`),
+  lockedTips: () => request('/tips/locked'),
   record: () => request('/record'),
   featured: () => request('/featured'),
 
@@ -122,6 +123,7 @@ export const api = {
   aiLabBuild: () => request('/admin/ai-lab/staking/build', { method: 'POST' }),
   aiLabDeleteBundle: (id) => request(`/admin/ai-lab/staking/bundles/${id}`, { method: 'DELETE' }),
   aiLabArbs: () => request('/admin/ai-lab/arbs'),
+  arbitrage: () => request('/arbitrage'),
   // Tonight's bundles
   tonightSessions: () => request('/tonight/sessions'),
   tonightBuild: (body) => request('/tonight/bundles', { method: 'POST', body }),

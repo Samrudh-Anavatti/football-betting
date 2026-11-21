@@ -7,12 +7,12 @@ export const SITE_URL = 'https://football-predictions.org'
 export const API_URL = 'https://api.football-predictions.org/api/v1'
 
 const HOME_DESCRIPTION =
-  'Simple, confident football picks from our team, every one on the record, plus odds and stats for every fixture.'
+  "Football picks from our team and bundles built by AI for the matches you're watching, every one on the record, plus odds, stats and analysis for every fixture."
 
 // Pages with fixed text. The build writes each into its own HTML file, so crawlers see it without running the app.
 export const PAGES = {
   '/': {
-    title: `${SITE}: expert football picks, odds and AI match analysis`,
+    title: `${SITE}: football picks, AI bundles and odds for tonight's matches`,
     description: HOME_DESCRIPTION,
   },
   '/fixtures': {
@@ -34,9 +34,9 @@ export const PAGES = {
       "Our picks combined into bets at around 6.00, with stakes that win back every loss. Every bundle and result on the record.",
   },
   '/membership': {
-    title: `Membership: our staking plan | ${SITE}`,
-    description:
-      'Join to follow our staking plan: our picks bundled at about 6.00 with stakes that win back every loss. Monthly, cancel any time.',
+    title: `Membership | ${SITE}`,
+    description: 'Membership of Football Predictions AI: monthly, cancel any time.',
+    noindex: true, // until it opens
   },
   '/terms': {
     title: `Terms | ${SITE}`,
@@ -52,14 +52,18 @@ export const PAGES = {
   },
   '/admin': { title: `Admin | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
   '/login': { title: `Sign in | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
-  '/signup': { title: `Create an account | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
+  '/signup': { title: `Join free | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
   '/forgot': { title: `Reset your password | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
   '/reset': { title: `Choose a new password | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
   '/tonight': {
     title: `Tonight's bundles: AI picks for the matches you're watching | ${SITE}`,
     description:
-      "Tick the matches you're sitting down for and the AI builds up to three bundles from its surest legs on them, at about 3.00, 6.00 or 10.00.",
-    noindex: true, // while it's admins only
+      "Tick the matches you're sitting down for and the AI builds up to three bundles from its surest calls on them, at about 3.00, 6.00 or 10.00. Free with an account.",
+  },
+  '/arbitrage': {
+    title: `Football arbitrage finder: prices that add up to a profit | ${SITE}`,
+    description:
+      'Markets where the best prices across five bookmakers add up to a profit whatever the result, with the stake for each side. Free with an account.',
   },
   '/account': { title: `Your account | ${SITE}`, description: HOME_DESCRIPTION, noindex: true },
 }
