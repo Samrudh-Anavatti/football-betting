@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import BookLink from './BookLink.jsx'
 import { dayLabel, kickoffTime, pickLabel, signed } from '../lib/format.js'
 import { LeagueBadge, Price } from './ui.jsx'
 import { matchPath } from '../lib/seo.js'
@@ -34,7 +35,7 @@ export default function TipCard({ tip }) {
             </p>
             <p className="mt-0.5 text-sm text-ink-soft">
               {tip.stake_units} unit{tip.stake_units === 1 ? '' : 's'}
-              {tip.bookmaker ? ` at ${tip.bookmaker}` : ''}
+              {tip.bookmaker && <> at <BookLink name={tip.bookmaker} /></>}
             </p>
           </div>
           <div className="ml-auto shrink-0">

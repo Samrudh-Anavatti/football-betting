@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import BookLink from '../components/BookLink.jsx'
 import { Link } from 'react-router-dom'
 import DailyBundle from '../components/DailyBundle.jsx'
 import JoinCard from '../components/JoinCard.jsx'
@@ -137,7 +138,7 @@ function Slip({ bundle, index, stake }) {
       <article className="perforated rounded-t-xl bg-paper">
         <header className="px-4 pt-3.5 pb-2 flex items-baseline gap-x-3 text-sm text-ink-soft">
           <span className="font-display font-bold text-ink">Bundle {index + 1}</span>
-          {bundle.bookmaker && <span>at {bundle.bookmaker}</span>}
+          {bundle.bookmaker && <span>at <BookLink name={bundle.bookmaker} /></span>}
           {bundle.stretch && (
             <span className="text-xs font-semibold uppercase tracking-wider text-amber-dark" title="A thin night: the AI's surest legs on these matches couldn't reach the target on their own">
               with longer shots

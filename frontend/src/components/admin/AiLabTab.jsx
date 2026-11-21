@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import BookLink from '../BookLink.jsx'
 import { Link } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
 import { api } from '../../lib/api.js'
@@ -231,7 +232,7 @@ function ArbCard({ a, total }) {
         {a.legs.map((l) => (
           <li key={l.value} className="py-1.5 flex items-center gap-3">
             <span className="flex-1 min-w-0 truncate">{teamify(l.value, a.fixture)}</span>
-            <span className="text-ink-soft shrink-0">{l.bookmaker}</span>
+            <BookLink name={l.bookmaker} className="text-ink-soft shrink-0" />
             <span className="num w-12 text-right shrink-0">{odds(l.price)}</span>
             <span className="num w-20 text-right font-semibold shrink-0">{money(total * l.share)}</span>
           </li>

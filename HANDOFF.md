@@ -243,6 +243,20 @@ sessions, targets, ticking matches and a custom stake stay behind the account.
   `az webapp config appsettings set -g rg-football-betting -n <app name> --settings ANTHROPIC_API_KEY=<key>`.
   Until then Luna makes the bundle.
 
+## Bookmaker links (2026-11-21)
+
+Wherever a price, pick, bundle or arbitrage leg names a bookmaker, the name links to that bookmaker's football pages
+(`frontend/src/components/BookLink.jsx`, one table of addresses; new tab, `nofollow`). Pinnacle has no link (it
+doesn't take UK customers; unverified, Sam to confirm).
+
+* **Not match or bet-slip links.** Every bookmaker's URL needs its own id for the match, and API-Football's odds
+  carry no link or bookmaker-side id; building them ourselves would mean scraping five betting sites. The Odds API
+  has `includeLinks=true` (event, market and bet-slip links "if available"), untested for our five and it needs a
+  paid plan. **On hold** (Sam, 2026-11-21: not paying for The Odds API now). A multi-leg bundle can't be pre-filled
+  at a bookmaker by a public link in any case.
+* **Affiliate codes**, once the business has joined the bookmakers' partner programmes, go on the addresses in
+  `BookLink.jsx` (and `rel` becomes `sponsored`).
+
 ## Staking plan (built 2026-11-01)
 
 Ivo's method: his picks combined into one bet ("bundle") at about 6.00, and after a loss the next stake is raised so

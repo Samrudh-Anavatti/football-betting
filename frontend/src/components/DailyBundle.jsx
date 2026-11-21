@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import BookLink from './BookLink.jsx'
 import { Link } from 'react-router-dom'
 import { useApi } from '../hooks/useApi.js'
 import { useCan } from '../lib/access.js'
@@ -90,7 +91,7 @@ export default function DailyBundle({ className = '' }) {
                 <span className="font-semibold uppercase tracking-wider text-amber-dark">
                   {isToday ? "Today's bundle" : `${dayLabel(`${bundle.day}T12:00:00Z`)}'s bundle`}
                 </span>
-                <span>at {bundle.bookmaker}</span>
+                <span>at <BookLink name={bundle.bookmaker} /></span>
                 <span>chosen by {bundle.by_claude ? 'Claude' : 'our AI'}</span>
                 {settled && <span className="ml-auto"><Mark status={bundle.status} /></span>}
               </div>

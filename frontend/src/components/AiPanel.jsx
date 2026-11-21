@@ -1,4 +1,5 @@
 import JoinCard from './JoinCard.jsx'
+import BookLink from './BookLink.jsx'
 import { Fragment, useEffect, useState } from 'react'
 import { useApi } from '../hooks/useApi.js'
 import { useRun } from '../hooks/useRun.js'
@@ -137,7 +138,7 @@ function Prediction({ pred, fx, board, tips, onPick }) {
                 <p className="text-sm leading-relaxed text-ink/85">{b.reasoning}</p>
                 <div className="flex flex-wrap items-center gap-3 text-sm">
                   <span className={ok ? 'text-pitch font-semibold' : 'text-ink-soft'}>
-                    {now == null ? 'Not on the board now' : `Best now ${odds(now)} at ${found.sel.best_bookmaker}`}
+                    {now == null ? 'Not on the board now' : <>Best now {odds(now)} at <BookLink name={found.sel.best_bookmaker} /></>}
                     {now != null && !ok && ', below the AI’s minimum'}
                   </span>
                   {onPick && found && (

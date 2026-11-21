@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react'
+import BookLink from './BookLink.jsx'
 import { odds, pct, teamify } from '../lib/format.js'
 
 // The full market board: every market our bookmakers price for this match,
@@ -58,7 +59,7 @@ function SelTile({ sel, market, fx, onPick, label }) {
           {label ?? teamify(sel.value, fx)}
         </p>
         <p className="text-xs text-ink-soft truncate">
-          {sel.best_bookmaker}
+          <BookLink name={sel.best_bookmaker} />
           {sel.fair != null && (
             <>
               {' · fair '}
@@ -152,7 +153,7 @@ function BookTable({ selections, bookmakers, fx }) {
         <tbody className="divide-y divide-ink/5">
           {bookmakers.map((b, i) => (
             <tr key={b}>
-              <td className="py-1 pr-3 whitespace-nowrap">{b}</td>
+              <td className="py-1 pr-3 whitespace-nowrap"><BookLink name={b} /></td>
               {selections.map((s) => {
                 const p = s.prices[i]
                 return (

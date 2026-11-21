@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import BookLink from '../components/BookLink.jsx'
 import { Link } from 'react-router-dom'
 import JoinCard from '../components/JoinCard.jsx'
 import { SubNav } from '../components/Shell.jsx'
@@ -42,7 +43,7 @@ export function BundleSlip({ bundle, scale = 1, losses, onSettle }) {
             Run {bundle.run}, bet {bundle.step}
           </span>
           {losses > 0 && <span>recovering {money(losses * scale)}</span>}
-          {bundle.bookmaker && <span>at {bundle.bookmaker}</span>}
+          {bundle.bookmaker && <span>at <BookLink name={bundle.bookmaker} /></span>}
           <span className="ml-auto">Placed {shortDate(bundle.created_at)}</span>
         </header>
         <ol className="divide-y divide-dashed divide-ink/15 border-y border-dashed border-ink/15">
