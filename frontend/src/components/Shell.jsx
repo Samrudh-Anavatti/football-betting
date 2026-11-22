@@ -74,6 +74,12 @@ export default function Shell({ children }) {
           </nav>
           <div className="ml-auto flex h-full shrink-0 items-center gap-1 sm:gap-2">
             {me ? (
+              <>
+              {membership?.open && !user.is_admin && !user.membership?.member && (
+                <Link to="/membership" className="btn-amber px-2.5 py-1.5 text-[13px] sm:px-3.5 sm:text-sm">
+                  <span className="sm:hidden">Join</span><span className="hidden sm:inline">Membership</span>
+                </Link>
+              )}
               <NavLink to={me.to} className={({ isActive }) => cls(isActive)} aria-label={me.label} data-tour="nav-account">
                 {/* An icon on phones, where the sections need the room. */}
                 <svg viewBox="0 0 24 24" className="h-5 w-5 sm:hidden" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden>
@@ -82,6 +88,7 @@ export default function Shell({ children }) {
                 </svg>
                 <span className="hidden sm:inline">{me.label}</span>
               </NavLink>
+              </>
             ) : (
               <>
                 <NavLink to={onAuthPage ? '/login' : join.replace('/signup', '/login')} className={({ isActive }) => `hidden sm:inline-flex ${cls(isActive)}`}>
