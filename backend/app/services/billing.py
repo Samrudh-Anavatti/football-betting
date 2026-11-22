@@ -221,8 +221,13 @@ def _payment_succeeded(db: Session, pay: dict) -> None:
             m = membership(pay["membership_id"])
         except WhopError:
             log.exception("payment %s: couldn't read membership %s", pay.get("id"), pay["membership_id"])
-    u = apply_membership(db, {**m, "metadata": m.get("metadata") or pay.get("metadata")}) if m else None
-    u = u or _user(db, pay.get("membership_id"), pay.get("metadata"))
+    meta = (m or {}).get("metadata") or pay.get("metadata") or {}
+    if _user(db, pay.get("membership_id"), meta) is None and pay.get("customer_email"):
+        # Bought on Whop's own page rather than through our checkout: the email they paid with is all we have.
+        by_email = db.scalar(select(User).where(User.email == pay["customer_email"].strip().lower()))
+        meta = {"user_id": str(by_email.id)} if by_email is not None else meta
+    u = apply_membership(db, {**m, "metadata": meta}) if m else None
+    u = u or _user(db, pay.get("membership_id"), meta)
     country = ((pay.get("billing_address") or {}).get("country") or "").upper()[:2] or None
     if u is not None:
         u.billing_country = country or u.billing_country

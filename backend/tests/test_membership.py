@@ -207,3 +207,17 @@ def test_sandbox_is_for_test_accounts_only(client, whop, monkeypatch):
     assert client.post(f"{API}/membership/checkout", headers=visitor, json=join).status_code == 503
     assert client.get(f"{API}/membership", headers=tester).json()["open"] is True
     assert client.post(f"{API}/membership/checkout", headers=tester, json=join).status_code == 200
+    # Live but not announced yet: the same list keeps it to the testers. Emptied, it is open to everyone.
+    monkeypatch.setattr(config, "WHOP_SANDBOX", False)
+    assert client.get(f"{API}/membership", headers=visitor).json()["open"] is False
+    assert client.get(f"{API}/membership", headers=tester).json()["open"] is True
+    monkeypatch.setattr(config, "WHOP_TESTERS", set())
+    assert client.get(f"{API}/membership").json()["open"] is True
+
+
+def test_bought_on_whop_directly_is_matched_by_email(client, whop):
+    h = signup(client, "direct@example.com")
+    end = (datetime.utcnow() + timedelta(days=30)).replace(microsecond=0)
+    whop["memberships"]["mem_e"] = {**mem("mem_e", 0, end), "metadata": {}}
+    send(client, "payment.succeeded", {**payment("pay_e", "mem_e", 0), "metadata": None, "customer_email": "Direct@example.com"})
+    assert me(client, h)["member"] is True

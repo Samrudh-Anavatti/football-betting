@@ -26,10 +26,13 @@ UNAVAILABLE = "Payments aren't available right now. Try again in a few minutes."
 
 
 def open_to(user: User | None) -> bool:
-    """Whop's sandbox only takes test cards, so while it is on, joining is open to the listed test accounts alone."""
+    """While WHOP_TESTERS is set, joining is open to those accounts alone: for trying it out before it opens to
+    everyone. Whop's sandbox only takes test cards, so with the sandbox on it is never open to anyone else."""
     if not billing.ready():
         return False
-    return not config.WHOP_SANDBOX or (user is not None and (user.email or "").lower() in config.WHOP_TESTERS)
+    if config.WHOP_SANDBOX or config.WHOP_TESTERS:
+        return user is not None and (user.email or "").lower() in config.WHOP_TESTERS
+    return True
 
 
 @router.get("/membership")

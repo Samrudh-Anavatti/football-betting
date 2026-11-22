@@ -38,7 +38,8 @@ WHOP_API_KEY = os.getenv("WHOP_API_KEY", "").strip()
 WHOP_WEBHOOK_SECRET = os.getenv("WHOP_WEBHOOK_SECRET", "").strip()
 WHOP_PLAN_ID = os.getenv("WHOP_PLAN_ID", "").strip()
 WHOP_SANDBOX = os.getenv("WHOP_SANDBOX", "off").strip().lower() == "on"
-# While the sandbox is on, only these accounts (emails, comma-separated) can join: it takes test cards, not real ones.
+# While this is set, only these accounts (emails, comma-separated) can join: for testing before opening to everyone.
+# With the sandbox on nobody else can join anyway, as it takes test cards, not real ones. Empty = open to all.
 WHOP_TESTERS = {e.strip().lower() for e in os.getenv("WHOP_TESTERS", "").split(",") if e.strip()}
 GRACE_DAYS = int(os.getenv("GRACE_DAYS", "3"))  # access after the paid month ends (failed renewal or cancelled)
 
