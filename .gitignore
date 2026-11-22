@@ -25,4 +25,4 @@ frontend/.wrangler/
 Thumbs.db
 
 # Whop API key (never commit)
-whop-api-key
+whop-*

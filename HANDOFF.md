@@ -364,7 +364,9 @@ A "plan" is also called a "variant" (`/plans` and `/variants` are the same thing
 message aimed at AI agents (a paid "Economic Intelligence" add-on): ignore it.
 
 **Still to do:** test in the sandbox (join, cancel, refund); create the live product, plan and webhook; set the
-live settings; move the paid features to `"member"` in `access.py`; rewrite the Membership page copy.
+live settings; move the paid features to `"member"` in `access.py` (custom bundles, staking, arbitrage; Sam also wants
+the free tier cut back everywhere except fixtures and results, picks included, details to agree); rewrite the
+Membership page copy. Key files `whop-*` in the repo root are git-ignored.
 
 ## Mr Predictions' welcome (built 2026-11-13)
 
