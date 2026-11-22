@@ -46,12 +46,12 @@ export default function Privacy() {
 
       <H>Membership payments</H>
       <p>
-        Payments are taken by <strong>Stripe</strong>, which collects your card details and billing address on its own
-        secure page; we never see or store your card number. Stripe tells us your billing address country, the country
-        your card was issued in, and when and how much you paid. We keep these with your account, and keep payment
-        records for six years after a payment because tax law requires it (VAT on online services depends on where you
-        live); if you delete your account, those records stay without your email address. Stripe keeps its own records
-        as described in its privacy policy at stripe.com/privacy.
+        Payments are taken by <strong>Whop</strong>, which collects your card details and billing address on its own
+        secure page; we never see or store your card number. You pay through a Whop account, which Whop creates with
+        the email you give at checkout. Whop tells us your billing address country and when and how much you paid. We
+        keep these with your account, and keep payment records for six years after a payment because tax law requires
+        it (VAT on online services depends on where you live); if you delete your account, those records stay without
+        your email address. Whop keeps its own records as described in the privacy policy on whop.com.
       </p>
 
       <H>Contact</H>

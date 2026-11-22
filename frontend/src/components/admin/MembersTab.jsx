@@ -15,7 +15,7 @@ function statusText(m) {
 }
 
 // Who the members are and where the money comes from. VAT on digital services is owed in the customer's country,
-// so each payment keeps two pieces of location evidence: billing address country and card country.
+// so each payment keeps the billing address country Whop collected at checkout.
 export default function MembersTab() {
   const { data, loading, error } = useApi(() => api.members(), [])
   const [csvError, setCsvError] = useState(null)
@@ -35,8 +35,8 @@ export default function MembersTab() {
     <div className="space-y-8">
       {!data.open && (
         <p className="panel p-4 text-sm">
-          Membership is closed: Stripe isn't set up yet (STRIPE_API_KEY, STRIPE_WEBHOOK_SECRET and STRIPE_PRICE_ID in
-          the App Service settings).
+          Membership is closed: Whop isn't connected yet (WHOP_API_KEY, WHOP_WEBHOOK_SECRET and WHOP_PLAN_ID in the
+          App Service settings).
         </p>
       )}
       <div className="grid gap-3 grid-cols-2 sm:grid-cols-4">
@@ -123,9 +123,7 @@ export default function MembersTab() {
                   {m.member_since ? `since ${fullDate(m.member_since)}` : ''}
                   {m.paid_until ? `, paid to ${fullDate(m.paid_until)}` : ''}
                 </span>
-                <span className="num w-24 text-right" title="Billing country / card country">
-                  {m.billing_country || '–'} / {m.card_country || '–'}
-                </span>
+                <span className="num w-12 text-right" title="Billing country">{m.billing_country || '–'}</span>
               </li>
             ))}
           </ol>

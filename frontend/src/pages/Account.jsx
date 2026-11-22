@@ -49,7 +49,7 @@ function ChangePassword() {
   )
 }
 
-// Back from Stripe Checkout (?joined=1): the payment lands through Stripe's webhook a moment later, so re-read the
+// Back from Whop's checkout (?joined=1): the payment lands through Whop's webhook a moment later, so re-read the
 // account every couple of seconds until it shows, for up to half a minute.
 function useJoined() {
   const { user, refresh } = useAuth()
@@ -124,7 +124,7 @@ function MembershipCard() {
   else if (m.member && (m.cancelling || m.status === 'canceled'))
     line = `Cancelled: you keep access until ${fullDate(m.paid_until)}, and won't be charged again.`
   else if (m.member) line = `Member since ${fullDate(m.member_since)}. Renews on ${fullDate(m.paid_until)}.`
-  else if (m.status === 'canceled' || m.paid_until) line = 'Your membership has ended.'
+  else if (m.status === 'canceled' || m.status === 'expired' || m.paid_until) line = 'Your membership has ended.'
   if (!info?.open && !line && !m.can_manage) return null
   return (
     <section className="panel p-6 space-y-4">

@@ -45,7 +45,7 @@ function JoinForm({ price }) {
       <button className="btn-primary w-full" disabled={busy}>
         {busy ? 'Opening secure checkout…' : `Join for ${formatPrice(price)} a month`}
       </button>
-      <p className="text-xs text-ink-soft text-center">Payment by Stripe. We never see your card details.</p>
+      <p className="text-xs text-ink-soft text-center">Payment by Whop. We never see your card details.</p>
     </form>
   )
 }

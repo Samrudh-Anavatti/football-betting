@@ -49,7 +49,7 @@ export default function Terms() {
 
       <H>Membership and payment</H>
       <p>
-        Membership is a monthly subscription at the price shown when you join, taken by our payment provider, Stripe.
+        Membership is a monthly subscription at the price shown when you join, taken by our payment provider, Whop.
         It renews automatically each month on the day you joined until you cancel. Prices include any VAT we have to
         charge. If we change the price, we'll email you at least 30 days before it applies to you, and you can cancel
         before then.
@@ -70,7 +70,7 @@ export default function Terms() {
 
       <H>If a payment fails</H>
       <p>
-        Stripe will try again over the following days and email you so you can update your card. You keep access for 3
+        Whop will try again over the following days and email you so you can update your card. You keep access for 3
         days after the end of your paid month while that happens. If no payment goes through, membership ends.
       </p>
 
