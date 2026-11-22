@@ -32,13 +32,14 @@ EMAIL_SENDER = os.getenv("EMAIL_SENDER", "no-reply@football-predictions.org")
 SITE_URL = os.getenv("SITE_URL", "https://football-predictions.org").rstrip("/")
 RESET_MINUTES = int(os.getenv("RESET_MINUTES", "60"))
 
-# Membership through Stripe. Joining is off until all three are set (Checkout, webhook signing, the monthly price).
-# The key should be a restricted key (rk_...) with only the permissions listed in HANDOFF.md, "Membership".
-STRIPE_API_KEY = os.getenv("STRIPE_API_KEY", "").strip()
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "").strip()
-STRIPE_PRICE_ID = os.getenv("STRIPE_PRICE_ID", "").strip()
-# Stripe Tax works out VAT at checkout; turn on once registered where tax is owed (see HANDOFF.md, "Membership").
-STRIPE_AUTOMATIC_TAX = os.getenv("STRIPE_AUTOMATIC_TAX", "off").strip().lower() == "on"
+# Membership through Whop. Joining is off until the key, the webhook's signing secret and the monthly plan are set
+# (see HANDOFF.md, "Membership"). WHOP_SANDBOX=on points at Whop's sandbox, which has its own key, plan and secret.
+WHOP_API_KEY = os.getenv("WHOP_API_KEY", "").strip()
+WHOP_WEBHOOK_SECRET = os.getenv("WHOP_WEBHOOK_SECRET", "").strip()
+WHOP_PLAN_ID = os.getenv("WHOP_PLAN_ID", "").strip()
+WHOP_SANDBOX = os.getenv("WHOP_SANDBOX", "off").strip().lower() == "on"
+# While the sandbox is on, only these accounts (emails, comma-separated) can join: it takes test cards, not real ones.
+WHOP_TESTERS = {e.strip().lower() for e in os.getenv("WHOP_TESTERS", "").split(",") if e.strip()}
 GRACE_DAYS = int(os.getenv("GRACE_DAYS", "3"))  # access after the paid month ends (failed renewal or cancelled)
 
 # The Odds API (backup price source: match result and totals only).

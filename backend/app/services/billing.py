@@ -1,46 +1,83 @@
-"""Membership through Stripe: Checkout to join, the Customer Portal to manage or cancel, and a webhook that keeps
-each member's access in step with Stripe.
+"""Membership through Whop: its hosted checkout to join, its billing page to manage or cancel, and a webhook that
+keeps each member's access in step with Whop.
 
-Access runs to `paid_until` (the end of the last paid month, from `invoice.paid`) plus `GRACE_DAYS`, so a failed
-renewal and a cancellation end it the same way, and a renewal that's paid late just extends it again. Only the
-webhook moves `paid_until` forward; a refund, a dispute or a fraud warning ends access at once and cancels the
-subscription. Each paid invoice is kept in `payments` with the member's billing and card countries: VAT on digital
-services is owed where the customer is, and that's the evidence for it.
+Access runs to `paid_until` (the end of the paid month, as Whop's membership has it) plus `GRACE_DAYS`, so a renewal
+that fails still has a few days to be paid. A membership Whop reports as cancelled or expired ends access, and so does
+a full refund or a dispute, which also cancel the membership. Each payment is kept in `payments` with the member's
+billing country: VAT on digital services is owed where the customer is, and that's the evidence for it.
 
-The Stripe calls are small functions of their own so tests can replace them.
+We tie a Whop membership to our account with `metadata.user_id`, which we put on the checkout and Whop copies to
+the membership and its payments (the buyer's Whop email need not match ours).
+
+The calls to Whop are small functions of their own so tests can replace them. API: https://docs.whop.com/api-reference
 """
+import base64
+import hashlib
+import hmac
 import json
 import logging
+import time
 from datetime import datetime, timedelta
+from decimal import Decimal
 
-import stripe
+import httpx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .. import config
 from ..database import SessionLocal
-from ..models import Payment, StripeEvent, User
+from ..models import BillingEvent, Payment, User
 from ..serialize import iso
 
 log = logging.getLogger(__name__)
 
-INTEGRATION_ID = "membership-monthly-qhzvrkdm"  # tags our Checkout Sessions in the Dashboard
-# A subscription that still exists and could charge again ("incomplete" was never paid and expires in a day).
-LIVE_STATUSES = {"active", "trialing", "past_due", "unpaid", "paused"}
+API_VERSION_DATE = "2026-11-20"  # the dated API version these calls and the webhook's payloads are written against
+# A membership that still exists and could charge again.
+LIVE_STATUSES = {"active", "trialing", "past_due", "unresolved"}
+PAID_STATUSES = {"active", "trialing"}  # Whop: these grant access
 PRICE_TTL = timedelta(hours=1)
 _price_cache: dict = {"at": None, "value": None}
 
 
+class WhopError(Exception):
+    """Whop couldn't be reached or refused the call."""
+
+
+class BadSignature(Exception):
+    """A webhook delivery that Whop didn't sign."""
+
+
 def ready() -> bool:
-    return bool(config.STRIPE_API_KEY and config.STRIPE_WEBHOOK_SECRET and config.STRIPE_PRICE_ID)
+    return bool(config.WHOP_API_KEY and config.WHOP_WEBHOOK_SECRET and config.WHOP_PLAN_ID)
 
 
-def _client() -> stripe.StripeClient:
-    return stripe.StripeClient(config.STRIPE_API_KEY, max_network_retries=2)
+def _api(method: str, path: str, body: dict | None = None) -> dict:
+    base = "https://sandbox-api.whop.com/api/v1" if config.WHOP_SANDBOX else "https://api.whop.com/api/v1"
+    try:
+        r = httpx.request(method, base + path, json=body, timeout=20, headers={
+            "Authorization": f"Bearer {config.WHOP_API_KEY}", "Api-Version-Date": API_VERSION_DATE})
+    except httpx.HTTPError as e:
+        raise WhopError(f"{method} {path}: {e}") from e
+    if r.status_code >= 400:
+        raise WhopError(f"{method} {path}: {r.status_code} {r.text[:300]}")
+    return r.json()
 
 
-def _ts(seconds: int | None) -> datetime | None:
-    return datetime.utcfromtimestamp(seconds) if seconds else None
+def _time(value: str | None) -> datetime | None:
+    """Whop's ISO timestamps as naive UTC, like the rest of our dates."""
+    if not value:
+        return None
+    t = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    return (t - t.utcoffset()).replace(tzinfo=None) if t.utcoffset() is not None else t
+
+
+def _minor(money) -> int:
+    """Whop's amounts ({"amount": "3.99", "decimals": 2}, or a plain number on some objects) in pence."""
+    if money is None:
+        return 0
+    if isinstance(money, dict):
+        return int(Decimal(str(money.get("amount") or 0)).scaleb(int(money.get("decimals", 2))).to_integral_value())
+    return int((Decimal(str(money)) * 100).to_integral_value())
 
 
 # ── Access ───────────────────────────────────────────────────────────────────
@@ -62,205 +99,177 @@ def membership_dict(u: User) -> dict:
     return {
         "member": is_member(u), "status": u.subscription_status, "cancelling": u.cancel_at_period_end,
         "paid_until": iso(u.paid_until), "access_until": iso(access_until(u)), "member_since": iso(u.member_since),
-        "can_manage": u.stripe_customer_id is not None,
+        "can_manage": u.subscription_id is not None,
     }
 
 
-# ── Calls to Stripe ──────────────────────────────────────────────────────────
+# ── Calls to Whop ────────────────────────────────────────────────────────────
 
 
 def price() -> dict | None:
-    """The monthly price as Stripe has it, so our page can't disagree with checkout. Cached for an hour."""
+    """The monthly price as Whop has it, so our page can't disagree with checkout. Cached for an hour."""
     now = datetime.utcnow()
     if _price_cache["at"] and now - _price_cache["at"] < PRICE_TTL:
         return _price_cache["value"]
-    p = _client().v1.prices.retrieve(config.STRIPE_PRICE_ID)
-    value = {"amount": p["unit_amount"], "currency": p["currency"], "interval": (p.get("recurring") or {}).get("interval")}
+    plan = _api("GET", f"/plans/{config.WHOP_PLAN_ID}")
+    money = plan.get("renewal_price")
+    currency = money.get("currency") if isinstance(money, dict) else plan.get("currency")
+    value = {"amount": _minor(money), "currency": (currency or "").lower(),
+             "interval": "month" if plan.get("billing_period") == 30 else f"{plan.get('billing_period')} days"}
     _price_cache.update(at=now, value=value)
     return value
 
 
 def create_checkout(u: User) -> str:
-    """A Checkout Session for the monthly membership; makes the Stripe customer first if there isn't one."""
-    client = _client()
-    if u.stripe_customer_id is None:
-        u.stripe_customer_id = client.v1.customers.create(params={"email": u.email, "metadata": {"user_id": str(u.id)}}).id
-    params = {
-        "mode": "subscription", "customer": u.stripe_customer_id, "client_reference_id": str(u.id),
-        "line_items": [{"price": config.STRIPE_PRICE_ID, "quantity": 1}],
-        # The billing address is our location evidence for tax, so ask for it; take a fresh one each time.
-        "billing_address_collection": "required", "customer_update": {"address": "auto"},
-        "success_url": f"{config.SITE_URL}/account?joined=1", "cancel_url": f"{config.SITE_URL}/membership",
-        "integration_identifier": INTEGRATION_ID,
-    }
-    if config.STRIPE_AUTOMATIC_TAX:
-        params["automatic_tax"] = {"enabled": True}
-    return client.v1.checkout.sessions.create(params=params).url
+    """Whop's checkout page for the monthly plan, tagged with our account so the webhook knows whose it is."""
+    return _api("POST", "/checkout_configurations", {
+        "variant_id": config.WHOP_PLAN_ID, "metadata": {"user_id": str(u.id)},
+        "redirect_url": f"{config.SITE_URL}/account?joined=1"})["purchase_url"]
+
+
+def membership(membership_id: str) -> dict:
+    return _api("GET", f"/memberships/{membership_id}")
 
 
 def portal_url(u: User) -> str:
-    return _client().v1.billing_portal.sessions.create(
-        params={"customer": u.stripe_customer_id, "return_url": f"{config.SITE_URL}/account"}).url
+    """Whop's page where the member changes card or cancels."""
+    url = membership(u.subscription_id).get("manage_url")
+    if not url:
+        raise WhopError(f"no manage_url on {u.subscription_id}")
+    return url
 
 
-def cancel_now(subscription_id: str) -> None:
-    _client().v1.subscriptions.cancel(subscription_id)
-
-
-def card_country(subscription_id: str) -> str | None:
-    sub = _client().v1.subscriptions.retrieve(subscription_id, params={"expand": ["default_payment_method"]})
-    pm = sub.get("default_payment_method")
-    return ((pm or {}).get("card") or {}).get("country") if not isinstance(pm, str) else None
-
-
-def payment_method_country(payment_method_id: str) -> str | None:
-    pm = _client().v1.payment_methods.retrieve(payment_method_id)
-    return (pm.get("card") or {}).get("country")
-
-
-def charge_customer(charge_id: str) -> str | None:
-    return _client().v1.charges.retrieve(charge_id).get("customer")
+def cancel_now(membership_id: str) -> None:
+    _api("POST", f"/memberships/{membership_id}/cancel", {"cancel_at_period_end": False})
 
 
 # ── Webhook ──────────────────────────────────────────────────────────────────
 
 
-def handle_webhook(payload: bytes, signature: str | None) -> None:
-    """Verify and apply one event. Raises stripe.SignatureVerificationError if it isn't from Stripe."""
-    stripe.WebhookSignature.verify_header(payload, signature, config.STRIPE_WEBHOOK_SECRET, tolerance=300)
+def signature(secret: str, msg_id: str, stamp: str, payload: bytes) -> str:
+    """Standard Webhooks, as Whop signs them: HMAC-SHA256 of "id.timestamp.body" keyed with the secret's own bytes
+    (prefix and all), in base64."""
+    signed = f"{msg_id}.{stamp}.".encode() + payload
+    return base64.b64encode(hmac.new(secret.encode(), signed, hashlib.sha256).digest()).decode()
+
+
+def verify(payload: bytes, headers) -> None:
+    """`webhook-signature` holds "v1,<signature>" (several, space-separated, while a secret is being rotated)."""
+    msg_id, stamp, given = headers.get("webhook-id"), headers.get("webhook-timestamp"), headers.get("webhook-signature")
+    if not (msg_id and stamp and given and stamp.isdigit()) or abs(time.time() - int(stamp)) > 300:
+        raise BadSignature()
+    want = signature(config.WHOP_WEBHOOK_SECRET, msg_id, stamp, payload)
+    if not any(hmac.compare_digest(want, part.partition(",")[2]) for part in given.split() if part.startswith("v1,")):
+        raise BadSignature()
+
+
+def handle_webhook(payload: bytes, headers) -> None:
+    """Verify and apply one event. Raises BadSignature if it isn't from Whop."""
+    verify(payload, headers)
     event = json.loads(payload)
     with SessionLocal() as db:
-        if db.get(StripeEvent, event["id"]):
-            return  # Stripe sends some events more than once
-        handler = HANDLERS.get(event["type"])
+        if db.get(BillingEvent, headers["webhook-id"]):
+            return  # Whop retries, so the same delivery can arrive more than once
+        handler = HANDLERS.get(event.get("type"))
         if handler:
-            handler(db, event["data"]["object"], event["data"].get("previous_attributes") or {})
-        db.add(StripeEvent(id=event["id"], type=event["type"]))
+            handler(db, event.get("data") or {})
+        db.add(BillingEvent(id=headers["webhook-id"], type=str(event.get("type"))[:60]))
         db.commit()
 
 
-def _user(db: Session, customer_id: str | None) -> User | None:
-    return db.scalar(select(User).where(User.stripe_customer_id == customer_id)) if customer_id else None
+def _user(db: Session, membership_id: str | None, metadata: dict | None, payment_id: str | None = None) -> User | None:
+    """Whose membership or payment this is: the membership we already hold, else the account id we put on checkout,
+    else the account an earlier payment was recorded for."""
+    if membership_id and (u := db.scalar(select(User).where(User.subscription_id == membership_id))) is not None:
+        return u
+    user_id = str((metadata or {}).get("user_id") or "")
+    if user_id.isdigit() and (u := db.get(User, int(user_id))) is not None:
+        return u
+    if payment_id and (p := db.scalar(select(Payment).where(Payment.invoice_id == payment_id))) is not None and p.user_id:
+        return db.get(User, p.user_id)
+    return None
 
 
-def _country(address: dict | None) -> str | None:
-    return (address or {}).get("country")
-
-
-def _checkout_completed(db: Session, session: dict, _prev: dict) -> None:
-    if session.get("mode") != "subscription" or session.get("payment_status") not in ("paid", "no_payment_required"):
-        return  # access comes from invoice.paid anyway; this adds where the member is
-    u = _user(db, session.get("customer"))
-    if u is None and str(session.get("client_reference_id") or "").isdigit():
-        u = db.get(User, int(session["client_reference_id"]))
-        if u is not None:
-            u.stripe_customer_id = session.get("customer")
+def apply_membership(db: Session, m: dict) -> User | None:
+    """Bring an account in step with its Whop membership."""
+    u = _user(db, m.get("id"), m.get("metadata"))
     if u is None:
-        log.warning("checkout %s: no account for customer %s", session.get("id"), session.get("customer"))
-        return
-    u.subscription_id = session.get("subscription") or u.subscription_id
-    u.billing_country = _country((session.get("customer_details") or {}).get("address")) or u.billing_country
-    if u.subscription_id:
-        try:
-            u.card_country = card_country(u.subscription_id) or u.card_country
-        except stripe.StripeError:
-            log.exception("couldn't read the card country for %s", u.subscription_id)
-    # The first invoice.paid often arrives before this event, so fill in where that payment came from.
-    for p in db.scalars(select(Payment).where(Payment.stripe_customer_id == u.stripe_customer_id)):
-        p.billing_country = p.billing_country or u.billing_country
-        p.card_country = p.card_country or u.card_country
+        log.warning("membership %s: no account (metadata %s)", m.get("id"), m.get("metadata"))
+        return None
+    status = m.get("status")
+    if u.subscription_id and m["id"] != u.subscription_id and has_subscription(u) and status not in LIVE_STATUSES:
+        return u  # an old membership ending doesn't change the current one
+    u.subscription_id, u.subscription_status = m["id"], status
+    u.cancel_at_period_end = bool(m.get("cancel_at_period_end")) and status in LIVE_STATUSES
+    if status in PAID_STATUSES:
+        u.paid_until = _time(m.get("current_period_end")) or u.paid_until
+        u.member_since = u.member_since or datetime.utcnow()
+    elif status in ("canceled", "expired"):
+        u.paid_until = None  # Whop says access is over (the end of a cancelled month, or ended early)
+    # past_due: paid_until stays, so the grace days run from the end of the paid month.
+    return u
 
 
-def _subscription_changed(db: Session, sub: dict, prev: dict) -> None:
-    u = _user(db, sub.get("customer"))
-    if u is None:
-        return
-    if (u.subscription_id and sub["id"] != u.subscription_id and has_subscription(u)
-            and sub.get("status") not in LIVE_STATUSES):
-        return  # an old subscription ending doesn't change the current one
-    u.subscription_id, u.subscription_status = sub["id"], sub.get("status")
-    u.cancel_at_period_end = bool(sub.get("cancel_at_period_end") or sub.get("cancel_at")) and sub.get("status") != "canceled"
-    pm = sub.get("default_payment_method")
-    if "default_payment_method" in prev and isinstance(pm, str):  # they changed card in the portal
-        try:
-            u.card_country = payment_method_country(pm) or u.card_country
-        except stripe.StripeError:
-            log.exception("couldn't read the card country for %s", pm)
+def _membership_changed(db: Session, m: dict) -> None:
+    apply_membership(db, m)
 
 
-def _invoice_paid(db: Session, inv: dict, _prev: dict) -> None:
-    u = _user(db, inv.get("customer"))
-    lines = (inv.get("lines") or {}).get("data") or []
-    start = min((ln["period"]["start"] for ln in lines if ln.get("period")), default=None)
-    end = max((ln["period"]["end"] for ln in lines if ln.get("period")), default=None)
-    if db.scalar(select(Payment).where(Payment.invoice_id == inv["id"])) is None:
+def _payment_succeeded(db: Session, pay: dict) -> None:
+    m = None
+    if pay.get("membership_id"):
+        try:  # the period this payment bought, and access even if the membership event is late
+            m = membership(pay["membership_id"])
+        except WhopError:
+            log.exception("payment %s: couldn't read membership %s", pay.get("id"), pay["membership_id"])
+    u = apply_membership(db, {**m, "metadata": m.get("metadata") or pay.get("metadata")}) if m else None
+    u = u or _user(db, pay.get("membership_id"), pay.get("metadata"))
+    country = ((pay.get("billing_address") or {}).get("country") or "").upper()[:2] or None
+    if u is not None:
+        u.billing_country = country or u.billing_country
+    if db.scalar(select(Payment).where(Payment.invoice_id == pay["id"])) is None:
         db.add(Payment(
-            invoice_id=inv["id"], user_id=u.id if u else None, stripe_customer_id=inv.get("customer"),
-            amount=inv.get("amount_paid") or 0, tax=sum(t.get("amount", 0) for t in inv.get("total_taxes") or []),
-            currency=(inv.get("currency") or "").upper(),
-            billing_country=_country(inv.get("customer_address")) or (u.billing_country if u else None),
-            card_country=u.card_country if u else None, period_start=_ts(start), period_end=_ts(end),
-            paid_at=_ts((inv.get("status_transitions") or {}).get("paid_at")) or datetime.utcnow(),
+            invoice_id=pay["id"], user_id=u.id if u else None, amount=_minor(pay.get("total")),
+            tax=_minor(pay.get("tax_amount")), currency=(pay.get("currency") or "").upper()[:3],
+            billing_country=country or (u.billing_country if u else None),
+            period_start=_time((m or {}).get("current_period_start")), period_end=_time((m or {}).get("current_period_end")),
+            paid_at=_time(pay.get("paid_at")) or datetime.utcnow(),
         ))
-    if u is None or end is None:
-        return
-    period_end = _ts(end)
-    u.paid_until = max(u.paid_until, period_end) if u.paid_until else period_end
-    u.member_since = u.member_since or datetime.utcnow()
-
-
-def _payment_failed(db: Session, inv: dict, _prev: dict) -> None:
-    # Stripe retries and emails the member; access carries on to the end of the paid month plus the grace days.
-    if (u := _user(db, inv.get("customer"))) is not None and u.subscription_status == "active":
-        u.subscription_status = "past_due"
-
-
-def _customer_updated(db: Session, customer: dict, _prev: dict) -> None:
-    if (u := _user(db, customer.get("id"))) is not None:
-        u.billing_country = _country(customer.get("address")) or u.billing_country
 
 
 def end_access(u: User) -> None:
-    """Refund, dispute or fraud warning: no access from now, and no more charges."""
+    """Refund or dispute: no access from now, and no more charges."""
     if u.subscription_id and has_subscription(u):
         try:
             cancel_now(u.subscription_id)
-        except stripe.StripeError:
-            log.exception("couldn't cancel %s; cancel it in the Stripe Dashboard", u.subscription_id)
+        except WhopError:
+            log.exception("couldn't cancel %s; cancel it in the Whop dashboard", u.subscription_id)
     u.paid_until = None
     u.cancel_at_period_end = False
 
 
-def _charge_refunded(db: Session, charge: dict, _prev: dict) -> None:
-    if charge.get("refunded") and (u := _user(db, charge.get("customer"))) is not None:  # fully refunded only
+def _refund_created(db: Session, refund: dict) -> None:
+    pay = refund.get("payment") or {}
+    if _minor(refund.get("amount")) < _minor(pay.get("total")) or refund.get("status") in ("failed", "canceled"):
+        return  # a part refund changes nothing
+    u = _user(db, (pay.get("membership") or {}).get("id"), pay.get("metadata"), pay.get("id"))
+    if u is not None:
         end_access(u)
 
 
-def _dispute_created(db: Session, dispute: dict, _prev: dict) -> None:
-    charge = dispute.get("charge")
-    try:
-        customer = charge.get("customer") if isinstance(charge, dict) else charge_customer(charge)
-    except stripe.StripeError:
-        log.exception("dispute %s: couldn't read charge %s", dispute.get("id"), charge)
-        return
-    if (u := _user(db, customer)) is not None:
+def _dispute_created(db: Session, dispute: dict) -> None:
+    u = _user(db, None, None, (dispute.get("payment") or {}).get("id"))
+    if u is not None:
         end_access(u)
 
 
 HANDLERS = {
-    "checkout.session.completed": _checkout_completed,
-    "checkout.session.async_payment_succeeded": _checkout_completed,
-    "customer.subscription.created": _subscription_changed,
-    "customer.subscription.updated": _subscription_changed,
-    "customer.subscription.deleted": _subscription_changed,
-    "invoice.paid": _invoice_paid,
-    "invoice.payment_failed": _payment_failed,
-    "customer.updated": _customer_updated,
-    "charge.refunded": _charge_refunded,
-    "charge.dispute.created": _dispute_created,
-    "radar.early_fraud_warning.created": _dispute_created,  # has a `charge` too; acting first avoids a dispute
+    "membership.activated": _membership_changed,
+    "membership.updated": _membership_changed,
+    "payment.succeeded": _payment_succeeded,
+    "refund.created": _refund_created,
+    "dispute.created": _dispute_created,
 }
-EVENTS = sorted(HANDLERS)  # what the Stripe webhook endpoint should send
+EVENTS = sorted(HANDLERS)  # what the Whop webhook should send
 
 
 # ── Admin ────────────────────────────────────────────────────────────────────
@@ -268,7 +277,7 @@ EVENTS = sorted(HANDLERS)  # what the Stripe webhook endpoint should send
 
 def members_overview(db: Session) -> dict:
     now = datetime.utcnow()
-    members = list(db.scalars(select(User).where(User.is_admin.is_(False), User.stripe_customer_id.is_not(None))
+    members = list(db.scalars(select(User).where(User.is_admin.is_(False), User.subscription_id.is_not(None))
                               .order_by(User.member_since.desc())))
     payments = list(db.scalars(select(Payment).order_by(Payment.paid_at.desc())))
     year_ago = now - timedelta(days=365)

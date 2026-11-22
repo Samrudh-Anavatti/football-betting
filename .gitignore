@@ -23,3 +23,6 @@ frontend/.wrangler/
 .idea/
 .DS_Store
 Thumbs.db
+
+# Whop API key (never commit)
+whop-api-key

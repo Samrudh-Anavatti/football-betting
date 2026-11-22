@@ -4,7 +4,6 @@ import secrets
 from datetime import datetime, timedelta
 from typing import Annotated
 
-import stripe
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request
 from pydantic import AfterValidator, BaseModel
 from sqlalchemy import select
@@ -137,10 +136,10 @@ def delete_account(body: DeleteIn, request: Request, db: Session = Depends(get_d
         hit("login", ip, *LOGIN_LIMIT)
         raise HTTPException(403, "Wrong password")
     user = db.get(User, user.id)
-    if user.subscription_id and billing.has_subscription(user):  # or Stripe would carry on charging the card
+    if user.subscription_id and billing.has_subscription(user):  # or Whop would carry on charging the card
         try:
             billing.cancel_now(user.subscription_id)
-        except stripe.StripeError:
+        except billing.WhopError:
             raise HTTPException(502, "We couldn't cancel your membership just now, so nothing was deleted. Try again "
                                      "in a few minutes.")
     db.delete(user)

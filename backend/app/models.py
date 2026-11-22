@@ -223,11 +223,11 @@ class User(Base):
     reset_token_hash: Mapped[str | None] = mapped_column(String(64))
     reset_expires_at: Mapped[datetime | None] = mapped_column(DateTime)
     starting_bankroll: Mapped[float] = mapped_column(Float, default=1000.0)
-    # Membership (Stripe). Access runs to `paid_until` (the end of the last paid month) plus a few days' grace,
+    # Membership (Whop). Access runs to `paid_until` (the end of the last paid month) plus a few days' grace,
     # so a failed renewal or a cancellation ends it the same way. Only the webhook changes these.
-    stripe_customer_id: Mapped[str | None] = mapped_column(String(40), index=True)
-    subscription_id: Mapped[str | None] = mapped_column(String(40))
-    subscription_status: Mapped[str | None] = mapped_column(String(20))  # Stripe's: active, past_due, canceled...
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(40), index=True)  # unused (from the Stripe build)
+    subscription_id: Mapped[str | None] = mapped_column(String(40))  # the Whop membership, mem_...
+    subscription_status: Mapped[str | None] = mapped_column(String(20))  # Whop's: active, past_due, canceled...
     cancel_at_period_end: Mapped[bool] = mapped_column(Boolean, default=False)
     paid_until: Mapped[datetime | None] = mapped_column(DateTime)
     member_since: Mapped[datetime | None] = mapped_column(DateTime)
@@ -419,7 +419,7 @@ class SessionBundleLeg(Base):
 
 
 class Payment(Base):
-    """One paid membership invoice: the record of who paid what, where, for tax (VAT is owed where the customer is).
+    """One membership payment (`invoice_id` is Whop's payment id, pay_...): the record of who paid what, where, for tax (VAT is owed where the customer is).
     Kept when the account is deleted (user_id cleared): financial records must be kept for six years."""
 
     __tablename__ = "payments"
@@ -427,9 +427,9 @@ class Payment(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     invoice_id: Mapped[str] = mapped_column(String(40), unique=True)
     user_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), index=True)
-    stripe_customer_id: Mapped[str | None] = mapped_column(String(40))
+    stripe_customer_id: Mapped[str | None] = mapped_column(String(40))  # unused (from the Stripe build)
     amount: Mapped[int] = mapped_column(Integer)  # minor units (pence), what was charged, tax included
-    tax: Mapped[int] = mapped_column(Integer, default=0)  # minor units, if Stripe Tax added any
+    tax: Mapped[int] = mapped_column(Integer, default=0)  # minor units, the VAT or sales tax in it, if any
     currency: Mapped[str] = mapped_column(String(3))
     billing_country: Mapped[str | None] = mapped_column(String(2))
     card_country: Mapped[str | None] = mapped_column(String(2))
@@ -438,8 +438,9 @@ class Payment(Base):
     paid_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
 
 
-class StripeEvent(Base):
-    """Webhook events already handled: Stripe can send one more than once."""
+class BillingEvent(Base):
+    """Webhook deliveries already handled: Whop can send one more than once. (The table keeps the name it had when
+    membership was built on Stripe.)"""
 
     __tablename__ = "stripe_events"
 

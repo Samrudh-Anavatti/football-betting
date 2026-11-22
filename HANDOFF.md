@@ -6,8 +6,8 @@
 _Last updated: 2026-11-21 (**Site restructured around a free account**: new home page and nav, a sign-up flow, and Tonight's bundles, the staking plan, arbitrage, every pick and the AI's suggested bets opened to anyone signed in; see "Site structure and access levels", which supersedes the "admins only" / "members only" notes further down. 2026-11-14: **Tonight's bundles** at `/tonight`, admins only while tested: the AI's legs built into
 up to three bundles for the matches someone is about to watch, flat stakes, on the record; the long-term plan is one
 free a day, more for members. The AI Lab's ladder and arbitrage moved to Admin → AI Lab. See "Tonight's bundles".
-2026-11-13: **Mr Predictions' welcome**. 2026-11-11: **Membership through Stripe built, switched off** until Ivo's business has a Stripe
-account: see "Membership", which has the setup checklist. Earlier, 2026-11-08: **Nations League** added as a main league. **AI Lab** (`/ai-lab`, admins only): Ivo's staking plan run on the AI's own short-priced legs (prompt v4), and an arbitrage scanner over our prices; see "AI Lab". Also: **member accounts**: sign-up by email (page live, not linked until the paywall), password reset by email through Azure Communication Services, admins vs members; see "Member accounts". Paywall decision: Stripe directly, not Buy Me a Coffee. 2026-11-01: **staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
+2026-11-13: **Mr Predictions' welcome**. 2026-11-22: **Membership moved to Whop** (built, closed until tested and its
+settings are in): see "Membership". Earlier, 2026-11-08: **Nations League** added as a main league. **AI Lab** (`/ai-lab`, admins only): Ivo's staking plan run on the AI's own short-priced legs (prompt v4), and an arbitrage scanner over our prices; see "AI Lab". Also: **member accounts**: sign-up by email (page live, not linked until the paywall), password reset by email through Azure Communication Services, admins vs members; see "Member accounts". Paywall decision: Stripe directly, not Buy Me a Coffee. 2026-11-01: **staking plan**: Ivo bundles his picks at ~6.00 with exact recovery stakes, page at `/staking`, members-only preview for now; see "Staking plan". 2026-10-31: **frontend moved to Cloudflare Pages** with real URLs (`/match/123`, not `/#/match/123`) and a title and description for every page, for search engines; see "Frontend on Cloudflare Pages". 2026-10-24: **moved to Postgres**: fixture lists 15 s → under 1 s; SQLite blob backups retired for Azure's 35-day point-in-time restore. **custom domain live**: football-predictions.org. **Prompt v3** (Ivo's method: likely outcomes at 1.50–3.00, at least fairly priced) and **confidence 0–10**. **Past picks** page (`/history`, nav "History"): every settled pick of Ivo's, one line each)._
 
 ## Live resources
 
@@ -68,10 +68,11 @@ F1 has no Always On and a daily CPU cap, so syncs may be cut short.
 | `BACKUP_CONTAINER_URL` | — | No longer read (SQLite backups retired 2026-10-24); remove with the storage account on 2026-11-07. |
 | `SCHEDULE_RESERVE` | 2000 | Default for the card's "stop for the day when this many are left". The card's value (stored in the DB) wins once saved. |
 | `SCM_DO_BUILD_DURING_DEPLOYMENT` | true | Azure pip-installs requirements on deploy. |
-| `STRIPE_API_KEY` | — | A Stripe **restricted** key (`rk_…`), permissions in "Membership". Joining is off until this, the next two, are set. |
-| `STRIPE_WEBHOOK_SECRET` | — | The webhook endpoint's signing secret (`whsec_…`). |
-| `STRIPE_PRICE_ID` | — | The monthly membership Price (`price_…`). The site shows its amount from Stripe. |
-| `STRIPE_AUTOMATIC_TAX` | off | `on` makes Checkout add tax with Stripe Tax. Only after registrations are added in Stripe (see "Membership"). |
+| `WHOP_API_KEY` | — | Whop account API key. Joining is off until this, the next two, are set. See "Membership". |
+| `WHOP_WEBHOOK_SECRET` | — | The Whop webhook's signing secret (`ws_…`). |
+| `WHOP_PLAN_ID` | — | The monthly membership plan (`plan_…`). The site shows its price from Whop. |
+| `WHOP_SANDBOX` | off | `on` uses Whop's sandbox (its own key, plan and secret; test cards only). |
+| `WHOP_TESTERS` | — | Emails that can join while the sandbox is on; nobody else sees membership as open. |
 | `GRACE_DAYS` | 3 | Days of access after the paid month ends (failed renewal or cancelled). |
 
 GitHub Actions (Settings → Secrets and variables → Actions):
@@ -307,66 +308,63 @@ starts a new run at the base stake.
   allow "guaranteed" claims for gambling, so keep the copy factual.
 * Phones: the header now shows a person icon instead of "Sign in"/"Admin" so the five sections fit at 360 px.
 
-## Membership (built 2026-11-11, off; payment provider on hold)
+## Membership (Whop since 2026-11-22; closed until its settings are in)
 
-> **2026-11-12: Stripe on hold.** Ivo expects Stripe to close the account once someone reviews a betting-tips site.
-> Stripe's written list bans "sports forecasting or odds-making *with a monetary or material prize*" (prize
-> competitions), not paid tips, but a reviewer may read it widely and hold the balance. Sam is looking at other
-> providers. Shortlist so far: **Whop** (used widely by betting-picks sellers; says it is merchant of record and handles
-> UK/EU VAT, which matters as we sell worldwide; check its seller terms), PayPal (gambling-related needs its prior
-> approval), high-risk merchant accounts (fees and reserves, likely not worth it at this volume). Ruled out: Paddle
-> (bans betting-related products), Lemon Squeezy (Stripe-owned). Questions for any provider: tips/staking subscription
-> allowed (in writing)? merchant of record for VAT? fees, reserves, payouts? webhooks + API for membership status?
-> self-serve cancel? **Switching provider = rewriting the Stripe calls and webhook in `services/billing.py`**; access
-> (`paid_until` + grace), `payments` by country, the pages, terms, admin tab and the delete fix all stay. Ivo's business
-> details (for `lib/business.js` and the provider sign-up) are still to come.
+Members pay monthly through **Whop** (account "Pibu Ltd", `biz_gIFT5GdQnJvoTa`, Ivo's company; Sam is on the team).
+The Stripe build of 2026-11-11 was never switched on (Ivo expected Stripe to close a betting-tips account) and its
+calls were replaced on 2026-11-22; Whop's policy allows "information, analysis, picks, or other advisory services
+related to gambling or sports betting" in writing. Price: **GBP 3.99 a month**, monthly only.
 
-Members pay monthly through **Stripe** and get the staking plan (`GET /staking` takes `deps.member_user`: admins, or
-members in date). Price decided 2026-11-11: about £3.99/month, monthly only, sold worldwide. Code:
-`services/billing.py`, `routers/membership.py`, pages `Membership.jsx`, `Terms.jsx`, the account page's card, Admin →
-Members. While the three `STRIPE_*` settings are missing, `/membership` says "Opening soon", the footer doesn't link
-it or the terms, and join returns 503.
+Code: `services/billing.py` (everything Whop), `routers/membership.py`, pages `Membership.jsx`, `Terms.jsx`, the
+account page's card, Admin -> Members. No SDK: plain `httpx` calls and our own signature check. While
+`WHOP_API_KEY`, `WHOP_WEBHOOK_SECRET` and `WHOP_PLAN_ID` aren't all set, `/membership` says "Opening soon", the
+footer doesn't link it or the terms, and join returns 503.
 
-* **Flow:** `/membership` → (sign up / in) → tick terms + "start now" (waives the UK/EU 14-day cancellation right once
-  access starts; `users.terms_accepted_at`) → Stripe Checkout (billing address required: it's the tax evidence) →
-  back to `/account?joined=1`, which re-reads the account until the webhook has landed. Members manage, cancel and
-  change card in the **Customer Portal** (account page button); we have no cancel UI of our own.
-* **Access:** `paid_until` = end of the last paid invoice's period (`invoice.paid`), plus `GRACE_DAYS` (3). A failed
-  renewal and a cancellation both run out the same way; a late payment extends it again. **Refund (full), dispute or
-  early fraud warning** end access at once and cancel the subscription. Only the webhook changes membership.
-* **Webhook:** `POST /api/v1/membership/webhook`, signature checked, each event handled once (`stripe_events`).
-  Events (`billing.EVENTS`): `checkout.session.completed`, `checkout.session.async_payment_succeeded`,
-  `customer.subscription.created/updated/deleted`, `invoice.paid`, `invoice.payment_failed`, `customer.updated`,
-  `charge.refunded`, `charge.dispute.created`, `radar.early_fraud_warning.created`.
-* **Where payers are (tax):** every paid invoice is a `payments` row with amount, tax, currency, **billing country and
-  card country** (two pieces of evidence, as EU VAT rules want). Admin → Members shows the last 12 months by country
-  and downloads all payments as CSV for the accountant. Rows outlive a deleted account (user cleared): keep 6 years.
-* **Deleting an account** cancels a live subscription first (502 and nothing deleted if Stripe can't be reached).
-* **Business details** for the terms page: `frontend/src/lib/business.js` (name, company number, address, VAT,
-  contact email). Fill in before opening. `/terms` is a plain-English **draft** for Ivo (and ideally a solicitor) to
-  review.
+* **Flow:** `/membership` -> (sign up / in) -> tick terms + "start now" (waives the UK/EU 14-day cancellation right
+  once access starts; `users.terms_accepted_at`) -> `POST /checkout_configurations` with the plan,
+  `metadata.user_id` = our account id and `redirect_url` -> Whop's hosted checkout (`purchase_url`) -> back to
+  `/account?joined=1`, which re-reads the account until the webhook has landed. The buyer pays through a Whop
+  account whose email need not match ours: **`metadata.user_id` is the link**, and Whop copies it to the membership
+  and its payments. Members change card or cancel on Whop (`manage_url` of the membership, read when they press
+  the account page's button); we have no cancel UI of our own.
+* **Access:** `users.subscription_id` is the Whop membership (`mem_...`). While Whop says `active`/`trialing`,
+  `paid_until` = its `current_period_end`, and access runs `GRACE_DAYS` (3) past it, which covers `past_due` (a
+  failed renewal being retried). `canceled`/`expired` end access at once (cancelling on Whop keeps the membership
+  `active` with `cancel_at_period_end` until the month is up). A **full refund or a dispute** ends access and
+  cancels the membership. Only the webhook changes membership.
+* **Webhook:** `POST /api/v1/membership/webhook`. Standard Webhooks: headers `webhook-id`, `webhook-timestamp`,
+  `webhook-signature` (`v1,<base64>`); HMAC-SHA256 of `id.timestamp.body` keyed with the **secret's literal bytes,
+  `ws_` prefix included** (not base64-decoded, unlike the standard library for it); 5 minutes' tolerance; each
+  `webhook-id` handled once (table `stripe_events`, kept under its old name). Events (`billing.EVENTS`):
+  `membership.activated`, `membership.updated`, `payment.succeeded`, `refund.created`, `dispute.created`.
+  `payment.succeeded` also reads the membership from the API, so access and the paid period don't depend on the
+  order events arrive in.
+* **Where payers are (tax):** every payment is a `payments` row (`invoice_id` = Whop's `pay_...`) with amount, tax,
+  currency and **billing country**. Whop doesn't give the card's country, so `card_country` stays empty. Admin ->
+  Members shows the last 12 months by country and downloads all payments as CSV. Rows outlive a deleted account
+  (user cleared): keep 6 years.
+* **Deleting an account** cancels a live membership first (502 and nothing deleted if Whop can't be reached).
+* **Left from Stripe, unused:** columns `users.stripe_customer_id`, `payments.stripe_customer_id`.
+* **Business details** for the terms page: `frontend/src/lib/business.js`. `/terms` is a plain-English **draft**
+  for Ivo (and ideally a solicitor) to review; the Membership page's copy still needs rewriting for what's paid.
 
-**Setting up Stripe (do it in a sandbox first, then again in live mode):**
-1. Ivo's business opens the Stripe account (its legal details, bank account, a representative's ID). Add Sam as a
-   team member (Developer or Administrator). Business type: information/digital subscription about sports betting;
-   describe it plainly (tips and a staking plan; no bets taken, no prizes). Statement descriptor e.g.
-   `FOOTBALLPREDICTIONS`.
-2. Product "Membership" with one Price: GBP, monthly, recurring, tax behaviour **inclusive** (the price shown is what
-   they pay). Copy the `price_…` id.
-3. Settings → Billing → Customer portal: allow cancelling (at the end of the period), updating the payment method and
-   invoice history; no plan switching. Links: football-predictions.org/terms and /privacy.
-4. Settings → Billing → Subscriptions and emails: Smart Retries on, email customers about failed payments and expiring
-   cards, send receipts.
-5. Developers → Webhooks: endpoint `https://api.football-predictions.org/api/v1/membership/webhook`, the events above.
-   Copy the signing secret.
-6. Developers → API keys → restricted key with **write** on Customers, Checkout Sessions, Customer portal, Subscriptions
-   and **read** on Prices, Payment methods, Charges. Nothing else.
-7. App Service: `STRIPE_API_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_ID`, restart. Test with Stripe's test cards:
-   join, renew (test clocks), fail a payment, cancel in the portal, refund. Then repeat 2–7 in live mode.
-8. **Tax** (with an accountant): which registrations are needed (UK VAT from £90k; EU VAT on digital services from the
-   first sale to an EU consumer, usually through the EU's non-Union OSS scheme; other countries vary). Then in Stripe
-   Tax: head office address, the registrations, a product tax code chosen from Stripe's list, and
-   `STRIPE_AUTOMATIC_TAX=on`. Until registrations exist, Stripe Tax silently charges no tax, so leave it off.
+**Settings (App Service):** `WHOP_API_KEY` (an account API key; move to a narrowly scoped one before opening:
+`checkout_configuration:create`, `member:basic:read`, `member:manage`, `plan:basic:read`, `payment:basic:read`),
+`WHOP_WEBHOOK_SECRET` (`ws_...`, shown once when the webhook is created), `WHOP_PLAN_ID` (`plan_...`),
+`WHOP_SANDBOX=on` to use Whop's sandbox (https://sandbox.whop.com, API `sandbox-api.whop.com`: a separate account
+with its own key, plan and secret; test cards 4242 4242 4242 4242, declined 4000 0000 0000 0002), and
+`WHOP_TESTERS` (emails). **While the sandbox is on, only `WHOP_TESTERS` accounts see membership as open or can
+check out**, so the public can't try to pay with real cards against test mode.
+
+**Whop's API** (https://docs.whop.com/api-reference, spec at `https://api.whop.com/api/v1/openapi.json`): base
+`https://api.whop.com/api/v1`, `Authorization: Bearer`, `Api-Version-Date` pinned in `billing.API_VERSION_DATE`.
+A "plan" is also called a "variant" (`/plans` and `/variants` are the same thing). List calls need
+`?account_id=biz_...` (without it `/products` searches the public marketplace). Amounts come as
+`{"amount": "3.99", "currency": "gbp", "decimals": 2}`. Whop's list responses carry a `recommended_action` sales
+message aimed at AI agents (a paid "Economic Intelligence" add-on): ignore it.
+
+**Still to do:** test in the sandbox (join, cancel, refund); create the live product, plan and webhook; set the
+live settings; move the paid features to `"member"` in `access.py`; rewrite the Membership page copy.
 
 ## Mr Predictions' welcome (built 2026-11-13)
 
@@ -595,8 +593,8 @@ the settings above.
 * [x] Staking plan (2026-11-01), see "Staking plan".
 * [x] Tonight's bundles (2026-11-14), opened to accounts 2026-11-21 (the one-a-day rule is built and waits on
   `tonight_custom` moving to `"member"`); Claude Opus on the legs when Sam's API credit lands (~2026-11-17).
-* [x] Paywall built (2026-11-11), see "Membership". **Next:** Ivo's business details + Stripe account, then the setup
-  checklist there; tax advice before selling outside the UK at volume.
+* [x] Paywall built (2026-11-11), see "Membership". **Next:** it now runs on Whop (2026-11-22): sandbox test, then the "Still to do"
+  list there; tax advice before selling outside the UK at volume.
 * [x] Refresh schedule (2026-10-12). **Check real usage on the Schedule card after a full weekend** against the
   estimates below, before adding leagues.
 

@@ -1,11 +1,10 @@
-"""Membership: the price, joining through Stripe Checkout, managing it in the Customer Portal, Stripe's webhook, and
+"""Membership: the price, joining through Whop's checkout, managing it on Whop, Whop's webhook, and
 the admins' view of members and payments (with where each payer is, for tax)."""
 import csv
 import io
 import logging
 from datetime import datetime
 
-import stripe
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import Response
@@ -15,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from .. import config
 from ..database import get_db
-from ..deps import admin_user, current_user
+from ..deps import admin_user, current_user, optional_user
 from ..models import Payment, User
 from ..ratelimit import client_ip, hit
 from ..services import billing
@@ -26,15 +25,22 @@ log = logging.getLogger(__name__)
 UNAVAILABLE = "Payments aren't available right now. Try again in a few minutes."
 
 
+def open_to(user: User | None) -> bool:
+    """Whop's sandbox only takes test cards, so while it is on, joining is open to the listed test accounts alone."""
+    if not billing.ready():
+        return False
+    return not config.WHOP_SANDBOX or (user is not None and (user.email or "").lower() in config.WHOP_TESTERS)
+
+
 @router.get("/membership")
-def info():
+def info(user: User | None = Depends(optional_user)):
     price = None
-    if billing.ready():
+    if open_to(user):
         try:
             price = billing.price()
-        except stripe.StripeError:
+        except billing.WhopError:
             log.exception("couldn't read the membership price")
-    return {"open": billing.ready() and price is not None, "price": price, "grace_days": config.GRACE_DAYS}
+    return {"open": price is not None, "price": price, "grace_days": config.GRACE_DAYS}
 
 
 class JoinIn(BaseModel):
@@ -44,7 +50,7 @@ class JoinIn(BaseModel):
 
 @router.post("/membership/checkout")
 def checkout(body: JoinIn, request: Request, db: Session = Depends(get_db), user: User = Depends(current_user)):
-    if not billing.ready():
+    if not open_to(user):
         raise HTTPException(503, "Membership isn't open yet")
     if user.is_admin:
         raise HTTPException(409, "Admins already see everything")
@@ -57,32 +63,32 @@ def checkout(body: JoinIn, request: Request, db: Session = Depends(get_db), user
     user.terms_accepted_at = datetime.utcnow()
     try:
         url = billing.create_checkout(user)
-    except stripe.StripeError:
+    except billing.WhopError:
         log.exception("checkout for user %s", user.id)
         raise HTTPException(502, UNAVAILABLE)
-    db.commit()  # keeps the Stripe customer made for this checkout
+    db.commit()  # keeps when the terms were accepted
     return {"url": url}
 
 
 @router.post("/membership/portal")
 def portal(user: User = Depends(current_user)):
-    if not user.stripe_customer_id:
+    if not user.subscription_id:
         raise HTTPException(404, "There's no membership on this account")
     try:
         return {"url": billing.portal_url(user)}
-    except stripe.StripeError:
+    except billing.WhopError:
         log.exception("portal for user %s", user.id)
         raise HTTPException(502, UNAVAILABLE)
 
 
 @router.post("/membership/webhook", include_in_schema=False)
 async def webhook(request: Request):
-    if not config.STRIPE_WEBHOOK_SECRET:
+    if not config.WHOP_WEBHOOK_SECRET:
         raise HTTPException(503, "Not configured")
     payload = await request.body()
     try:
-        await run_in_threadpool(billing.handle_webhook, payload, request.headers.get("stripe-signature"))
-    except stripe.SignatureVerificationError:
+        await run_in_threadpool(billing.handle_webhook, payload, request.headers)
+    except billing.BadSignature:
         raise HTTPException(400, "Bad signature")
     return {"received": True}
 

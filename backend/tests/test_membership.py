@@ -1,7 +1,5 @@
-"""Membership: joining through Stripe Checkout, the webhook keeping access in step, the grace days, refunds and
-disputes, deleting an account with a live subscription, and the admins' view of payments by country."""
-import hashlib
-import hmac
+"""Membership: joining through Whop's checkout, the webhook keeping access in step, the grace days, refunds and
+disputes, deleting an account with a live membership, and the admins' view of payments by country."""
 import json
 import time
 from datetime import datetime, timedelta
@@ -17,7 +15,7 @@ from app.services import billing
 from .test_auth import signup
 
 API = "/api/v1"
-SECRET = "whsec_test"
+SECRET = "ws_test_secret"
 _ids = count(1)
 
 
@@ -28,55 +26,62 @@ def staking_for_members(monkeypatch):
 
 
 @pytest.fixture()
-def stripe_fake(monkeypatch):
-    """Stripe switched on, with its outbound calls replaced; returns what they were asked to do."""
-    calls = {"cancelled": []}
-    monkeypatch.setattr(config, "STRIPE_API_KEY", "rk_test_x")
-    monkeypatch.setattr(config, "STRIPE_WEBHOOK_SECRET", SECRET)
-    monkeypatch.setattr(config, "STRIPE_PRICE_ID", "price_1")
+def whop(monkeypatch):
+    """Whop switched on, with its outbound calls replaced; holds the memberships Whop "has" and what was cancelled."""
+    state = {"cancelled": [], "memberships": {}}
+    monkeypatch.setattr(config, "WHOP_API_KEY", "apik_test")
+    monkeypatch.setattr(config, "WHOP_WEBHOOK_SECRET", SECRET)
+    monkeypatch.setattr(config, "WHOP_PLAN_ID", "plan_1")
     monkeypatch.setattr(billing, "price", lambda: {"amount": 399, "currency": "gbp", "interval": "month"})
-
-    def create_checkout(u):
-        u.stripe_customer_id = u.stripe_customer_id or f"cus_{u.id}"
-        return "https://checkout.stripe.test/s"
-
-    monkeypatch.setattr(billing, "create_checkout", create_checkout)
-    monkeypatch.setattr(billing, "portal_url", lambda u: "https://billing.stripe.test/p")
-    monkeypatch.setattr(billing, "card_country", lambda sub_id: "DE")
-    monkeypatch.setattr(billing, "payment_method_country", lambda pm: "FR")
-    monkeypatch.setattr(billing, "charge_customer", lambda charge: calls["charge_customer"])
-    monkeypatch.setattr(billing, "cancel_now", lambda sub_id: calls["cancelled"].append(sub_id))
-    return calls
+    monkeypatch.setattr(billing, "create_checkout", lambda u: "https://whop.test/checkout/plan_1")
+    monkeypatch.setattr(billing, "membership", lambda mem_id: state["memberships"][mem_id])
+    monkeypatch.setattr(billing, "cancel_now", lambda mem_id: state["cancelled"].append(mem_id))
+    return state
 
 
-def send(client, type_, obj, previous=None, event_id=None):
-    data = {"object": obj, **({"previous_attributes": previous} if previous else {})}
-    payload = json.dumps({"id": event_id or f"evt_{next(_ids)}", "type": type_, "data": data})
-    t = int(time.time())
-    sig = hmac.new(SECRET.encode(), f"{t}.{payload}".encode(), hashlib.sha256).hexdigest()
-    return client.post(f"{API}/membership/webhook", content=payload,
-                       headers={"stripe-signature": f"t={t},v1={sig}", "content-type": "application/json"})
+def send(client, type_, data, msg_id=None):
+    payload = json.dumps({"id": "evt", "type": type_, "api_version": "v1", "data": data}).encode()
+    msg_id, stamp = msg_id or f"msg_{next(_ids)}", str(int(time.time()))
+    return client.post(f"{API}/membership/webhook", content=payload, headers={
+        "webhook-id": msg_id, "webhook-timestamp": stamp, "content-type": "application/json",
+        "webhook-signature": "v1," + billing.signature(SECRET, msg_id, stamp, payload)})
 
 
-def invoice(customer, end, inv_id=None, country="DE"):
-    start = end - timedelta(days=30)
-    return {"id": inv_id or f"in_{next(_ids)}", "customer": customer, "amount_paid": 399, "currency": "gbp",
-            "total_taxes": [], "customer_address": {"country": country},
-            "status_transitions": {"paid_at": int(time.time())},
-            "lines": {"data": [{"period": {"start": int(start.timestamp()), "end": int(end.timestamp())}}]}}
+def z(t):
+    return t.isoformat() + ".000Z"
+
+
+def mem(mem_id, uid, end, status="active", cancelling=False):
+    return {"id": mem_id, "status": status, "metadata": {"user_id": str(uid)}, "cancel_at_period_end": cancelling,
+            "current_period_start": z(end - timedelta(days=30)), "current_period_end": z(end),
+            "manage_url": f"https://whop.test/billing/manage/{mem_id}"}
+
+
+def payment(pay_id, mem_id, uid, country="de"):
+    return {"id": pay_id, "membership_id": mem_id, "metadata": {"user_id": str(uid)}, "currency": "gbp",
+            "total": {"amount": "3.99", "currency": "gbp", "decimals": 2},
+            "tax_amount": {"amount": "0.67", "currency": "gbp", "decimals": 2},
+            "billing_address": {"country": country}, "paid_at": z(datetime.utcnow().replace(microsecond=0))}
 
 
 def me(client, h):
     return client.get(f"{API}/auth/me", headers=h).json()["membership"]
 
 
-def join(client, h):
-    r = client.post(f"{API}/membership/checkout", headers=h, json={"terms": True, "start_now": True})
-    assert r.status_code == 200, r.text
-    return f"cus_{client.get(f'{API}/auth/me', headers=h).json()['id']}"
+def uid_of(client, h):
+    return client.get(f"{API}/auth/me", headers=h).json()["id"]
 
 
-def test_closed_until_stripe_is_set_up(client):
+def pay_in(client, whop, h, mem_id, pay_id, end=None):
+    """A first payment landing: Whop holds the membership, and tells us about it and the payment."""
+    uid = uid_of(client, h)
+    end = end or (datetime.utcnow() + timedelta(days=30)).replace(microsecond=0)
+    whop["memberships"][mem_id] = mem(mem_id, uid, end)
+    assert send(client, "payment.succeeded", payment(pay_id, mem_id, uid)).status_code == 200
+    return uid, end
+
+
+def test_closed_until_whop_is_set_up(client):
     h = signup(client, "early@example.com")
     assert client.get(f"{API}/membership").json()["open"] is False
     assert client.post(f"{API}/membership/checkout", headers=h, json={"terms": True, "start_now": True}).status_code == 503
@@ -84,98 +89,121 @@ def test_closed_until_stripe_is_set_up(client):
     assert client.get(f"{API}/staking", headers=h).status_code == 403  # members only
 
 
-def test_join_pay_renew_and_lapse(client, auth, stripe_fake):
+def test_join_pay_renew_and_lapse(client, auth, whop):
     h = signup(client, "joiner@example.com")
     assert client.get(f"{API}/membership").json() == {
         "open": True, "price": {"amount": 399, "currency": "gbp", "interval": "month"}, "grace_days": 3}
+    join = {"terms": True, "start_now": True}
     assert client.post(f"{API}/membership/checkout", headers=h, json={"terms": True, "start_now": False}).status_code == 422
-    assert client.post(f"{API}/membership/checkout", headers=auth, json={"terms": True, "start_now": True}).status_code == 409
-    cus = join(client, h)
-    assert me(client, h)["member"] is False and me(client, h)["can_manage"] is True  # nothing paid yet
+    assert client.post(f"{API}/membership/checkout", headers=auth, json=join).status_code == 409
+    assert client.post(f"{API}/membership/checkout", headers=h, json=join).json() == {"url": "https://whop.test/checkout/plan_1"}
+    assert me(client, h)["member"] is False and me(client, h)["can_manage"] is False  # nothing paid yet
+    assert client.post(f"{API}/membership/portal", headers=h).status_code == 404
 
-    # Only Stripe can call the webhook.
-    bad = client.post(f"{API}/membership/webhook", content=b'{"id":"evt_x"}', headers={"stripe-signature": "t=1,v1=00"})
-    assert bad.status_code == 400
+    # Only Whop can call the webhook: a wrong signature, a missing one and a stale one are all refused.
+    stamp = str(int(time.time()))
+    bad = {"webhook-id": "msg_x", "webhook-timestamp": stamp, "webhook-signature": "v1,AAAA"}
+    assert client.post(f"{API}/membership/webhook", content=b'{"type":"x"}', headers=bad).status_code == 400
+    assert client.post(f"{API}/membership/webhook", content=b'{"type":"x"}').status_code == 400
+    old = str(int(time.time()) - 3600)
+    stale = {"webhook-id": "msg_x", "webhook-timestamp": old,
+             "webhook-signature": "v1," + billing.signature(SECRET, "msg_x", old, b"{}")}
+    assert client.post(f"{API}/membership/webhook", content=b"{}", headers=stale).status_code == 400
 
+    # The payment arrives first; Whop sends it twice; then the membership event.
+    uid = uid_of(client, h)
     end = (datetime.utcnow() + timedelta(days=30)).replace(microsecond=0)
-    assert send(client, "customer.subscription.created", {"id": "sub_1", "customer": cus, "status": "active"}).status_code == 200
-    first = invoice(cus, end, "in_first")
-    assert send(client, "invoice.paid", first, event_id="evt_paid").status_code == 200
-    assert send(client, "invoice.paid", first, event_id="evt_paid").status_code == 200  # Stripe resends: no double count
-    send(client, "checkout.session.completed", {
-        "id": "cs_1", "mode": "subscription", "payment_status": "paid", "customer": cus, "subscription": "sub_1",
-        "client_reference_id": "x", "customer_details": {"address": {"country": "DE"}}})
+    whop["memberships"]["mem_1"] = mem("mem_1", uid, end)
+    first = payment("pay_first", "mem_1", uid)
+    assert send(client, "payment.succeeded", first, "msg_paid").status_code == 200
+    assert send(client, "payment.succeeded", first, "msg_paid").status_code == 200  # a retry: no double count
+    assert send(client, "membership.activated", mem("mem_1", uid, end)).status_code == 200
     m = me(client, h)
     assert m["member"] is True and m["status"] == "active" and m["paid_until"] == end.isoformat() + "Z"
-    assert m["access_until"] == (end + timedelta(days=3)).isoformat() + "Z"
+    assert m["access_until"] == (end + timedelta(days=3)).isoformat() + "Z" and m["can_manage"] is True
     assert client.get(f"{API}/staking", headers=h).status_code == 200
-    assert client.post(f"{API}/membership/checkout", headers=h, json={"terms": True, "start_now": True}).status_code == 409
-    assert client.post(f"{API}/membership/portal", headers=h).json() == {"url": "https://billing.stripe.test/p"}
+    assert client.post(f"{API}/membership/checkout", headers=h, json=join).status_code == 409
+    assert client.post(f"{API}/membership/portal", headers=h).json() == {"url": "https://whop.test/billing/manage/mem_1"}
 
     with SessionLocal() as db:
-        u = db.get(User, client.get(f"{API}/auth/me", headers=h).json()["id"])
-        assert (u.billing_country, u.card_country) == ("DE", "DE") and u.terms_accepted_at is not None
-        assert db.query(Payment).filter(Payment.user_id == u.id).count() == 1
+        u = db.get(User, uid)
+        assert u.billing_country == "DE" and u.terms_accepted_at is not None
+        p = db.query(Payment).filter(Payment.user_id == u.id).one()
+        assert (p.amount, p.tax, p.currency, p.period_end) == (399, 67, "GBP", end)
         # The grace days: still in 2 days after the paid month ends, out after 4.
         assert billing.is_member(u, end + timedelta(days=2)) and not billing.is_member(u, end + timedelta(days=4))
 
     # A failed renewal shows as past due; access carries on to the same date. Paid late, it extends.
-    send(client, "invoice.payment_failed", {"id": "in_2", "customer": cus})
+    send(client, "membership.updated", mem("mem_1", uid, end, status="past_due"))
     assert me(client, h)["status"] == "past_due" and me(client, h)["paid_until"] == end.isoformat() + "Z"
-    send(client, "invoice.paid", invoice(cus, end + timedelta(days=30)))
-    assert me(client, h)["paid_until"] == (end + timedelta(days=30)).isoformat() + "Z"
-
-    # Cancelling in the portal keeps access to the end of the month; a new card's country is picked up.
-    send(client, "customer.subscription.updated", {"id": "sub_1", "customer": cus, "status": "active",
-                                                   "cancel_at_period_end": True, "default_payment_method": "pm_2"},
-         previous={"cancel_at_period_end": False, "default_payment_method": "pm_1"})
-    m = me(client, h)
-    assert m["cancelling"] is True and m["member"] is True
-    send(client, "customer.subscription.deleted", {"id": "sub_1", "customer": cus, "status": "canceled"})
-    m = me(client, h)
-    assert m["status"] == "canceled" and m["cancelling"] is False and m["member"] is True  # paid to the end
+    later = end + timedelta(days=30)
+    whop["memberships"]["mem_1"] = mem("mem_1", uid, later)
+    send(client, "payment.succeeded", payment("pay_second", "mem_1", uid))
+    assert me(client, h)["paid_until"] == later.isoformat() + "Z" and me(client, h)["status"] == "active"
 
     # Admins see members and where the money came from; the CSV is for the accountant.
     overview = client.get(f"{API}/admin/members", headers=auth).json()
     row = next(r for r in overview["members"] if r["email"] == "joiner@example.com")
-    assert (row["billing_country"], row["card_country"]) == ("DE", "FR")
+    assert row["billing_country"] == "DE" and row["member"] is True
     # Every sign-up is listed, paying or not, with when they joined.
     joined = next(r for r in overview["signups"] if r["email"] == "joiner@example.com")
     assert joined["created_at"] and overview["signups_week"] >= 1 and all(r["email"] for r in overview["signups"])
-    assert {"country": "DE", "currency": "GBP", "payments": 2, "amount": 798, "tax": 0, "card_elsewhere": 0} in overview["by_country"]
+    assert {"country": "DE", "currency": "GBP", "payments": 2, "amount": 798, "tax": 134, "card_elsewhere": 0} in overview["by_country"]
     csv = client.get(f"{API}/admin/members/payments.csv", headers=auth)
-    assert csv.status_code == 200 and "in_first,3.99,0.00,GBP,DE,DE" in csv.text
+    assert csv.status_code == 200 and "pay_first,3.99,0.67,GBP,DE," in csv.text
     assert client.get(f"{API}/admin/members", headers=h).status_code == 403
 
+    # Cancelling on Whop keeps access to the end of the month; then Whop ends the membership and access goes.
+    send(client, "membership.updated", mem("mem_1", uid, later, cancelling=True))
+    m = me(client, h)
+    assert m["cancelling"] is True and m["member"] is True
+    send(client, "membership.updated", mem("mem_1", uid, later, status="canceled", cancelling=True))
+    m = me(client, h)
+    assert m["status"] == "canceled" and m["cancelling"] is False and m["member"] is False
+    assert client.get(f"{API}/staking", headers=h).status_code == 403
 
-def test_refund_and_dispute_end_access(client, stripe_fake):
+
+def test_refund_and_dispute_end_access(client, whop):
     h = signup(client, "refund@example.com")
-    cus = join(client, h)
-    send(client, "customer.subscription.created", {"id": "sub_r", "customer": cus, "status": "active"})
-    send(client, "invoice.paid", invoice(cus, datetime.utcnow() + timedelta(days=30)))
-    send(client, "charge.refunded", {"id": "ch_1", "customer": cus, "refunded": False})  # partial: no change
+    pay_in(client, whop, h, "mem_r", "pay_r")
     assert me(client, h)["member"] is True
-    send(client, "charge.refunded", {"id": "ch_1", "customer": cus, "refunded": True})
-    assert me(client, h)["member"] is False and stripe_fake["cancelled"] == ["sub_r"]
+    part = {"id": "rfnd_1", "amount": 1.0, "status": "succeeded", "payment": {"id": "pay_r", "total": 3.99}}
+    send(client, "refund.created", part)  # a part refund: no change
+    assert me(client, h)["member"] is True
+    send(client, "refund.created", {**part, "id": "rfnd_2", "amount": 3.99})
+    assert me(client, h)["member"] is False and whop["cancelled"] == ["mem_r"]
 
     h2 = signup(client, "dispute@example.com")
-    cus2 = join(client, h2)
-    send(client, "customer.subscription.created", {"id": "sub_d", "customer": cus2, "status": "active"})
-    send(client, "invoice.paid", invoice(cus2, datetime.utcnow() + timedelta(days=30)))
-    stripe_fake["charge_customer"] = cus2
-    send(client, "radar.early_fraud_warning.created", {"id": "issfr_1", "charge": "ch_2"})
-    assert me(client, h2)["member"] is False and stripe_fake["cancelled"][-1] == "sub_d"
+    pay_in(client, whop, h2, "mem_d", "pay_d")
+    send(client, "dispute.created", {"id": "dspt_1", "payment": {"id": "pay_d"}})
+    assert me(client, h2)["member"] is False and whop["cancelled"][-1] == "mem_d"
 
 
-def test_delete_account_cancels_the_subscription(client, stripe_fake):
+def test_delete_account_cancels_the_membership(client, whop):
     h = signup(client, "leaver@example.com", "password1")
-    cus = join(client, h)
-    uid = client.get(f"{API}/auth/me", headers=h).json()["id"]
-    send(client, "customer.subscription.created", {"id": "sub_l", "customer": cus, "status": "active"})
-    send(client, "invoice.paid", invoice(cus, datetime.utcnow() + timedelta(days=30), "in_leaver"))
+    uid, _ = pay_in(client, whop, h, "mem_l", "pay_leaver")
     r = client.post(f"{API}/auth/delete-account", headers=h, json={"password": "password1"})
-    assert r.status_code == 204 and stripe_fake["cancelled"] == ["sub_l"]
+    assert r.status_code == 204 and whop["cancelled"] == ["mem_l"]
     with SessionLocal() as db:
         assert db.get(User, uid) is None
-        p = db.query(Payment).filter(Payment.invoice_id == "in_leaver").one()
+        p = db.query(Payment).filter(Payment.invoice_id == "pay_leaver").one()
         assert p.user_id is None and p.billing_country == "DE"  # the financial record stays, without the person
+
+
+def test_whop_amounts_and_times():
+    assert billing._minor({"amount": "3.99", "decimals": 2}) == 399 and billing._minor(3.99) == 399
+    assert billing._minor(None) == 0 and billing._minor({"amount": "500", "decimals": 0}) == 500
+    assert billing._time("2026-08-01T00:00:00.000Z") == datetime(2026, 8, 1)
+    assert billing._time("2026-11-22T16:29:52+02:00") == datetime(2026, 11, 22, 14, 29, 52)
+
+
+def test_sandbox_is_for_test_accounts_only(client, whop, monkeypatch):
+    monkeypatch.setattr(config, "WHOP_SANDBOX", True)
+    monkeypatch.setattr(config, "WHOP_TESTERS", {"tester@example.com"})
+    join = {"terms": True, "start_now": True}
+    visitor, tester = signup(client, "public@example.com"), signup(client, "tester@example.com")
+    assert client.get(f"{API}/membership").json()["open"] is False
+    assert client.get(f"{API}/membership", headers=visitor).json()["open"] is False
+    assert client.post(f"{API}/membership/checkout", headers=visitor, json=join).status_code == 503
+    assert client.get(f"{API}/membership", headers=tester).json()["open"] is True
+    assert client.post(f"{API}/membership/checkout", headers=tester, json=join).status_code == 200
