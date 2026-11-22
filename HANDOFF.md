@@ -368,10 +368,18 @@ first month, so it must be 0 (3.99 there made the first charge 7.98); and Whop's
 top), so set `override_tax_type: "inclusive"` to keep 3.99 as what the member pays. Sandbox test 2026-11-22: join
 worked end to end (checkout, both webhook events, account page).
 
-**Still to do:** test in the sandbox (cancel, refund); create the live product, plan and webhook; set the
-live settings; move the paid features to `"member"` in `access.py` (custom bundles, staking, arbitrage; Sam also wants
-the free tier cut back everywhere except fixtures and results, picks included, details to agree); rewrite the
-Membership page copy. Key files `whop-*` in the repo root are git-ignored.
+**Live since 2026-11-22, limited to testers.** On the live Whop account: product `prod_ZJVPgFmb85ylz`
+("Football Predictions Membership"), plan `plan_7TItJQCPPEhrB` (GBP 3.99 every 30 days, tax inclusive, no joining
+fee), webhook `hook_P8ihGxHydlpfc`. The App Service has the live key, secret and plan, `WHOP_SANDBOX=off` and
+`WHOP_TESTERS` = Sam's own account, so **only that account can join; everyone else sees "Opening soon"**. A signed
+test delivery from live Whop was accepted. Sandbox (business "football-pred-analysis") passed join and cancel with
+a test card. A purchase made on Whop's own product page (no `metadata.user_id`) is matched by the buyer's email.
+Local files `whop-live.json` / `whop-sandbox.json` (git-ignored) hold the ids and webhook secrets.
+
+**To open to everyone:** empty `WHOP_TESTERS`. **Before that:** one real payment by a tester, then cancel; move
+the paid features to `"member"` in `access.py` (custom bundles, staking, arbitrage; Sam also wants the free tier cut
+back everywhere except fixtures and results, picks included, details to agree); rewrite the Membership page copy;
+Ivo to review `/terms`; swap the full-access key for a scoped one.
 
 ## Mr Predictions' welcome (built 2026-11-13)
 
