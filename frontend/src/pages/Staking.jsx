@@ -261,7 +261,13 @@ function PlanView({ data, hitRate, days }) {
         </div>
       </section>
 
-      <section>
+      {data.preview && (
+        <JoinCard row title="The run so far is for members">
+          You're seeing the live bundle and its stake. Members also get every bundle in this run and how the last one
+          ended.
+        </JoinCard>
+      )}
+      <section className={data.preview ? 'hidden' : ''}>
         <SectionHead title="This run" count={history.length || null} />
         {history.length === 0 ? (
           <p className="text-ink-soft">No bundle has settled in this run yet. A win ends the run and starts the next.</p>

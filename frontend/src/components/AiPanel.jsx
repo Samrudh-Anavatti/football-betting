@@ -115,7 +115,7 @@ function Prediction({ pred, fx, board, tips, onPick }) {
 
       {locked > 0 && (
         <JoinCard row title={`The AI suggests ${locked === 1 ? 'a bet' : `${locked} bets`} on this match`}>
-          The selection, the price to take, the stake and how confident it is. Free with an account.
+          The selection, the price to take, the stake and how confident it is. For members.
         </JoinCard>
       )}
       {a.suggested_bets.length > 0 && (

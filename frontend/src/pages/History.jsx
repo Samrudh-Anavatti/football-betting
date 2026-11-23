@@ -2,6 +2,8 @@ import { Link } from 'react-router-dom'
 import { Empty, ErrorNote, Loading, SectionHead } from '../components/ui.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { api } from '../lib/api.js'
+import { useAuth } from '../lib/auth.jsx'
+import SignUpWall from '../components/SignUpWall.jsx'
 import { odds, pct, pickLabel, shortDate, signed } from '../lib/format.js'
 import { matchPath } from '../lib/seo.js'
 
@@ -14,6 +16,18 @@ const RESULT = {
 // The record is a rolling window (the API's `days`, 14): four figures and the picks settled in it, newest first,
 // one line each. Older picks stay on their match pages.
 export default function History() {
+  const { user, checking } = useAuth()
+  if (checking) return <Loading />
+  if (!user)
+    return (
+      <SignUpWall heading="Our record" title="Every pick, won or lost">
+        Our picks from the last two weeks at the price we took, with the hit rate and the profit. Free with an account.
+      </SignUpWall>
+    )
+  return <Record />
+}
+
+function Record() {
   const tips = useApi(() => api.tips('settled', 500), [])
   const record = useApi(() => api.record(), [])
   const r = record.data

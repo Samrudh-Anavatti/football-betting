@@ -146,17 +146,13 @@ function ToolCard({ to, kicker, title, children, feature }) {
 // The open picks a visitor can't see yet: which matches they're on, and the way in.
 function LockedPicks({ locked }) {
   if (!locked?.length) return null
-  const names = locked.slice(0, 3).map((x) => `${x.fixture.home.name} v ${x.fixture.away.name}`)
   return (
     <div data-tour="locked" className="rounded-xl border-2 border-dashed border-ink/20 bg-paper/60 p-5 flex flex-col">
       <span className="grid h-9 w-9 place-items-center rounded-full bg-ink text-amber"><LockIcon className="h-4 w-4" /></span>
       <h3 className="mt-3 text-xl leading-tight">
         {locked.length} more pick{locked.length === 1 ? '' : 's'} open today
       </h3>
-      <p className="mt-1.5 text-sm text-ink-soft">
-        On {names.join(', ')}
-        {locked.length > names.length ? ` and ${locked.length - names.length} more` : ''}. Free with an account.
-      </p>
+      <p className="mt-1.5 text-sm text-ink-soft">The selection, the price and the thinking. Free with an account.</p>
       <JoinButtons className="mt-auto pt-4" />
     </div>
   )

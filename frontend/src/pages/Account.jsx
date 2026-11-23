@@ -75,18 +75,26 @@ function useJoined() {
 
 // What the account opens, as doors to each: the first thing a new account sees here.
 const INCLUDED = [
-  ['/tonight', "Tonight's bundles", "The AI's bundles for the matches you're watching"],
-  ['/staking', 'Staking plan', 'Our picks bundled at about 6.00, stakes worked out'],
-  ['/arbitrage', 'Arbitrage', 'Prices that add up to a profit'],
+  ['/', "Today's picks", 'Every open pick, with the price and the thinking'],
+  ['/tonight', "Tonight's bundles", "The AI's bundle of the day and its bundle for tonight"],
+  ['/staking', 'Staking plan', 'The live bundle and its stake'],
+  ['/arbitrage', 'Arbitrage', 'The best two open right now'],
+]
+const MEMBER_INCLUDED = [
   ['/', "Today's picks", "Every open pick, and the AI's suggested bets on each match"],
+  ['/tonight', "Tonight's bundles", "Your own bundles for the matches you're watching"],
+  ['/staking', 'Staking plan', 'The live bundle and every bundle in the run'],
+  ['/arbitrage', 'Arbitrage', 'Every price gap that adds up to a profit'],
 ]
 
 function IncludedCard() {
+  const { user } = useAuth()
+  const member = user.membership?.member
   return (
     <section className="panel p-6 space-y-4">
-      <h2 className="text-2xl">Your account includes</h2>
+      <h2 className="text-2xl">{member ? 'Your membership includes' : 'Your free account includes'}</h2>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {INCLUDED.map(([to, name, text]) => (
+        {(member ? MEMBER_INCLUDED : INCLUDED).map(([to, name, text]) => (
           <li key={to}>
             <Link to={to} className="block h-full rounded-lg bg-ink/[0.04] px-4 py-3 transition hover:bg-amber-light">
               <span className="font-display font-bold">{name}</span>

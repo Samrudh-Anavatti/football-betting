@@ -265,6 +265,38 @@ export default function Match() {
   const ctx = data.context
   const canPick = admin && fx.status === 'NS'
 
+  // A visitor: the teams, the score, the line-ups and any free pick. The rest needs a (free) account.
+  if (data.locked)
+    return (
+      <div className="space-y-6">
+        <Link to="/fixtures" className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft hover:text-ink transition-colors">
+          <span aria-hidden>‹</span> Back to fixtures
+        </Link>
+        <Header fx={fx} />
+        {data.tips.length > 0 && (
+          <section>
+            <h2 className="text-2xl mb-3">Our team's pick{data.tips.length > 1 ? 's' : ''}</h2>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {data.tips.map((t) => (
+                <TipCard key={t.id} tip={{ ...t, fixture: fx }} />
+              ))}
+            </div>
+          </section>
+        )}
+        <JoinCard title={data.has_ai ? "Prices, research and the AI's read" : 'Prices and research'}>
+          {data.locked_tips > 0 && `Our team has ${data.locked_tips === 1 ? 'a pick' : `${data.locked_tips} picks`} on this match. `}
+          Compare five bookmakers across every market, and see form, head-to-head and injuries
+          {data.has_ai ? ', with what the AI makes of the match' : ''}. Free with an account.
+        </JoinCard>
+        {(data.pitch?.home.start_xi?.length > 0 || data.pitch?.away.start_xi?.length > 0) && (
+          <section className="max-w-xl">
+            <h2 className="text-2xl mb-3">Line-ups</h2>
+            <PitchCard pitch={data.pitch} fx={fx} injuries={[]} />
+          </section>
+        )}
+      </div>
+    )
+
   return (
     <div className="space-y-6">
       <Link to="/fixtures" className="inline-flex items-center gap-1.5 text-sm font-semibold text-ink-soft hover:text-ink transition-colors">

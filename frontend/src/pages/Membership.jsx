@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { ErrorNote, Loading } from '../components/ui.jsx'
 import { api } from '../lib/api.js'
+import { MEMBER_PERKS } from '../lib/access.js'
 import { useAuth } from '../lib/auth.jsx'
 import { formatPrice } from '../lib/business.js'
 import { useMembershipInfo } from '../lib/membership.js'
@@ -57,7 +58,7 @@ function JoinPanel({ info }) {
     return (
       <div className="space-y-2 text-center">
         <p className="font-display text-xl font-bold">Opening soon</p>
-        <p className="text-ink-soft">Membership isn't open yet. Have a look at our free picks in the meantime.</p>
+        <p className="text-ink-soft">Membership isn't open yet. A free account opens every page in the meantime.</p>
       </div>
     )
   if (!user)
@@ -76,7 +77,7 @@ function JoinPanel({ info }) {
     return (
       <div className="space-y-3 text-center">
         <p className="font-display text-xl font-bold">You're a member</p>
-        <Link to="/staking" className="btn-primary w-full">Go to the staking plan</Link>
+        <Link to="/tonight" className="btn-primary w-full">Build tonight's bundles</Link>
         <Link to="/account" className={`text-sm ${linkCls}`}>Manage your membership</Link>
       </div>
     )
@@ -97,15 +98,18 @@ export default function Membership() {
           )}
         </div>
         <p>
-          Our picks and match analysis stay free. Members also get <strong>our staking plan</strong>: our picks
-          combined into one bet at odds of about 6.00, with a stake worked out after every loss so that the next win
-          pays back the whole run and still makes the profit.
+          A free account already opens every page: all of our picks, every match's prices and research, the bundle of
+          the day and a look at the tools. Membership takes the limits off.
         </p>
-        <ul className="list-disc pl-5 space-y-1.5">
-          <li>Each bundle as soon as we place it: the picks, the odds and the stake.</li>
-          <li>Every stake scaled to your own starting stake and bank.</li>
-          <li>The loss ladder, so you can see how far your bank goes before you start.</li>
-          <li>Every bundle we've placed, won or lost, on the record.</li>
+        <ul className="space-y-3">
+          {MEMBER_PERKS.map(([name, text]) => (
+            <li key={name} className="flex gap-3">
+              <span aria-hidden className="mt-1.5 h-2.5 w-2.5 shrink-0 rotate-[10deg] rounded-[2px] bg-amber" />
+              <p className="leading-snug">
+                <span className="font-display font-bold">{name}.</span> <span className="text-ink-soft">{text}</span>
+              </p>
+            </li>
+          ))}
         </ul>
         <p>
           Membership renews monthly until you cancel. Cancel from your account page whenever you like: you keep access

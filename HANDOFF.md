@@ -137,31 +137,31 @@ so the app used hash URLs (`/#/match/123`), and Google ignores everything after 
   `CLOUDFLARE_API_TOKEN=… CLOUDFLARE_ACCOUNT_ID=… npx wrangler@4.151.3 pages deploy dist --project-name football-predictions --branch main`
   from `frontend/`.
 
-## Site structure and access levels (2026-11-21)
-
-The site is organised by what a visitor is after, and a **free account** stands in for the paywall until a payment
-provider is chosen.
+## Site structure and access levels (three levels since 2026-11-23)
 
 **Three levels** (`backend/app/access.py`): a *visitor* (not signed in), an *account* (signed up, free) and a
-*member* (paying, or an admin). `FEATURES` there says which level each gated feature needs; today every one is
-`"account"`. **Putting a feature behind the paywall later = changing its line to `"member"`**, nothing else: the API
-enforces it (`deps.require("<feature>")`, 401 for a visitor, 403 for an account), `/auth/me` reports it as `access`,
-and the frontend's lock cards switch from "Join free" to "See membership" by themselves (`lib/access.js` `useCan`,
-`components/JoinCard.jsx`).
+*member* (paying through Whop, or an admin). `FEATURES` there says which level each gated feature needs. **Moving a
+feature between levels = changing its line there**: the API enforces it (`deps.require("<feature>")`, 401 for a
+visitor, 403 for an account), `/auth/me` reports it as `access`, and the frontend's lock cards switch from "Join
+free" to "See membership" by themselves (`lib/access.js` `useCan`, `components/JoinCard.jsx`).
 
-| Feature | Visitor | Account |
-|---|---|---|
-| `all_picks` | the 3 most confident open picks (`public.FREE_PICKS`); `/tips/locked` gives only the matches of the rest | every open pick |
-| `ai_bets` | the AI's read and probabilities; `bets_locked` says how many bets wait | the suggested bets |
-| `tonight` / `tonight_custom` | sessions and the record (public) | bundles; without `tonight_custom`, only the day's default request and its first bundle (`tonight.default_request`) |
-| `staking` | blurred sample | the plan |
-| `arbitrage` | blurred sample | the list (`GET /arbitrage`, the same scan as Admin → AI Lab) |
+| Page | Visitor | Account (free) | Member |
+|---|---|---|---|
+| Home | 3 most confident open picks (`public.FREE_PICKS`), bundle of the day, a "N more picks" card | every open pick | same |
+| Fixtures, Results | open | open | open |
+| Match page | teams, score, line-ups, a free pick if it is on this match (`locked: true`, `has_ai`) | + prices, research, standings, the AI's read (`match_detail`); AI bets counted in `bets_locked` | + the AI's suggested bets (`ai_bets`) |
+| Record (`/history`) | sign-up wall (frontend only: `/record` and `/tips` stay open, the home page uses them) | open | open |
+| Tonight (`/tonight`) | sign-up wall (frontend) | bundle of the day + the day's default request, first bundle (`tonight`) | any session, matches and target (`tonight_custom`) |
+| Staking (`/staking`) | blurred sample | plan, ladder, live bundle and stake (`staking`; `preview: true`, no history) | + the run so far (`staking_full`) |
+| Arbitrage | blurred sample | best `access.ARB_PREVIEW` (2), with `more` and `preview` (`arbitrage`) | the list (`arbitrage_full`) |
 
-* A pick is only ever hidden **until its match kicks off**; after that it is on the record for everyone. Settled
-  picks, the record, fixtures, results, prices and research are public, as before.
+* A pick is only ever hidden **until its match kicks off**; after that it is on the record.
 * Match titles for search engines (`/matches/{id}/meta`) only mention picks a visitor can see.
-* **No names:** bundle legs use `serialize.leg_tip_dict` (no `author`), since the staking plan and Tonight are no
-  longer team-only.
+* A whole page that needs an account uses `components/SignUpWall.jsx`. What each level adds, for the sign-up,
+  membership and account pages: `ACCOUNT_PERKS` / `MEMBER_PERKS` in `lib/access.js`, `INCLUDED` in `Account.jsx`.
+* **No names:** bundle legs use `serialize.leg_tip_dict` (no `author`).
+* Local check of each level: `.claude/launch.json` has `backend-local` (port 8000, scheduler off) and
+  `frontend-local-backend`; `python -m app.demo` refreshes the local data.
 
 **Nav** (`components/Shell.jsx`): Today (`/`), Matches (`/fixtures` + `/results`, tabs), Bundles (`/tonight` +
 `/staking`, tabs), Arbitrage (`/arbitrage`, "Arbs" on phones), Record (`/history`), then Sign in + an amber **Join
@@ -179,9 +179,8 @@ lists what the account includes; its Membership card stays hidden until membersh
 → the Join button), and on locked pages a second stop points at the lock card (`data-tour="locked"`). Right after
 signing up, a three-stop "you're in" tour of the header runs once (`queueWelcome` / `pendingWelcome`).
 
-**Still to decide / do:** the Membership page's copy still describes the staking plan as the paid feature (it is
-closed, unlinked and now `noindex`); rewrite it when the paywall's contents are chosen. Local testing: `.claude/
-launch.json` has two previews, the frontend on live data and on a local backend (`python -m app.demo`).
+**Still to do:** the home-page tour (`lib/tour.js`) and `/signup` copy were written for two levels; re-read them
+against the table above.
 
 ## The record is a rolling 14 days (2026-11-21)
 
@@ -376,10 +375,9 @@ test delivery from live Whop was accepted. Sandbox (business "football-pred-anal
 a test card. A purchase made on Whop's own product page (no `metadata.user_id`) is matched by the buyer's email.
 Local files `whop-live.json` / `whop-sandbox.json` (git-ignored) hold the ids and webhook secrets.
 
-**To open to everyone:** empty `WHOP_TESTERS`. **Before that:** one real payment by a tester, then cancel; move
-the paid features to `"member"` in `access.py` (custom bundles, staking, arbitrage; Sam also wants the free tier cut
-back everywhere except fixtures and results, picks included, details to agree); rewrite the Membership page copy;
-Ivo to review `/terms`; swap the full-access key for a scoped one.
+**To open to everyone:** empty `WHOP_TESTERS`. **Before that:** one real payment by a tester, then cancel; Ivo to
+review `/terms`; swap the full-access key for a scoped one. (The three access levels and the Membership page copy
+were done 2026-11-23.)
 
 ## Mr Predictions' welcome (built 2026-11-13)
 

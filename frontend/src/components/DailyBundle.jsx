@@ -173,7 +173,7 @@ export default function DailyBundle({ className = '' }) {
             </Link>
           ) : (
             <JoinCard row title="Want more than one bet?">
-              An account builds bundles for the matches you're watching, at Safer, Standard or Big night odds, with your own stake.
+              Members build bundles for the matches they're watching, at Safer, Standard or Big night odds, with their own stake.
             </JoinCard>
           )}
         </div>

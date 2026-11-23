@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import DailyBundle from '../components/DailyBundle.jsx'
 import JoinCard from '../components/JoinCard.jsx'
 import { SubNav } from '../components/Shell.jsx'
+import SignUpWall from '../components/SignUpWall.jsx'
 import { Empty, ErrorNote, LeagueBadge, Loading, Price, SectionHead } from '../components/ui.jsx'
 import { useApi } from '../hooks/useApi.js'
 import { useCan } from '../lib/access.js'
@@ -401,16 +402,23 @@ function TonightInner({ canBuild }) {
 }
 
 export default function Tonight() {
-  const { checking } = useAuth()
+  const { user, checking } = useAuth()
   const canBuild = useCan('tonight')
+  if (!checking && !user)
+    return (
+      <SignUpWall heading="Tonight's bundles" title="Bundles for tonight's matches">
+        The AI's bundle of the day with every leg explained, and its pick of bundle for tonight's matches. Free with
+        an account.
+      </SignUpWall>
+    )
   return (
     <div className="space-y-6">
       <div data-tour="tonight" className="space-y-4">
         <SubNav tabs={BUNDLE_TABS} />
         <h1 className="text-4xl sm:text-5xl leading-none">Tonight's bundles</h1>
         <p className="max-w-prose text-[17px] text-ink-soft leading-relaxed">
-          One bundle a day chosen by the AI from every match, free for everyone. Sitting down for a few matches?
-          Tick the ones you're watching and it builds up to three more from its surest calls on them.
+          One bundle a day chosen by the AI from every match. Sitting down for a few matches? Members tick the ones
+          they're watching and it builds up to three more from its surest calls on them.
         </p>
       </div>
       <section>

@@ -6,8 +6,8 @@ import { useCan } from '../lib/access.js'
 import { api } from '../lib/api.js'
 import { useAuth } from '../lib/auth.jsx'
 
-// The arbitrage list for accounts (the `arbitrage` feature). Without it: the page's shape under a blur, filled
-// with a made-up example, and the way in. The real list is never sent to a visitor.
+// The arbitrage list: an account gets the best two (the `arbitrage` feature), a member all of it. A visitor gets
+// the page's shape under a blur, filled with a made-up example, and the way in; the real list is never sent to them.
 
 const hoursFromNow = (h) => new Date(Date.now() + h * 3600e3).toISOString()
 const sampleFixture = (id, home, away, h) => ({
@@ -39,7 +39,17 @@ function Live() {
   const { data, error, loading } = useApi(() => api.arbitrage(), [])
   if (loading && !data) return <Loading rows={4} />
   if (error) return <ErrorNote error={error} />
-  return <ArbitrageView data={data} />
+  return (
+    <div className="space-y-5">
+      <ArbitrageView data={data} />
+      {data.preview && (
+        <JoinCard row title={data.more > 0 ? `${data.more} more open right now` : 'Members see every arbitrage'}>
+          {data.more > 0 ? "You're seeing the best two." : 'A free account shows the best two when any are open.'} Members get
+          the whole list as prices move.
+        </JoinCard>
+      )}
+    </div>
+  )
 }
 
 function Preview() {
