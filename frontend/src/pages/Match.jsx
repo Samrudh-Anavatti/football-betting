@@ -290,7 +290,6 @@ export default function Match() {
         </JoinCard>
         {(data.pitch?.home.start_xi?.length > 0 || data.pitch?.away.start_xi?.length > 0) && (
           <section className="max-w-xl">
-            <h2 className="text-2xl mb-3">Line-ups</h2>
             <PitchCard pitch={data.pitch} fx={fx} injuries={[]} />
           </section>
         )}
