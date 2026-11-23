@@ -133,6 +133,7 @@ def test_tonight_bundles(client, auth, fake, monkeypatch, night_fixtures):
 
 def test_tonight_access(client, monkeypatch):
     # The sessions and the record are the shop window; building bundles needs an account.
+    monkeypatch.setitem(access.FEATURES, "tonight_custom", "account")
     assert client.get(f"{API}/tonight/sessions").json()["custom"] is False
     assert client.get(f"{API}/tonight/record").status_code == 200
     body = {"session_at": KICKOFF.isoformat() + "Z", "fixture_ids": [1], "target": 6.0}

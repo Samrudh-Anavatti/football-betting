@@ -1,5 +1,5 @@
 """The staking plan and Ivo's bundle builder. Reading it needs the `staking` feature (see `access.FEATURES`) and
-gives the current run only; the full history (`/staking/full`) and every change are for admins."""
+gives the current run only (an account: just the live bundle); the full history (`/staking/full`) and every change are for admins."""
 import math
 from datetime import datetime
 
@@ -8,17 +8,23 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .. import access
 from ..database import get_db
 from ..deps import admin_user, require
-from ..models import Bundle, BundleLeg, Tip
+from ..models import Bundle, BundleLeg, Tip, User
 from ..services.staking import bundle_dict, get_plan, plan_bundles, plan_state, public_state, run_state, stake_for
 
 router = APIRouter(prefix="/staking", tags=["staking"])
 
 
-@router.get("", dependencies=[Depends(require("staking"))])
-def state(db: Session = Depends(get_db)):
-    return public_state(db)
+@router.get("")
+def state(db: Session = Depends(get_db), user: User = Depends(require("staking"))):
+    """An account gets the plan, the live bundle and its stake; the run so far is for members."""
+    out = public_state(db)
+    full = access.can(user, "staking_full")
+    if not full:
+        out["history"], out["previous_run"] = [], None
+    return {**out, "preview": not full}
 
 
 @router.get("/full", dependencies=[Depends(admin_user)])

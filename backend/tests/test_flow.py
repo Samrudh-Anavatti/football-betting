@@ -42,7 +42,7 @@ def test_full_flow(client, auth, fake):
     assert run["status"] == "ok" and run["requests_made"] == 8 + 2  # +2: early-season form top-up; 8 includes the previous XI
 
     # Before an API-Football pull the board falls back to The Odds API's snapshots.
-    m = client.get(f"{API}/matches/1001").json()
+    m = client.get(f"{API}/matches/1001", headers=auth).json()
     assert m["odds"]["source"] == "odds_api"
     one_x_two = m["odds"]["markets"][0]
     assert one_x_two["name"] == "Match Winner" and one_x_two["groups"][0]["selections"][0]["best_bookmaker"] == "Sky Bet"
@@ -114,7 +114,7 @@ def test_markets_board_and_any_market_pick(client, auth, fake):
     run = client.post(f"{API}/admin/sync/markets", json={"league_ids": [39]}, headers=auth).json()
     assert run["status"] == "ok" and run["items"] == 1 and run["requests_made"] == 1
 
-    m = client.get(f"{API}/matches/1001").json()
+    m = client.get(f"{API}/matches/1001", headers=auth).json()
     board = m["odds"]
     assert board["source"] == "api_football"
     assert board["bookmakers"] == ["Bet365", "William Hill"]  # 1xBet isn't one of ours
@@ -152,7 +152,7 @@ def test_lineups(client, auth, fake):
     client.post(f"{API}/admin/sync/fixtures", json={"league_ids": [39]}, headers=auth)
     run = client.post(f"{API}/admin/matches/1001/lineups", headers=auth).json()
     assert run["status"] == "ok"
-    assert client.get(f"{API}/matches/1001").json()["context"]["lineups"][0]["start_xi"] == ["Haaland (F)"]
+    assert client.get(f"{API}/matches/1001", headers=auth).json()["context"]["lineups"][0]["start_xi"] == ["Haaland (F)"]
 
 
 def test_pitch_card_previous_then_confirmed_xi(client, auth, fake):
@@ -164,7 +164,7 @@ def test_pitch_card_previous_then_confirmed_xi(client, auth, fake):
 
     client.post(f"{API}/admin/sync/fixtures", json={"league_ids": [39]}, headers=auth)
     client.post(f"{API}/admin/matches/1001/context", headers=auth)
-    m = client.get(f"{API}/matches/1001").json()
+    m = client.get(f"{API}/matches/1001", headers=auth).json()
     assert [i["player"] for i in m["context"]["injuries"]] == ["R. Dias"]  # duplicate dropped
     home, away = m["pitch"]["home"], m["pitch"]["away"]
     # City's previous match was fixture 1000; the fake has line-ups for City only.
@@ -179,7 +179,7 @@ def test_pitch_card_previous_then_confirmed_xi(client, auth, fake):
     assert fake.calls.count("/fixtures/lineups") == calls  # a finished match's XI is fetched once
 
     client.post(f"{API}/admin/matches/1001/lineups", headers=auth)
-    assert client.get(f"{API}/matches/1001").json()["pitch"]["home"]["source"] == "confirmed"
+    assert client.get(f"{API}/matches/1001", headers=auth).json()["pitch"]["home"]["source"] == "confirmed"
 
 
 def test_closing_price_is_stored_once_the_match_starts(client, auth):

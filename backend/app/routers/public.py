@@ -100,18 +100,25 @@ def match(fixture_id: int, db: Session = Depends(get_db), user: User | None = De
     if fx is None:
         raise HTTPException(404, "Match not found")
     rows = latest_snapshots(db, [fx.id]).get(fx.id, [])
-    board = match_board(db, fx.id)
     tips = list(db.scalars(select(Tip).where(Tip.fixture_id == fx.id, Tip.published.is_(True))))
     locked = tip_gate(db, user)
-    return {
+    out = {
         "fixture": fixture_dict(fx, best_1x2(rows)),
+        "tips": [public_tip(t, with_fixture=False) for t in tips if not locked(t)],
+        "locked_tips": sum(1 for t in tips if locked(t)),  # picks an account would see
+        "pitch": pitch_dict(db, fx),
+    }
+    if not access.can(user, "match_detail"):
+        # A visitor gets the teams, the score, the line-ups and any free pick; the rest is behind a free account.
+        pred = latest_prediction(db, fx)
+        return {**out, "locked": True, "has_ai": pred is not None}
+    board = match_board(db, fx.id)
+    return {
+        **out, "locked": False,
         "odds": {**board, "pulled_at": iso(board["pulled_at"])},
         "context": context_dict(db.get(MatchContext, fixture_id)),
         "standings": {"synced_at": iso(fx.league.standings_synced_at), "rows": _standing_rows(fx)},
-        "tips": [public_tip(t, with_fixture=False) for t in tips if not locked(t)],
-        "locked_tips": sum(1 for t in tips if locked(t)),  # picks an account would see
         "ai": ai_dict(latest_prediction(db, fx), fx, user),
-        "pitch": pitch_dict(db, fx),
     }
 
 
@@ -166,7 +173,7 @@ def latest_prediction(db: Session, fx: Fixture) -> AiPrediction | None:
 def ai_dict(pred: AiPrediction | None, fx: Fixture, user: User | None) -> dict | None:
     """Public view of an analysis: the read, probabilities and suggested bets. Read-only:
     nobody outside can start one, and the AI's tracked tips stay private. Until kick-off the suggested bets are
-    for accounts (`ai_bets`): a visitor gets the read and probabilities, and how many bets are waiting."""
+    for members (`ai_bets`): an account gets the read and probabilities, and how many bets are waiting."""
     if pred is None:
         return None
     analysis = json.loads(pred.analysis_json)

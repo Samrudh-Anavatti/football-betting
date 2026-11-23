@@ -9,6 +9,8 @@ from app import config
 from app.ai import client as ai_client
 from app.ai import service
 
+from .test_auth import signup  # noqa: E402
+
 API = "/api/v1"
 
 
@@ -182,11 +184,13 @@ def test_public_sees_the_latest_analysis(client, auth, fake, monkeypatch):
     assert client.get(f"{API}/featured").json() is None
     client.post(f"{API}/admin/sync/fixtures", json={"league_ids": [39]}, headers=auth)
     client.post(f"{API}/admin/sync/markets", json={"league_ids": [39]}, headers=auth)
-    assert client.get(f"{API}/matches/1001").json()["ai"] is None
+    reader = signup(client, "reader@example.com")
+    assert client.get(f"{API}/matches/1001", headers=reader).json()["ai"] is None
     client.post(f"{API}/admin/matches/1001/ai", headers=auth)
 
-    ai = client.get(f"{API}/matches/1001").json()["ai"]  # no login
-    # A visitor gets the read and probabilities; the suggested bets wait for an account until kick-off.
+    assert client.get(f"{API}/matches/1001").json()["has_ai"] is True  # no login: only that there is one
+    ai = client.get(f"{API}/matches/1001", headers=reader).json()["ai"]
+    # An account gets the read and probabilities; the suggested bets are for members until kick-off.
     assert ai["analysis"]["probabilities"]["home_win"] == 0.7
     assert ai["analysis"]["suggested_bets"] == [] and ai["bets_locked"] >= 1
     signed_in = client.get(f"{API}/matches/1001", headers=auth).json()["ai"]

@@ -52,7 +52,12 @@ def test_visitors_see_the_free_picks_only(client, auth, fake, pick_fixtures):
     m = client.get(f"{API}/matches/5001", headers=h).json()
     assert len(m["tips"]) == 1 and m["locked_tips"] == 0
     assert client.get(f"{API}/auth/me", headers=h).json()["access"] == {
-        "all_picks": True, "ai_bets": True, "tonight": True, "tonight_custom": True, "staking": True, "arbitrage": True}
+        "match_detail": True, "all_picks": True, "ai_bets": False, "tonight": True, "tonight_custom": False,
+        "staking": True, "staking_full": False, "arbitrage": True, "arbitrage_full": False}
+    # The match page: a visitor gets the basics, an account the prices, research and AI read too.
+    v = client.get(f"{API}/matches/5001").json()
+    assert v["locked"] is True and "odds" not in v and "context" not in v and "ai" not in v and "pitch" in v
+    assert m["locked"] is False and {"odds", "context", "standings", "ai", "pitch"} <= set(m)
 
     # Once a match has kicked off its pick is on the record for everyone, and the next one becomes free.
     with SessionLocal() as db:
@@ -62,11 +67,32 @@ def test_visitors_see_the_free_picks_only(client, auth, fake, pick_fixtures):
     assert len(client.get(f"{API}/matches/5001").json()["tips"]) == 1
 
 
-def test_accounts_get_the_staking_plan_and_arbitrage(client):
+def test_accounts_get_a_preview_of_staking_and_arbitrage(client):
     assert client.get(f"{API}/staking").status_code == 401
     assert client.get(f"{API}/arbitrage").status_code == 401
     h = signup(client, "tools@example.com")
     assert client.get(f"{API}/staking", headers=h).status_code == 200
+    assert client.get(f"{API}/staking", headers=h).json()["preview"] is True
     r = client.get(f"{API}/arbitrage", headers=h)
-    assert r.status_code == 200 and set(r.json()) == {"scanned_at", "live"}
+    assert r.status_code == 200 and set(r.json()) == {"scanned_at", "live", "more", "preview"} and r.json()["preview"]
     assert client.get(f"{API}/admin/ai-lab/arbs", headers=h).status_code == 403  # the lab itself stays the team's
+
+
+def test_previews_for_accounts_and_all_of_it_for_members(client, auth, monkeypatch):
+    """An account sees the best two arbitrages and the live bundle; a member (here an admin) the rest too."""
+    from app.routers import arbitrage as arb_router
+    from app.routers import staking as staking_router
+
+    rows = [{"id": i, "profit": 0.05 - i / 1000} for i in range(5)]
+    monkeypatch.setattr(arb_router.arbitrage, "overview", lambda db: {"scanned_at": None, "live": list(rows)})
+    monkeypatch.setattr(staking_router, "public_state", lambda db: {
+        "plan": {}, "run": {}, "current": {"id": 1}, "history": [{"id": 2}], "previous_run": {"number": 1}})
+    h = signup(client, "preview@example.com")
+    a = client.get(f"{API}/arbitrage", headers=h).json()
+    assert [x["id"] for x in a["live"]] == [0, 1] and a["more"] == 3 and a["preview"] is True
+    s = client.get(f"{API}/staking", headers=h).json()
+    assert s["current"] == {"id": 1} and s["history"] == [] and s["previous_run"] is None and s["preview"] is True
+    a = client.get(f"{API}/arbitrage", headers=auth).json()
+    assert len(a["live"]) == 5 and a["more"] == 0 and a["preview"] is False
+    s = client.get(f"{API}/staking", headers=auth).json()
+    assert s["history"] == [{"id": 2}] and s["previous_run"] == {"number": 1} and s["preview"] is False
