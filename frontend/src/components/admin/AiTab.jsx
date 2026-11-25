@@ -188,8 +188,21 @@ function DailySpend() {
     setBusy(true)
     setMessage(null)
     try {
-      await api.dailyBuild()
-      setMessage("Asked for today's bundle; it takes a minute or two. Reload to see the call below.")
+      let run = await api.dailyBuild()
+      setMessage("Asked for today's bundle. The AI is working on it; this takes a minute or two.")
+      // Follow the job to its end and say what came of it, so a quiet "nothing to build" isn't mistaken for a fault.
+      for (let i = 0; i < 100 && run.status === 'running'; i++) {
+        await new Promise((r) => setTimeout(r, 3000))
+        run = await api.syncRun(run.id)
+      }
+      const d = run.details || {}
+      setMessage(
+        run.status === 'running' ? 'Still working after five minutes. Reload in a while to see the call below.'
+          : d.status === 'bundle' ? `Built by ${d.model}${d.cost_usd != null ? ` for $${d.cost_usd.toFixed(3)}` : ''}. It is on the home page now.`
+          : d.status === 'thin' ? `Nothing built: ${d.message}. A bundle needs at least three legs on two matches that kick off 45 minutes or more from now, before 05:00 UTC.`
+          : d.status === 'no_bundle' ? `The AI chose not to make one today: ${d.message}`
+          : `It failed: ${d.message || run.message || 'no reason given'}`,
+      )
     } catch (e) {
       setMessage(e.message)
     }
@@ -200,9 +213,11 @@ function DailySpend() {
     <section className="panel px-5 py-4 space-y-4">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-xl">AI budgets this month</h2>
-        <button type="button" onClick={build} disabled={busy} className="btn-ghost ml-auto text-sm">Build today's bundle now</button>
+        <button type="button" onClick={build} disabled={busy} className="btn-ghost ml-auto text-sm">
+          {busy ? 'Working on it…' : "Build today's bundle now"}
+        </button>
       </div>
-      {message && <p className="text-sm text-ink-soft">{message}</p>}
+      {message && <p role="status" className="rounded-lg bg-amber-light/70 px-3 py-2 text-sm">{message}</p>}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <Meter name="Claude" s={data.spend.claude} note="Picks the bundle of the day. Limit: CLAUDE_MONTHLY_BUDGET_USD; key: ANTHROPIC_API_KEY." />
         <Meter name="Luna" s={data.spend.luna} note="Match reports, and the bundle of the day when Claude can't. Limit: AI_MONTHLY_BUDGET_USD." />
