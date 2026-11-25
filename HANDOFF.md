@@ -317,7 +317,8 @@ starts a new run at the base stake.
 Members pay monthly through **Whop** (account "Pibu Ltd", `biz_gIFT5GdQnJvoTa`, Ivo's company; Sam is on the team).
 The Stripe build of 2026-11-11 was never switched on (Ivo expected Stripe to close a betting-tips account) and its
 calls were replaced on 2026-11-22; Whop's policy allows "information, analysis, picks, or other advisory services
-related to gambling or sports betting" in writing. Price: **GBP 3.99 a month**, monthly only.
+related to gambling or sports betting" in writing. Price: **GBP 7.99 a month** since 2026-11-25 (3.99 before),
+monthly only.
 
 Code: `services/billing.py` (everything Whop), `routers/membership.py`, pages `Membership.jsx`, `Terms.jsx`, the
 account page's card, Admin -> Members. No SDK: plain `httpx` calls and our own signature check. While
@@ -382,6 +383,10 @@ fee), webhook `hook_P8ihGxHydlpfc`. The App Service has the live key, secret and
 test delivery from live Whop was accepted. Sandbox (business "football-pred-analysis") passed join and cancel with
 a test card. A purchase made on Whop's own product page (no `metadata.user_id`) is matched by the buyer's email.
 Local files `whop-live.json` / `whop-sandbox.json` (git-ignored) hold the ids and webhook secrets.
+
+**Price change 2026-11-25:** a new plan `plan_ecYbg5MF81D3L` at GBP 7.99 replaced `plan_7TItJQCPPEhrB` (3.99) as
+`WHOP_PLAN_ID`; the old plan is hidden, not deleted, so the one member on it keeps renewing at 3.99 (the terms promise
+30 days' notice of a rise). A price change = a new plan + `WHOP_PLAN_ID`; the pages read the price from Whop.
 
 **Still open:** Ivo to review `/terms` (a draft that paying members now agree to); swap the full-access key for a
 scoped one. (The three access levels and the Membership page copy
