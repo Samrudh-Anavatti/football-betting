@@ -26,3 +26,6 @@ Thumbs.db
 
 # Whop API key (never commit)
 whop-*
+
+# Anthropic API key (never commit)
+anthropic-api-key*
