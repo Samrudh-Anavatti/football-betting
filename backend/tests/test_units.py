@@ -133,3 +133,19 @@ def test_board_is_stored_again_when_the_bookmakers_change(client, monkeypatch):
             assert db.query(OddsSnapshot).filter_by(fixture_id=fid).count() == rows
         finally:
             db.rollback()
+
+
+def test_quarter_lines_settle_when_both_halves_agree():
+    """Under 4.25 is half on Under 4 and half on Under 4.5: one goal wins both, four goals wins one and pushes one."""
+    from app.services.settlement import market_outcome as out
+
+    assert out("Goal Line", "Under 4.25", 1, 0, 0, 0) == "won"
+    assert out("Goal Line", "Under 4.25", 3, 2, 0, 0) == "lost"
+    assert out("Goal Line", "Under 4.25", 2, 2, 0, 0) is None  # half win: by hand
+    assert out("Goal Line", "Over 2.75", 2, 2, 0, 0) == "won"
+    assert out("Goal Line", "Over 2.75", 2, 1, 0, 0) is None  # half loss: by hand
+    assert out("Goal Line", "Over 2.75", 1, 1, 0, 0) == "lost"
+    assert out("Asian Handicap", "Home -0.25", 2, 0, 0, 0) == "won"
+    assert out("Asian Handicap", "Home -0.25", 1, 1, 0, 0) is None  # half loss: by hand
+    assert out("Asian Handicap", "Away +0.75", 3, 0, 0, 0) == "lost"
+    assert out("Asian Handicap", "Away -0.25", 1, 1, 0, 0) is None  # the line is the home team's: half win, by hand

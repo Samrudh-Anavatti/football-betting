@@ -243,6 +243,11 @@ sessions, targets, ticking matches and a custom stake stay behind the account.
   `az webapp config appsettings set -g rg-football-betting -n <app name> --settings ANTHROPIC_API_KEY=<key>`.
   Until then Luna makes the bundle.
 
+**Settling (2026-11-25).** Quarter lines (Under 4.25, Home -0.25) settle on their own when both half bets go the same
+way; a half win or half loss stays pending for settling by hand (`settlement._ou`, `_asian`). By hand: Admin -> AI has
+the latest bundle of the day with a status box per leg (the same `POST /admin/tips/{id}/settle` the Picks tab and the
+AI Lab use); the bundle and the next stake follow the legs. A deploy re-runs settlement over everything pending.
+
 ## Bookmakers (changed 2026-11-21)
 
 **Bet365, William Hill, Betfair, BetVictor, Betano** (`ODDS_BOOKMAKERS` 8,7,3,36,32). Betano replaced Pinnacle,

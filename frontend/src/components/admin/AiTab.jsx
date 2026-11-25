@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useApi } from '../../hooks/useApi.js'
 import { api } from '../../lib/api.js'
-import { ago, pct, shortDate, signed } from '../../lib/format.js'
+import { ago, odds, pct, pickLabel, shortDate, signed } from '../../lib/format.js'
 import { runSummary } from '../RunStatus.jsx'
 import { Empty, ErrorNote, Loading } from '../ui.jsx'
 import { matchPath } from '../../lib/seo.js'
@@ -87,6 +87,69 @@ function Scores({ scores }) {
           {row('Both teams score', scores.btts)}
         </tbody>
       </table>
+    </section>
+  )
+}
+
+// The latest bundle of the day, leg by leg, with the same by-hand settling the Picks tab has: for a leg the
+// automatic settlement can't decide (a half win on a quarter line, a match the feed never finished). The bundle
+// and the run's next stake are worked out again from the legs as they then stand.
+function DailySettle() {
+  const { data, error, reload } = useApi(() => api.daily(), [])
+  const [busy, setBusy] = useState(false)
+  const [failed, setFailed] = useState(null)
+  if (error) return <ErrorNote error={error} />
+  const b = data?.bundle
+  if (!b) return null
+  const settle = async (tipId, status) => {
+    setBusy(true)
+    setFailed(null)
+    try {
+      await api.settleTip(tipId, status)
+      await reload()
+    } catch (e) {
+      setFailed(e)
+    } finally {
+      setBusy(false)
+    }
+  }
+  return (
+    <section className="panel px-5 py-4 space-y-3">
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <h2 className="text-xl">Bundle of the day, {shortDate(b.day)}</h2>
+        <span className="text-sm text-ink-soft">
+          {b.status === 'pending' ? 'Waiting on its legs' : `Settled: ${b.status}`} · odds <span className="num">{odds(b.odds)}</span>
+        </span>
+      </div>
+      <p className="text-sm text-ink-soft">
+        Legs settle on their own at full time. Set one by hand here if it is stuck; the bundle follows its legs.
+      </p>
+      <ErrorNote error={failed} />
+      <ul className="divide-y divide-ink/10">
+        {b.legs.map((leg) => (
+          <li key={leg.tip_id} className="flex flex-wrap items-center gap-x-4 gap-y-1 py-2 text-sm">
+            <Link to={matchPath(leg.tip.fixture)} className="min-w-0 flex-1 basis-56 hover:underline">
+              <span className="font-semibold">{leg.tip.fixture.home.name} v {leg.tip.fixture.away.name}</span>
+              <span className="block text-ink-soft">
+                {pickLabel(leg.tip, leg.tip.fixture)} at <span className="num">{odds(leg.odds)}</span>
+                {leg.tip.fixture.home_goals != null && ` · finished ${leg.tip.fixture.home_goals}–${leg.tip.fixture.away_goals}`}
+              </span>
+            </Link>
+            <select
+              className="input py-1 w-auto"
+              value={leg.tip.status}
+              disabled={busy}
+              aria-label={`Settle ${leg.tip.fixture.home.name} v ${leg.tip.fixture.away.name} by hand`}
+              onChange={(e) => settle(leg.tip_id, e.target.value)}
+            >
+              <option value="pending">Pending</option>
+              <option value="won">Won</option>
+              <option value="lost">Lost</option>
+              <option value="void">Void</option>
+            </select>
+          </li>
+        ))}
+      </ul>
     </section>
   )
 }
@@ -176,6 +239,7 @@ export default function AiTab() {
 
   return (
     <div className="space-y-6">
+      <DailySettle />
       <DailySpend />
       <section className="panel px-5 py-4 space-y-2">
         <div className="flex flex-wrap items-end gap-x-4 gap-y-1">

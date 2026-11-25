@@ -49,7 +49,9 @@ def _res(h: int, a: int) -> str:
 
 
 def _ou(total: int, side: str, line: float | None) -> str | None:
-    if line is None or side not in ("Over", "Under") or line * 4 % 2 == 1:
+    """A quarter line (2.25, 2.75) is two half bets on the lines either side of it: it settles here when both go
+    the same way, and is left for settling by hand when the total lands on one of them (a half win or half loss)."""
+    if line is None or side not in ("Over", "Under") or (line * 4 % 2 == 1 and abs(total - line) < 0.5):
         return None
     if total == line:
         return "void"
@@ -86,13 +88,16 @@ def _european(v: str, h: int, a: int) -> str | None:
 
 
 def _asian(v: str, h: int, a: int) -> str | None:
-    """The line is the home team's. Quarter lines (half win/loss) are settled by hand."""
+    """The line is the home team's. A quarter line settles here when both of its half bets go the same way; a half
+    win or half loss is settled by hand."""
     from .markets import parse_value
 
     side, line = parse_value(v)
-    if side not in ("Home", "Away") or line is None or line * 4 % 2 == 1:
+    if side not in ("Home", "Away") or line is None:
         return None
     diff = h + line - a
+    if line * 4 % 2 == 1 and abs(diff) < 0.5:
+        return None
     if diff == 0:
         return "void"
     return _wl((side == "Home") == (diff > 0))
